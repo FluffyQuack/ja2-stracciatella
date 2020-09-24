@@ -2132,7 +2132,7 @@ void SaveStrategicAI(HWFILE const hFile)
 	FileWrite(hFile, &gfUseAlternateQueenPosition,        1);
 	FileWrite(hFile, gbPadding,           SAI_PADDING_BYTES);
 	//Save the army composition (which does get modified)
-	FileWrite(hFile, gArmyComp.data(), gArmyComp.size() * sizeof(ARMY_COMPOSITION));
+	if (!gArmyComp.empty()) FileWrite(hFile, gArmyComp.data(), gArmyComp.size() * sizeof(ARMY_COMPOSITION));
 	i = SAVED_ARMY_COMPOSITIONS - gArmyComp.size();
 	while( i-- )
 	{
@@ -2153,9 +2153,9 @@ void SaveStrategicAI(HWFILE const hFile)
 		FileWrite(hFile, &gEmptyGarrisonGroup, sizeof(GARRISON_GROUP));
 	}
 
-	FileWrite(hFile, gubPatrolReinforcementsDenied, gPatrolGroup.size());
+	if (!gPatrolGroup.empty()) FileWrite(hFile, gubPatrolReinforcementsDenied, gPatrolGroup.size());
 
-	FileWrite(hFile, gubGarrisonReinforcementsDenied, gGarrisonGroup.size());
+	if (!gGarrisonGroup.empty()) FileWrite(hFile, gubGarrisonReinforcementsDenied, gGarrisonGroup.size());
 }
 
 
@@ -2235,7 +2235,7 @@ void LoadStrategicAI(HWFILE const hFile)
 		gubPatrolReinforcementsDenied = NULL;
 	}
 	gubPatrolReinforcementsDenied = new UINT8[iPatrolArraySize]{};
-	FileRead(hFile, gubPatrolReinforcementsDenied, iPatrolArraySize);
+	if (iPatrolArraySize) FileRead(hFile, gubPatrolReinforcementsDenied, iPatrolArraySize);
 
 	//Load the list of reinforcement garrison points.
 	if( gubGarrisonReinforcementsDenied )
@@ -2244,7 +2244,7 @@ void LoadStrategicAI(HWFILE const hFile)
 		gubGarrisonReinforcementsDenied = NULL;
 	}
 	gubGarrisonReinforcementsDenied = new UINT8[iGarrisonArraySize]{};
-	FileRead(hFile, gubGarrisonReinforcementsDenied, iGarrisonArraySize);
+	if (iGarrisonArraySize) FileRead(hFile, gubGarrisonReinforcementsDenied, iGarrisonArraySize);
 
 	if( ubSAIVersion < 6 )
 	{ //Reinitialize the costs since they have changed.
