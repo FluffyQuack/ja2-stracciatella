@@ -1203,7 +1203,7 @@ UINT8 CurrentPlayerProgressPercentage(void)
 	uiPossibleIncome = CalcMaxPlayerIncomeFromMines();
 
 	// either of these indicates a critical failure of some sort
-	Assert(uiPossibleIncome > 0);
+	//Assert(uiPossibleIncome > 0);
 	Assert(uiCurrentIncome <= uiPossibleIncome);
 
 	// for a rough guess as to how well the player is doing,
