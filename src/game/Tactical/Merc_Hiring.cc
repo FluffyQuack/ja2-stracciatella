@@ -274,6 +274,7 @@ void MercArrivesCallback(SOLDIERTYPE& s)
 		// ( which means we are at beginning of game if so )
 		// Setup chopper....
 		if (s.ubStrategicInsertionCode != INSERTION_CODE_CHOPPER &&
+			s.ubStrategicInsertionCode != INSERTION_CODE_GRIDNO &&
 				SECTOR(s.sSectorX, s.sSectorY) == START_SECTOR)
 		{
 			gfTacticalDoHeliRun = TRUE;
