@@ -21,6 +21,7 @@ struct SOLDIERTYPE;
     \brief An structure element on the tactical map */
 struct STRUCTURE;
 
+struct STRATEGICEVENT;
 /**
  * @defgroup observables Observables
  * @brief Register listeners on these observables to receive callbacks when somemthing happens in game.
@@ -65,6 +66,19 @@ extern Observable<INT16, INT16, INT8, INT16, STRUCTURE*, UINT32, BOOLEAN_S*> Bef
   * @ingroup observables
   */
 extern Observable<INT16, INT16, INT8, INT16, STRUCTURE*, UINT8, BOOLEAN> OnStructureDamaged;
+extern Observable<> OnEnterTacticalScreen;
+extern Observable<> OnHandleStrategicScreen;
+extern Observable<> OnInitNewCampaign;
+extern Observable<SOLDIERTYPE*> OnMercHired;
+extern Observable<STRATEGICEVENT*, BOOLEAN_S*> OnStrategicEvent;
+extern Observable<UINT8_S*> OnCalcPlayerProgress;
+extern Observable<BOOLEAN_S*> OnTimeCompressDisallowed;
+extern Observable<UINT32, BOOLEAN_S*> OnCheckQuests;
+extern Observable<UINT8, INT16, INT16, BOOLEAN> OnQuestEnded;
+extern Observable<UINT8, UINT16, UINT8, BOOLEAN_S*> OnNPCDoAction;
+extern Observable<INT16, INT16, INT8> OnEnterSector;
+extern Observable<INT32, INT32, INT32, UINT8, BOOLEAN, INT32, UINT32, BOOLEAN_S*> OnAddEmail;
+extern Observable<SOLDIERTYPE*, OBJECTTYPE*, INT16, INT8> OnSoldierGotItem;
 
 /**
  * @defgroup funclib-general General 
@@ -88,6 +102,8 @@ void JA2Require(std::string scriptFileName);
  * @ingroup funclib-sectors
  */
 std::string GetCurrentSector();
+
+std::tuple<int, int, int> GetCurrentSectorLoc();
 
 /**
  * Returns a pointer to the SECTOR_INFO of the specified sector. Does not work for underground sectors.

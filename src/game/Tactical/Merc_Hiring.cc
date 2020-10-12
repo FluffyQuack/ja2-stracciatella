@@ -42,6 +42,7 @@
 #include "Map_Screen_Interface_Bottom.h"
 #include "Quests.h"
 #include "Logger.h"
+#include "Observable.h"
 
 #include <string_theory/string>
 
@@ -55,6 +56,8 @@ extern BOOLEAN gfFirstHeliRun;
 // Default to start sector
 // Saved in general saved game structure
 INT16 g_merc_arrive_sector = START_SECTOR;
+
+Observable<SOLDIERTYPE*> OnMercHired = {};
 
 void CreateSpecialItem(SOLDIERTYPE* const s, UINT16 item)
 {
@@ -222,6 +225,8 @@ INT8 HireMerc(MERC_HIRE_STRUCT& h)
 
 	// remove the merc from the Personnel screens departed list (if they have never been hired before, its ok to call it)
 	RemoveNewlyHiredMercFromPersonnelDepartedList(s->ubProfile);
+
+	OnMercHired(s);
 
 	gfAtLeastOneMercWasHired = TRUE;
 	return MERC_HIRE_OK;

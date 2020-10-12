@@ -292,7 +292,7 @@ static std::function<void(A...)> wrap(std::string luaFunc)
 	};
 }
 
-static void _RegisterListener(std::string observable, std::string luaFunc, ST::string key)
+static void _RegisterListener(const std::string& observable, const std::string& luaFunc, const ST::string& key)
 {
 	if (isLuaInitialized)
 	{
@@ -303,7 +303,20 @@ static void _RegisterListener(std::string observable, std::string luaFunc, ST::s
 	else if (observable == "BeforeStructureDamaged")     BeforeStructureDamaged.addListener(key, wrap<INT16, INT16, INT8, INT16, STRUCTURE*, UINT32, BOOLEAN_S*>(luaFunc));
 	else if (observable == "OnAirspaceControlUpdated")   OnAirspaceControlUpdated.addListener(key, wrap<>(luaFunc));
 	else if (observable == "BeforePrepareSector")        BeforePrepareSector.addListener(key, wrap<>(luaFunc));
+	else if (observable == "OnEnterSector")              OnEnterSector.addListener(key, wrap<INT16,INT16,INT8>(luaFunc));
 	else if (observable == "OnSoldierCreated")           OnSoldierCreated.addListener(key, wrap<SOLDIERTYPE*>(luaFunc));
+	else if (observable == "OnSoldierGotItem")           OnSoldierGotItem.addListener(key, wrap<SOLDIERTYPE*, OBJECTTYPE*, INT16, INT8>(luaFunc));
+	else if (observable == "OnInitNewCampaign")          OnInitNewCampaign.addListener(key, wrap<>(luaFunc));
+	else if (observable == "OnMercHired")                OnMercHired.addListener(key, wrap<SOLDIERTYPE*>(luaFunc));
+	else if (observable == "OnEnterTacticalScreen")      OnEnterTacticalScreen.addListener(key, wrap<>(luaFunc));
+	else if (observable == "OnHandleStrategicScreen")    OnHandleStrategicScreen.addListener(key, wrap<>(luaFunc));
+	else if (observable == "OnStrategicEvent")           OnStrategicEvent.addListener(key, wrap<STRATEGICEVENT*, BOOLEAN_S*>(luaFunc));
+	else if (observable == "OnCalcPlayerProgress")       OnCalcPlayerProgress.addListener(key, wrap<UINT8_S*>(luaFunc));
+	else if (observable == "OnTimeCompressDisallowed")   OnTimeCompressDisallowed.addListener(key, wrap<BOOLEAN_S*>(luaFunc));
+	else if (observable == "OnCheckQuests")              OnCheckQuests.addListener(key, wrap<UINT32, BOOLEAN_S*>(luaFunc));
+	else if (observable == "OnQuestEnded")               OnQuestEnded.addListener(key, wrap<UINT8, INT16, INT16, BOOLEAN>(luaFunc));
+	else if (observable == "OnNPCDoAction")              OnNPCDoAction.addListener(key, wrap<UINT8, UINT16, UINT8, BOOLEAN_S*>(luaFunc));
+	else if (observable == "OnAddEmail")                 OnAddEmail.addListener(key, wrap<INT32, INT32, INT32, UINT8, BOOLEAN, INT32, UINT32, BOOLEAN_S*>(luaFunc));
 	else {
 		ST::string err = ST::format("There is no observable named '{}'", observable);
 		throw std::logic_error(err.to_std_string());
