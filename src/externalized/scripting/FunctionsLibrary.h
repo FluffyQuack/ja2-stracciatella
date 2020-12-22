@@ -3,7 +3,10 @@
 #include "Facts.h"
 #include "Types.h"
 #include "Observable.h"
+#include "SaveLoadGameStates.h"
 #include <vector>
+
+typedef std::map<PRIMITIVE_VALUE, PRIMITIVE_VALUE> GameStatesMap;
 
 /*! \file FunctionsLibrary.h */
 
@@ -183,6 +186,16 @@ extern Observable<SOLDIERTYPE*, OBJECTTYPE*, INT16, INT8> OnSoldierGotItem;
  */
 
 /**
+ * When the game about to be saved. This is the place to persist mod game states.
+ */
+extern Observable<> BeforeGameSaved;
+
+/**
+ * Right after a game is loaded. This is the place to restore game states from a saved game.
+ */
+extern Observable<> OnGameLoaded;
+
+/**
  * Loads the specified script file into Lua space. The file is loaded via the VFS sub-system.
  * This function can only be used during initialization.
  * @param scriptFileName the name to the lua script file, e.g. enums.lua
@@ -319,3 +332,18 @@ void AddEveryDayStrategicEvent_(UINT8 ubCallbackID, UINT32  uiStartMin, UINT32 u
 void AddStrategicEvent_(UINT8 ubCallbackID, UINT32 uiMinStamp, UINT32);
 
 UINT32 GetWorldTotalMin();
+
+/**
+ * Retrieves a key-value mapping from saved game states.
+ * @param key provide a unique key so it will not clash with other mods
+ * @return
+ */
+GameStatesMap GetGameStates(const ST::string& key);
+
+/**
+ * Copies the key-value mapping into the game states. Game states are
+ * persisted in game saves, and can be retrieved with GetGameStates.
+ * @param key provide a unique key so it will not clash with other mods
+ * @param states a map of primitive types (string, numeric or boolean)
+ */
+void SetGameStates(const ST::string& key, GameStatesMap states);

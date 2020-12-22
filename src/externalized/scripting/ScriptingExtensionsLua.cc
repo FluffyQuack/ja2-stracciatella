@@ -336,6 +336,9 @@ static void RegisterGlobals()
 	lua.set_function("TriggerNPCRecord", TriggerNPCRecord);
 	lua.set_function("StrategicNPCDialogue", StrategicNPCDialogue);
 
+	lua.set_function("GetGameStates", GetGameStates);
+	lua.set_function("SetGameStates", SetGameStates);
+
 	lua.set_function("JA2Require", JA2Require);
 	lua.set_function("require",  []() { throw std::logic_error("require is not allowed. Use JA2Require instead"); });
 	lua.set_function("dofile",   []() { throw std::logic_error("dofile is not allowed. Use JA2Require instead"); });
@@ -430,6 +433,8 @@ static void _RegisterListener(const std::string& observable, const std::string& 
 	else if (observable == "OnQuestEnded")               OnQuestEnded.addListener(key, wrap<UINT8, INT16, INT16, BOOLEAN>(luaFunc));
 	else if (observable == "OnNPCDoAction")              OnNPCDoAction.addListener(key, wrap<UINT8, UINT16, UINT8, BOOLEAN_S*>(luaFunc));
 	else if (observable == "OnAddEmail")                 OnAddEmail.addListener(key, wrap<INT32, INT32, INT32, UINT8, BOOLEAN, INT32, UINT32, BOOLEAN_S*>(luaFunc));
+	else if (observable == "BeforeGameSaved")            BeforeGameSaved.addListener(key, wrap<>(luaFunc));
+	else if (observable == "OnGameLoaded")               OnGameLoaded.addListener(key, wrap<>(luaFunc));
 	else {
 		ST::string err = ST::format("There is no observable named '{}'", observable);
 		throw std::logic_error(err.to_std_string());

@@ -156,3 +156,21 @@ void EndQuest_(UINT8 const ubQuestID, const std::string sectorID)
 	}
 	EndQuest(ubQuestID, x, y);
 }
+
+GameStatesMap GetGameStates(const ST::string& key)
+{
+	auto k = ST::format("scripts:{}", key);
+	if (g_gameStates.HasKey(k))
+	{
+		return g_gameStates.Get<GameStatesMap>(k);
+	}
+	return GameStatesMap{};
+}
+
+void SetGameStates(const ST::string& key, GameStatesMap states)
+{
+	if (!states.empty())
+	{
+		g_gameStates.Set(ST::format("scripts:{}", key), states);
+	}
+}
