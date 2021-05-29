@@ -1922,7 +1922,7 @@ static void DisplayLoadPending(void)
 		iUnitTime = UNIT_TIME;
 	}
 
-	// Adjust loading speed based on config var
+	//Fluffy (UpgradeFromDialUp): Adjust loading speed based on config var
 	iUnitTime *= gamepolicy(website_loading_speed_scale);
 
 	iUnitTime += WWaitDelayIncreasedIfRaining(iUnitTime);
