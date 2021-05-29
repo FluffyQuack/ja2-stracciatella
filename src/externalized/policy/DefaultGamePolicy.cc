@@ -48,6 +48,7 @@ DefaultGamePolicy::DefaultGamePolicy(rapidjson::Document *json)
 	chance_to_hit_minimum = gp.getOptionalInt("chance_to_hit_minimum", 1);
 
 	always_show_cursor_in_tactical = gp.getOptionalBool("always_show_cursor_in_tactical", false); //Fluffy (ForeverMouseCursor)
+	website_loading_speed_scale = gp.getOptionalDouble("website_loading_speed_scale", 1.0); //Fluffy (UpgradeFromDialUp)
 
 	JsonObjectReader imp = JsonObjectReader(gp.GetValue("imp"));
 	imp_load_saved_merc_by_nickname = imp.getOptionalBool("load_saved_merc_by_nickname");

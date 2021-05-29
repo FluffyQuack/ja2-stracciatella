@@ -36,10 +36,12 @@
 #include "BobbyRUsed.h"
 #include "BobbyRMailOrder.h"
 #include "CharProfile.h"
+#include "ContentManager.h"
 #include "Florist.h"
 #include "Florist_Cards.h"
 #include "Florist_Gallery.h"
 #include "Florist_Order_Form.h"
+#include "GameInstance.h"
 #include "Insurance.h"
 #include "Insurance_Contract.h"
 #include "Insurance_Info.h"
@@ -87,6 +89,8 @@
 #include "Button_System.h"
 #include "JAScreens.h"
 #include "UILayout.h"
+
+#include "policy/GamePolicy.h"
 
 #include <string_theory/format>
 #include <string_theory/string>
@@ -1918,6 +1922,9 @@ static void DisplayLoadPending(void)
 		iUnitTime = UNIT_TIME;
 	}
 
+	//Fluffy (UpgradeFromDialUp): Adjust loading speed based on config var
+	iUnitTime *= gamepolicy(website_loading_speed_scale);
+
 	iUnitTime += WWaitDelayIncreasedIfRaining(iUnitTime);
 	iLoadTime  = iUnitTime * 30;
 
@@ -3263,10 +3270,9 @@ static void HandleWebBookMarkNotifyTimer(void)
 void ClearOutTempLaptopFiles(void)
 {
 	// clear out all temp files from laptop
-	FileDelete("files.dat");
-	FileDelete("finances.dat");
-	FileDelete("email.dat");
-	FileDelete("history.dat");
+	GCM->deleteTempFile(FILES_DATA_FILE);
+	GCM->deleteTempFile(FINANCES_DATA_FILE);
+	GCM->deleteTempFile(HISTORY_DATA_FILE);
 }
 
 

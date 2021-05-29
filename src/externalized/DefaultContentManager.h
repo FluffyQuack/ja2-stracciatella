@@ -43,11 +43,11 @@ public:
 	/** Open map for reading. */
 	virtual SGPFile* openMapForReading(const ST::string& mapName) const override;
 
-	/** Get directory for storing new map file. */
-	virtual ST::string getNewMapFolder() const override;
-
 	/** Get all available tilecache. */
 	virtual std::vector<ST::string> getAllTilecache() const override;
+
+	/** Does temp file exist. */
+	virtual bool doesTempFileExist(const ST::string& filename) const override;
 
 	/* Open a game resource file for reading. */
 	virtual SGPFile* openGameResForReading(const ST::string& filename) const override;
@@ -58,11 +58,23 @@ public:
 	/** Open temporary file for reading. */
 	virtual SGPFile* openTempFileForReading(const ST::string& filename) const override;
 
+	/** Open temporary file for read/write. */
+	virtual SGPFile* openTempFileForReadWrite(const ST::string& filename) const override;
+
 	/** Open temporary file for appending. */
 	virtual SGPFile* openTempFileForAppend(const ST::string& filename) const override;
 
 	/** Delete temporary file. */
 	virtual void deleteTempFile(const ST::string& filename) const override;
+
+	/** Create temporary directory. Does not fail if it exists already. */
+	virtual void createTempDir(const ST::string& dirname) const override;
+
+	/** List temporary directory. Pass empty string to list the temp dir itself. */
+	virtual std::vector<ST::string> findAllFilesInTempDir(const ST::string& dirname, bool sortResults, bool recursive, bool returnOnlyNames) const override;
+
+	/** Erase all files within temporary directory. */
+	virtual void eraseTempDir(const ST::string& dirname) const override;
 
 	/** Open user's private file (e.g. saved game, settings) for reading. */
 	virtual SGPFile* openUserPrivateFileForReading(const ST::string& filename) const override;
@@ -77,7 +89,6 @@ public:
 	virtual ST::string getVideoCaptureFolder() const override;
 
 	const ST::string& getDataDir() { return m_dataDir; }
-	const ST::string& getTileDir() { return m_tileDir; }
 
 	const ST::string& getExternalizedDataDir() { return m_externalizedDataPath; }
 
@@ -176,9 +187,11 @@ public:
 protected:
 	RustPointer<EngineOptions> m_engineOptions;
 	ST::string m_dataDir;
-	ST::string m_tileDir;
 	ST::string m_userHomeDir;
 	ST::string m_externalizedDataPath;
+
+	RustPointer<TempDir> m_tempDir;
+	ST::string m_tempDirPath;
 
 	GameVersion m_gameVersion;
 
