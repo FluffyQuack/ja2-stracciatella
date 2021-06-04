@@ -72,7 +72,7 @@ public:
 
 	bool always_show_cursor_in_tactical;  // Always show mouse cursor during tactical view (if false, no mourse cursor is shown when moving in real-time mode, selecting a merc, etc)
 
-	float website_loading_speed_scale;    //Fluffy (UpgradeFromDialUp): Scale the loading speed of websites on the laptop. Setting this to 0 removes the loading entirely
+	float website_loading_time_scale;     // Fluffy (UpgradeFromDialUp): Scales the loading time of websites on the laptop. Lower value means faster loading. Setting this to 0.0 removes the loading entirely.
 
 	/* IMP */
 	int8_t imp_attribute_max;             // IMP character attribute maximum 0 to 100, vanilla 85

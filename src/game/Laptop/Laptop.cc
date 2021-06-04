@@ -1922,10 +1922,12 @@ static void DisplayLoadPending(void)
 		iUnitTime = UNIT_TIME;
 	}
 
-	//Fluffy (UpgradeFromDialUp): Adjust loading speed based on config var
-	iUnitTime *= gamepolicy(website_loading_speed_scale);
-
+	
 	iUnitTime += WWaitDelayIncreasedIfRaining(iUnitTime);
+
+	//Fluffy (UpgradeFromDialUp): Adjust loading speed based on config var
+	iUnitTime *= gamepolicy(website_loading_time_scale);
+
 	iLoadTime  = iUnitTime * 30;
 
 	// we are now waiting on a web page to download, reset counter
