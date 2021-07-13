@@ -8,3 +8,5 @@ TAGS
 .idea
 .vscode
 rust/.vscode
+/.vs
+/out/build/x64-Debug

@@ -319,7 +319,8 @@ if (MSVC)
     string(REPLACE "SDL2main.lib" "SDL2.dll" SDL_DLL ${SDL2MAIN_LIBRARY})
     add_custom_command(TARGET ${JA2_BINARY} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy
-            ${SDL_DLL} "$<TARGET_FILE_DIR:${JA2_BINARY}>")
+		# ${SDL_DLL} "$<TARGET_FILE_DIR:${JA2_BINARY}>")
+		H:/apps/code/libcurl/vcpkg/packages/sdl2_x64-windows/bin/sdl2.dll "$<TARGET_FILE_DIR:${JA2_BINARY}>") #Fluffy: Hardcoded path for SDL2.dll
 endif()
 if (APPLE)
     add_custom_command(TARGET ${JA2_BINARY}
