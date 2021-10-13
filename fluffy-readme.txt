@@ -14,7 +14,7 @@ I did this in order to setting this up to to compile in VS2019:
 		cd _bin
 		cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain-msvc.cmake ..
 
-- This will fail due to not finding SDL2. Fix this by opening CMakeCache.txt and doing these changes.
+- This will fail due to not finding SDL2. Fix this by opening _bin/CMakeCache.txt and doing these changes.
 -- Replace:
 
 		//Path to a library.
@@ -44,3 +44,5 @@ I did this in order to setting this up to to compile in VS2019:
 		SDL2_SDLMAIN_LIBRARY:FILEPATH=H:/apps/code/libcurl/vcpkg/installed/x64-windows/lib/manual-link/SDL2main.lib
 
 - Then repeat the cmake command in the terminal
+
+- And everything is now done. Open _bin/ja2.vcxproj in Visual Studio to start working.
