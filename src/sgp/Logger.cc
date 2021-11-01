@@ -1,4 +1,5 @@
 #include "Logger.h"
+#include "MemMan.h"
 #include "SGPStrings.h"
 #include "Types.h"
 
@@ -23,14 +24,31 @@ void LogMessage(bool isAssert, LogLevel level, const char* file, const ST::strin
 
 void LogMessage(bool isAssert, LogLevel level, const char *file, const char *format, ...)
 {
-	char message[256];
+	//Fluffy (Misc): Changed this code to allow for messages longer than 256 characters
+	int bufferSize = 256, formattedLength = -1;
+	char *message = 0;
 	va_list args;
-	va_start(args, format);
-	vsnprintf(message, 256, format, args);
-	va_end(args);
+	for(int i = 0; i < 10; i++)
+	{
+		if(i > 0) //If previous attempt failed then increase buffer size
+		{
+			MemFree(message);
+			if(formattedLength != -1)
+				bufferSize = formattedLength + 1;
+			else
+				bufferSize *= 2;
+		}
+		message = (char *) MemAlloc(bufferSize);
+		va_start(args, format);
+		formattedLength = vsnprintf(message, bufferSize, format, args);
+		va_end(args);
+		if(formattedLength < bufferSize && formattedLength != -1)
+			break;
+	}
 
 	ST::string err_msg;
-	ST::string str = st_checked_buffer_to_string(err_msg, ST::char_buffer(message, lengthof(message)));
+	ST::string str = st_checked_buffer_to_string(err_msg, ST::char_buffer(message, strlen(message)));
+	MemFree(message);
 	if (!err_msg.empty())
 	{
 		STLOGW("LogMessage: {}", err_msg);

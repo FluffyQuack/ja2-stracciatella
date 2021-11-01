@@ -79,7 +79,7 @@ impl Cli {
         opts.optflag("", "nosound", "Turn the sound and music off");
         opts.optflag("", "window", "Start the game in a window");
         opts.optflag("", "debug", "Enable Debug Mode");
-        opts.optflag("", "help", "print this help menu");
+        opts.optflag("h", "help", "print this help menu"); //Fluffy (Misc): Added "h" as variant for command
 
         Cli {
             args: args.to_vec(),
@@ -179,7 +179,7 @@ impl Cli {
 
                 Ok(())
             }
-            Err(f) => Err(format!("{}\n{}", f.to_string(), &Cli::usage())),
+            Err(f) => Err(format!("{}\nUsage: ja2 [options]\n\nFor full list of options: ja2 -help", f.to_string())), ////Fluffy (Misc): Replaced entire list of options with a reminder on how to display full list
         }
     }
 
