@@ -46,54 +46,20 @@ public:
 	/** Get all available tilecache. */
 	virtual std::vector<ST::string> getAllTilecache() const override;
 
-	/** Does temp file exist. */
-	virtual bool doesTempFileExist(const ST::string& filename) const override;
+	/** User private file (e.g. settings) */
+	virtual DirFs* userPrivateFiles() const override;
+
+	/** Save game files */
+	virtual DirFs* saveGameFiles() const override;
+
+	/** Temp files */
+	virtual DirFs* tempFiles() const override;
 
 	/* Open a game resource file for reading. */
 	virtual SGPFile* openGameResForReading(const ST::string& filename) const override;
 
-	/** Open temporary file for writing. */
-	virtual SGPFile* openTempFileForWriting(const ST::string& filename, bool truncate) const override;
-
-	/** Open temporary file for reading. */
-	virtual SGPFile* openTempFileForReading(const ST::string& filename) const override;
-
-	/** Open temporary file for read/write. */
-	virtual SGPFile* openTempFileForReadWrite(const ST::string& filename) const override;
-
-	/** Open temporary file for appending. */
-	virtual SGPFile* openTempFileForAppend(const ST::string& filename) const override;
-
-	/** Delete temporary file. */
-	virtual void deleteTempFile(const ST::string& filename) const override;
-
-	/** Create temporary directory. Does not fail if it exists already. */
-	virtual void createTempDir(const ST::string& dirname) const override;
-
-	/** List temporary directory. Pass empty string to list the temp dir itself. */
-	virtual std::vector<ST::string> findAllFilesInTempDir(const ST::string& dirname, bool sortResults, bool recursive, bool returnOnlyNames) const override;
-
-	/** Erase all files within temporary directory. */
-	virtual void eraseTempDir(const ST::string& dirname) const override;
-
-	/** Open user's private file (e.g. saved game, settings) for reading. */
-	virtual SGPFile* openUserPrivateFileForReading(const ST::string& filename) const override;
-
 	/* Checks if a game resource exists. */
 	virtual bool doesGameResExists(const ST::string& filename) const override;
-
-	/** Get folder for screenshots. */
-	virtual ST::string getScreenshotFolder() const override;
-
-	/** Get folder for video capture. */
-	virtual ST::string getVideoCaptureFolder() const override;
-
-	const ST::string& getDataDir() { return m_dataDir; }
-
-	const ST::string& getExternalizedDataDir() { return m_externalizedDataPath; }
-
-	/** Get folder for saved games. */
-	virtual ST::string getSavedGamesFolder() const override;
 
 	/** Load encrypted string from game resource file. */
 	virtual ST::string loadEncryptedString(const ST::string& fileName, uint32_t seek_chars, uint32_t read_chars) const override;
@@ -122,6 +88,8 @@ public:
 
 	virtual const ItemModel* getItem(uint16_t index) const override;
 	virtual const ItemModel* getItemByName(const ST::string &internalName) const override;
+	virtual const ItemModel* getKeyItemForKeyId(uint16_t usKeyItem) const override;
+	virtual std::vector<ST::string> getAllSmallInventoryGraphicPaths() const override;
 	virtual const std::map<uint16_t, uint16_t> getMapItemReplacements() const override;
 
 	virtual const std::vector<std::vector<const WeaponModel*> > & getNormalGunChoice() const override;
@@ -176,22 +144,33 @@ public:
 	virtual int16_t getSectorLandType(uint8_t sectorID, uint8_t sectorLevel) const override;
 	virtual const std::vector<const StrategicMapSecretModel*>& getMapSecrets() const override;
 	virtual const CacheSectorsModel* getCacheSectors() const override;
+
 	virtual const std::map<uint8_t, const NpcPlacementModel*>& listNpcPlacements() const override;
 	virtual const NpcPlacementModel* getNpcPlacement(uint8_t profileId) const override;
 	virtual const RPCSmallFaceModel* getRPCSmallFaceOffsets(uint8_t profileID) const override;
 	virtual const std::vector<const MERCListingModel*>& getMERCListings() const override;
 	virtual const std::vector<const MercProfile*>& listMercProfiles() const override;
+	virtual const VehicleModel* getVehicle(uint8_t vehicleID) const override;
+
 	virtual const LoadingScreen* getLoadingScreenForSector(uint8_t sectorId, uint8_t sectorLevel, bool isNight) const override;
 	virtual const LoadingScreen* getLoadingScreen(uint8_t index) const override;
 
+	virtual const std::map<UINT32, UINT16>* getTranslationTable() const override;
+
+	std::unique_ptr<rapidjson::Document> readJsonDataFile(const ST::string& fileName) const;
+
+	/* Gets the enabled mods and their version strings */
+	virtual const std::vector<std::pair<ST::string, ST::string>> getEnabledMods() const override;
 protected:
 	RustPointer<EngineOptions> m_engineOptions;
-	ST::string m_dataDir;
-	ST::string m_userHomeDir;
-	ST::string m_externalizedDataPath;
+	RustPointer<ModManager> m_modManager;
+	RustPointer<SchemaManager> m_schemaManager;
 
 	RustPointer<TempDir> m_tempDir;
-	ST::string m_tempDirPath;
+	std::unique_ptr<DirFs> m_tempFiles;
+
+	std::unique_ptr<DirFs> m_userPrivateFiles;
+	std::unique_ptr<DirFs> m_saveGameFiles;
 
 	GameVersion m_gameVersion;
 
@@ -258,10 +237,12 @@ protected:
 
 	std::map<uint8_t, const RPCSmallFaceModel*> m_rpcSmallFaces;
 	std::vector<const MERCListingModel*> m_MERCListings;
+	std::vector<const VehicleModel*> m_vehicles;
 
 	// List of pre-constructed MercProfile objects; indices of elements are arbitrary (unlike gMercProfiles) and not guaranteed to follow any order
 	std::vector<const MercProfile*> m_mercProfiles;
 	std::map<uint8_t, const MercProfileInfo*> m_mercProfileInfo;
+	std::map<UINT32, UINT16> m_translationTable;
 
 	RustPointer<Vfs> m_vfs;
 
@@ -285,12 +266,20 @@ protected:
 	bool loadStrategicLayerData();
 	bool loadTacticalLayerData();
 	bool loadMercsData();
+	void loadVehicles();
+	void loadTranslationTable();
 
-	std::unique_ptr<rapidjson::Document> readJsonDataFile(const ST::string& fileName) const;
+	std::unique_ptr<rapidjson::Document> readJsonFromString(const ST::string& jsonData, const ST::string& label) const;
+	std::unique_ptr<rapidjson::Document> readJsonDataFileWithSchema(const ST::string& jsonPath) const;
 
 	/**
 	 * @param profileID
 	 * @return pointer to a MercProfileInfo. Never returns null. A pointer to the empty instance is returned if not defined in JSON.
 	 */
 	const MercProfileInfo* getMercProfileInfo(uint8_t profileID) const;
+	/**
+	 * @param profile
+	 * @return pointer to a MercProfileInfo. Returns null if not defined in JSON
+	 */
+	const MercProfileInfo* getMercProfileInfoByName(const ST::string& profile) const;
 };

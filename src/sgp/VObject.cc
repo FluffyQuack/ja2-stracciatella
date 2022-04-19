@@ -1,6 +1,7 @@
 #include "Debug.h"
 #include "HImage.h"
 #include "MemMan.h"
+#include "FileMan.h"
 #include "VObject.h"
 #include "VObject_Blitters.h"
 #include "VSurface.h"
@@ -128,7 +129,7 @@ ETRLEObject const& SGPVObject::SubregionProperties(size_t const idx) const
 {
 	if (idx >= SubregionCount())
 	{
-		throw std::logic_error("Tried to access invalid subregion in video object");
+		throw std::logic_error(ST::format("Tried to access invalid subregion in video object: Maximum is {}, got {}", SubregionCount()-1, idx).c_str());
 	}
 	return etrle_object_[idx];
 }
@@ -269,7 +270,7 @@ SGPVObject* AddStandardVideoObjectFromHImage(SGPImage* const img)
 #ifdef SGP_VIDEO_DEBUGGING
 static
 #endif
-SGPVObject* AddStandardVideoObjectFromFile(const char* const ImageFile)
+SGPVObject* AddStandardVideoObjectFromFile(const ST::string& ImageFile)
 {
 	AutoSGPImage hImage(CreateImage(ImageFile, IMAGE_ALLIMAGEDATA));
 	return AddStandardVideoObjectFromHImage(hImage.get());
@@ -354,13 +355,13 @@ static void DumpVObjectInfoIntoFile(const char* filename, BOOLEAN fAppend)
 {
 	if (guiVObjectSize == 0) return;
 
-	RustPointer<File> file(File_open(filename, fAppend ? FILE_OPEN_APPEND : FILE_OPEN_WRITE));
-	if (!file)
-	{
-		RustPointer<char> err(getRustError());
-		SLOGA("DumpVObjectInfoIntoFile: %s", err.get());
-		return;
+	SGPFile *f;
+	if (fAppend) {
+		f = FileMan::openForAppend(filename);
+	} else {
+		f = FileMan::openForReading(filename);
 	}
+	AutoSGPFile file{f};
 
 	//Allocate enough strings and counters for each node.
 	DUMPINFO* const Info = new DUMPINFO[guiVObjectSize]{};
@@ -403,11 +404,7 @@ static void DumpVObjectInfoIntoFile(const char* filename, BOOLEAN fAppend)
 
 	//Free all memory associated with this operation.
 	delete[] Info;
-	if (!File_writeAll(file.get(), reinterpret_cast<const uint8_t*>(buf.c_str()), buf.size()))
-	{
-		RustPointer<char> err(getRustError());
-		SLOGW("DumpVObjectInfoIntoFile: %s", err.get());
-	}
+	file->write(reinterpret_cast<const uint8_t*>(buf.c_str()), buf.size())
 }
 
 

@@ -33,7 +33,7 @@
 #include "VSurface.h"
 #include "WCheck.h"
 #include "UILayout.h"
-#include "GameState.h"
+#include "GameMode.h"
 #include "Logger.h"
 
 #include <string_theory/format>
@@ -181,7 +181,7 @@ INT16 gsScrollYIncrement;
 // Rendering flags (full, partial, etc.)
 static RenderFlags gRenderFlags = RENDER_FLAG_NONE;
 
-#define gClippingRect (g_ui.m_wordlClippingRect)
+#define gClippingRect (g_ui.m_worldClippingRect)
 static SGPRect gOldClipRect;
 INT16   gsRenderCenterX;
 INT16   gsRenderCenterY;
@@ -1942,7 +1942,7 @@ static void RenderDynamicWorld(void)
 	sLevelIDs[8] = RENDER_DYNAMIC_TOPMOST;
 	RenderTiles(TILES_DIRTY, gsStartPointX_M, gsStartPointY_M, gsStartPointX_S, gsStartPointY_S, gsEndXS, gsEndYS, 9, sLevelIDs);
 
-	if (!GameState::getInstance()->isEditorMode() || !gfEditMode)
+	if (!GameMode::getInstance()->isEditorMode() || !gfEditMode)
 	{
 		RenderTacticalInterface();
 	}
@@ -2010,7 +2010,10 @@ static BOOLEAN HandleScrollDirections(UINT32 ScrollFlags, INT16 sScrollXStep, IN
 	}
 
 	const BOOLEAN fAGoodMove = (scroll_x != 0 || scroll_y != 0);
-	if (fAGoodMove && !fCheckOnly) ScrollBackground(scroll_x, scroll_y);
+
+	if( fAGoodMove && !fCheckOnly && !( gRenderFlags & RENDER_FLAG_FULL )) {
+		ScrollBackground( scroll_x, scroll_y );
+	}
 
 	return fAGoodMove;
 }

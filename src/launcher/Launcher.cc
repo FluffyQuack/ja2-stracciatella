@@ -1,6 +1,7 @@
 #include "logo32.png.h"
 #include "Logger.h"
 #include "RustInterface.h"
+#include "FileMan.h"
 #include "Types.h"
 #include "GameRes.h"
 #include "Video.h"
@@ -17,6 +18,11 @@
 
 #define RESOLUTION_SEPARATOR "x"
 
+const Fl_Text_Display::Style_Table_Entry styleTable[] = {
+	{  FL_BLACK,		FL_COURIER_BOLD,	14 }, // A - Header
+	{  FL_BLACK,		FL_COURIER,			14 }, // B - Text
+	{  FL_DARK_RED,		FL_COURIER,			14 }, // B - Error Text
+};
 
 const char* defaultResolution = "640x480";
 
@@ -28,7 +34,8 @@ const std::vector<GameVersion> predefinedVersions = {
 	GameVersion::ITALIAN,
 	GameVersion::POLISH,
 	GameVersion::RUSSIAN,
-	GameVersion::RUSSIAN_GOLD
+	GameVersion::RUSSIAN_GOLD,
+	GameVersion::SIMPLIFIED_CHINESE
 };
 const std::vector< std::pair<int, int> > predefinedResolutions = {
 	std::make_pair(640,  480),
@@ -96,12 +103,13 @@ void Launcher::loadJa2Json() {
 		}
 	}
 
-	this->engine_options.reset(EngineOptions_create(configFolderPath.get(), argv, argc));
+	this->engineOptions.reset(EngineOptions_create(configFolderPath.get(), argv, argc));
+	this->modManager.reset(ModManager_createUnchecked(this->engineOptions.get()));
 
-	if (this->engine_options == NULL) {
+	if (this->engineOptions == NULL) {
 		exit(EXIT_FAILURE);
 	}
-	if (EngineOptions_shouldShowHelp(this->engine_options.get())) {
+	if (EngineOptions_shouldShowHelp(this->engineOptions.get())) {
 		exit(EXIT_SUCCESS);
 	}
 }
@@ -110,8 +118,10 @@ void Launcher::show() {
 	editorButton->callback( (Fl_Callback*)startEditor, (void*)(this) );
 	playButton->callback( (Fl_Callback*)startGame, (void*)(this) );
 	gameDirectoryInput->callback( (Fl_Callback*)widgetChanged, (void*)(this) );
+	saveGameDirectoryInput->callback( (Fl_Callback*)widgetChanged, (void*)(this) );
 	browseJa2DirectoryButton->callback((Fl_Callback *) openGameDirectorySelector, (void *) (this));
-	gameVersionInput->callback( (Fl_Callback*)widgetChanged, (void*)(this) );
+	browseSaveGameDirectoryButton->callback((Fl_Callback *) openSaveGameDirectorySelector, (void *) (this));
+	gameVersionInput->callback( (Fl_Callback*)selectGameVersion, (void*)(this) );
 	guessVersionButton->callback( (Fl_Callback*)guessVersion, (void*)(this) );
 	scalingModeChoice->callback( (Fl_Callback*)widgetChanged, (void*)(this) );
 	resolutionXInput->callback( (Fl_Callback*)widgetChanged, (void*)(this) );
@@ -124,7 +134,7 @@ void Launcher::show() {
 	}
 	fullscreenCheckbox->callback( (Fl_Callback*)widgetChanged, (void*)(this) );
 	playSoundsCheckbox->callback( (Fl_Callback*)widgetChanged, (void*)(this) );
-	RustPointer<char> ja2_json_path(findPathFromStracciatellaHome(this->engine_options.get(), "ja2.json", false, true));
+	RustPointer<char> ja2_json_path(findPathFromStracciatellaHome(this->engineOptions.get(), "ja2.json", false, true));
 	if (ja2_json_path) {
 		ja2JsonPathOutput->value(ja2_json_path.get());
 	} else {
@@ -132,10 +142,18 @@ void Launcher::show() {
 	}
 	ja2JsonReloadBtn->callback( (Fl_Callback*)reloadJa2Json, (void*)(this) );
 	ja2JsonSaveBtn->callback( (Fl_Callback*)saveJa2Json, (void*)(this) );
-	addModMenuButton->callback( (Fl_Callback*)addMod, (void*)(this) );
+
+	auto nmods = ModManager_getAvailableModsLength(this->modManager.get());
+	for (size_t i = 0; i < nmods; ++i) {
+		RustPointer<Mod> mod(ModManager_getAvailableModByIndex(this->modManager.get(), i));
+		RustPointer<char> modId(Mod_getId(mod.get()));
+	}
+	availableModsBrowser->callback( (Fl_Callback*)selectAvailableMods, (void*)(this) );
+	enabledModsBrowser->callback( (Fl_Callback*)selectEnabledMods, (void*)(this) );
+	enableModsButton->callback( (Fl_Callback*)enableMods, (void*)(this) );
+	disableModsButton->callback( (Fl_Callback*)disableMods, (void*)(this) );
 	moveDownModsButton->callback( (Fl_Callback*)moveDownMods, (void*)(this) );
 	moveUpModsButton->callback( (Fl_Callback*)moveUpMods, (void*)(this) );
-	removeModsButton->callback( (Fl_Callback*)removeMods, (void*)(this) );
 
 	populateChoices();
 	initializeInputsFromDefaults();
@@ -146,16 +164,42 @@ void Launcher::show() {
 }
 
 void Launcher::initializeInputsFromDefaults() {
-	RustPointer<char> rustResRootPath(EngineOptions_getVanillaGameDir(this->engine_options.get()));
+	RustPointer<char> rustResRootPath(EngineOptions_getVanillaGameDir(this->engineOptions.get()));
 	gameDirectoryInput->value(rustResRootPath.get());
+	RustPointer<char> rustSaveGamePath(EngineOptions_getSaveGameDir(this->engineOptions.get()));
+	saveGameDirectoryInput->value(rustSaveGamePath.get());
 
-	uint32_t n = EngineOptions_getModsLength(this->engine_options.get());
-	modsCheckBrowser->clear();
+	uint32_t n = EngineOptions_getModsLength(this->engineOptions.get());
+	enabledModsBrowser->clear();
 	for (uint32_t i = 0; i < n; ++i) {
-		modsCheckBrowser->add(EngineOptions_getMod(this->engine_options.get(), i));
+		RustPointer<char> modId(EngineOptions_getMod(this->engineOptions.get(), i));
+		RustPointer<Mod> mod(ModManager_getAvailableModById(this->modManager.get(), modId.get()));
+		if (mod.get() != NULL) {
+			RustPointer<char> modName(Mod_getName(mod.get()));
+
+			enabledModsBrowser->add(modName.get());
+			enabledModsBrowser->data(enabledModsBrowser->size(), modId.release());
+		} else {
+			// @C72 is dark red, should be highlighted because it is not available
+			enabledModsBrowser->add(ST::format("@C72{}", modId.get()).c_str());
+			enabledModsBrowser->data(enabledModsBrowser->size(), modId.release());
+		}
 	}
 
-	GameVersion rustResVersion = EngineOptions_getResourceVersion(this->engine_options.get());
+	availableModsBrowser->clear();
+	auto nmods = ModManager_getAvailableModsLength(this->modManager.get());
+	for (uintptr_t i = 0; i < nmods; i++) {
+		RustPointer<Mod> mod(ModManager_getAvailableModByIndex(this->modManager.get(), i));
+		RustPointer<char> modId(Mod_getId(mod.get()));
+		RustPointer<char> modName(Mod_getName(mod.get()));
+		availableModsBrowser->add(modName.get());
+		if (EngineOptions_isModEnabled(this->engineOptions.get(), modId.get())) {
+			availableModsBrowser->hide(availableModsBrowser->size());
+		}
+		availableModsBrowser->data(availableModsBrowser->size(), modId.release());
+	}
+
+	GameVersion rustResVersion = EngineOptions_getResourceVersion(this->engineOptions.get());
 	int resourceVersionIndex = 0;
 	for (GameVersion version : predefinedVersions) {
 		if (version == rustResVersion) {
@@ -165,13 +209,13 @@ void Launcher::initializeInputsFromDefaults() {
 	}
 	gameVersionInput->value(resourceVersionIndex);
 
-	int x = EngineOptions_getResolutionX(this->engine_options.get());
-	int y = EngineOptions_getResolutionY(this->engine_options.get());
+	int x = EngineOptions_getResolutionX(this->engineOptions.get());
+	int y = EngineOptions_getResolutionY(this->engineOptions.get());
 
 	resolutionXInput->value(x);
 	resolutionYInput->value(y);
 
-	VideoScaleQuality quality = EngineOptions_getScalingQuality(this->engine_options.get());
+	VideoScaleQuality quality = EngineOptions_getScalingQuality(this->engineOptions.get());
 	int scalingModeIndex = 0;
 	for (VideoScaleQuality scalingMode : scalingModes) {
 		if (scalingMode == quality) {
@@ -181,35 +225,38 @@ void Launcher::initializeInputsFromDefaults() {
 	}
 	this->scalingModeChoice->value(scalingModeIndex);
 
-	fullscreenCheckbox->value(EngineOptions_shouldStartInFullscreen(this->engine_options.get()) ? 1 : 0);
-	playSoundsCheckbox->value(EngineOptions_shouldStartWithoutSound(this->engine_options.get()) ? 0 : 1);
+	fullscreenCheckbox->value(EngineOptions_shouldStartInFullscreen(this->engineOptions.get()) ? 1 : 0);
+	playSoundsCheckbox->value(EngineOptions_shouldStartWithoutSound(this->engineOptions.get()) ? 0 : 1);
 	update(false, nullptr);
 }
 
 int Launcher::writeJsonFile() {
-	EngineOptions_setStartInFullscreen(this->engine_options.get(), fullscreenCheckbox->value());
-	EngineOptions_setStartWithoutSound(this->engine_options.get(), !playSoundsCheckbox->value());
+	EngineOptions_setStartInFullscreen(this->engineOptions.get(), fullscreenCheckbox->value());
+	EngineOptions_setStartWithoutSound(this->engineOptions.get(), !playSoundsCheckbox->value());
 
-	EngineOptions_setVanillaGameDir(this->engine_options.get(), gameDirectoryInput->value());
+	EngineOptions_setVanillaGameDir(this->engineOptions.get(), gameDirectoryInput->value());
+	EngineOptions_setSaveGameDir(this->engineOptions.get(), saveGameDirectoryInput->value());
 
-	EngineOptions_clearMods(this->engine_options.get());
-	int nitems = modsCheckBrowser->nitems();
+	EngineOptions_clearMods(this->engineOptions.get());
+	int nitems = enabledModsBrowser->size();
 	for (int item = 1; item <= nitems; ++item) {
-		EngineOptions_pushMod(this->engine_options.get(), modsCheckBrowser->text(item));
+		char* modId = static_cast<char*>(enabledModsBrowser->data(item));
+		EngineOptions_pushMod(this->engineOptions.get(), modId);
 	}
 
 	int x = (int)resolutionXInput->value();
 	int y = (int)resolutionYInput->value();
-	EngineOptions_setResolution(this->engine_options.get(), x, y);
+	EngineOptions_setResolution(this->engineOptions.get(), x, y);
+	EngineOptions_setBrightness(this->engineOptions.get(), -1.0f);
 
 	int currentResourceVersionIndex = gameVersionInput->value();
 	GameVersion currentResourceVersion = predefinedVersions.at(currentResourceVersionIndex);
-	EngineOptions_setResourceVersion(this->engine_options.get(), currentResourceVersion);
+	EngineOptions_setResourceVersion(this->engineOptions.get(), currentResourceVersion);
 
 	VideoScaleQuality currentScalingMode = scalingModes[this->scalingModeChoice->value()];
-	EngineOptions_setScalingQuality(this->engine_options.get(), currentScalingMode);
+	EngineOptions_setScalingQuality(this->engineOptions.get(), currentScalingMode);
 
-	bool success = EngineOptions_write(this->engine_options.get());
+	bool success = EngineOptions_write(this->engineOptions.get());
 
 	if (success) {
 		update(false, nullptr);
@@ -221,13 +268,6 @@ int Launcher::writeJsonFile() {
 }
 
 void Launcher::populateChoices() {
-	RustPointer<VecCString> mods(findAvailableMods(this->engine_options.get()));
-	size_t nmods = VecCString_len(mods.get());
-	for (size_t i = 0; i < nmods; ++i) {
-		RustPointer<char> mod(VecCString_get(mods.get(), i));
-		addModMenuButton->insert(-1, mod.get(), 0, addMod, this, 0);
-	}
-
 	for(GameVersion version : predefinedVersions) {
 		RustPointer<char> resourceVersionString(VanillaVersion_toString(version));
 		gameVersionInput->add(resourceVersionString.get());
@@ -267,6 +307,29 @@ void Launcher::openGameDirectorySelector(Fl_Widget *btn, void *userdata) {
 	}
 }
 
+void Launcher::openSaveGameDirectorySelector(Fl_Widget *btn, void *userdata) {
+	Launcher* window = static_cast< Launcher* >( userdata );
+	Fl_Native_File_Chooser fnfc;
+	fnfc.title("Select your save game directory");
+	fnfc.type(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
+	ST::char_buffer decoded = decodePath(window->saveGameDirectoryInput->value());
+	fnfc.directory(decoded.empty() ? nullptr : decoded.c_str());
+
+	switch ( fnfc.show() ) {
+		case -1:
+			break; // ERROR
+		case  1:
+			break; // CANCEL
+		default:
+		{
+			ST::string encoded = encodePath(fnfc.filename());
+			window->saveGameDirectoryInput->value(encoded.c_str());
+			window->update(true, window->saveGameDirectoryInput);
+			break; // FILE CHOSEN
+		}
+	}
+}
+
 void Launcher::startExecutable(bool asEditor) {
 	// check minimal resolution:
 	if (resolutionIsInvalid()) {
@@ -277,20 +340,42 @@ void Launcher::startExecutable(bool asEditor) {
 		return;
 	}
 
+	auto nenabled = this->enabledModsBrowser->size();
+	std::vector<ST::string> invalidMods;
+	for (auto i = 1; i <= nenabled; i++) {
+		ST::string modId = static_cast<char*>(this->enabledModsBrowser->data(i));
+		if (ModManager_getAvailableModById(this->modManager.get(), modId.c_str()) == NULL) {
+			invalidMods.push_back(modId);
+		}
+	}
+	if (invalidMods.size() > 0) {
+		ST::string message = "The following mods are enabled, but dont exist on the filesystem: ";
+		for (auto i = invalidMods.begin(); i < invalidMods.end(); i++) {
+			if (i != invalidMods.begin()) {
+				message += ", ";
+			}
+			message += *i;
+		}
+
+		fl_message_title("Invalid mods");
+		fl_alert("%s", message.c_str());
+		return;
+	}
+
 	RustPointer<char> exePath(Env_currentExe());
 	if (!exePath) {
 		showRustError();
 		return;
 	}
-	RustPointer<char> filename(Path_filename(exePath.get()));
-	if (!filename) {
+	ST::string filename = FileMan::getFileName(exePath.get());
+	if (filename.size() == 0) {
 		fl_message_title("No filename");
 		fl_alert("%s", exePath.get());
 		return;
 	}
 	ST::string target("-launcher");
-	ST::string newFilename(filename.get());
-	auto pos = newFilename.find(target);
+	ST::string newFilename(filename);
+	auto pos = newFilename.find_last(target);
 	if (pos == -1) {
 		fl_message_title("Not launcher");
 		fl_alert("%s", exePath.get());
@@ -298,7 +383,7 @@ void Launcher::startExecutable(bool asEditor) {
 	}
 	newFilename = newFilename.replace(target, "");
 	exePath.reset(Path_setFilename(exePath.get(), newFilename.c_str()));
-	if (!Fs_exists(exePath.get())) {
+	if (!FileMan::exists(exePath.get())) {
 		fl_message_title("Not found");
 		fl_alert("%s", exePath.get());
 		return;
@@ -342,7 +427,7 @@ void Launcher::startGame(Fl_Widget* btn, void* userdata) {
 	window->writeJsonFile();
 	if (!checkIfRelativePathExists(window->gameDirectoryInput->value(), "Data", true)) {
 		fl_message_title(window->playButton->label());
-		int choice = fl_choice("Data dir not found.\nAre you sure you want to continue?", "Stop", "Continue", 0);
+		int choice = fl_choice("Data directory not found within game directory.\nAre you sure you want to continue?", "Stop", "Continue", 0);
 		if (choice != 1) {
 			return;
 		}
@@ -428,101 +513,220 @@ void Launcher::saveJa2Json(Fl_Widget* widget, void* userdata) {
 	window->writeJsonFile();
 }
 
-void Launcher::addMod(Fl_Widget* widget, void* userdata) {
-	Fl_Menu_Button* menuButton = static_cast< Fl_Menu_Button* >( widget );
+void Launcher::showModDetails(const ST::string& modId) {
+	int styleTableSize = sizeof(styleTable)/sizeof(styleTable[0]);
+	Fl_Text_Buffer *textBuffer = new Fl_Text_Buffer();
+    Fl_Text_Buffer *styleBuffer = new Fl_Text_Buffer();
+	RustPointer<Mod> mod(ModManager_getAvailableModById(this->modManager.get(), modId.c_str()));
+	if (mod.get() != NULL) {
+		ST::string modName(RustPointer<char>(Mod_getName(mod.get())).get());
+		ST::string modVersion(RustPointer<char>(Mod_getVersionString(mod.get())).get());
+		ST::string modDescription(RustPointer<char>(Mod_getDescription(mod.get())).get());
+
+		auto nameLine = ST::format("{}\n", modName);
+		auto versionLine = ST::format("Version: {}\n\n", modVersion);
+		auto description = ST::string("");
+		if (!modDescription.empty()) {
+			description = ST::format("{}\n\n", modDescription);
+		}
+		auto idLine = ST::format("Mod Id: {}", modId);
+
+		auto modDetails = nameLine + versionLine + description + idLine;
+		ST::string modDetailsStyle;
+		for (size_t i = 0; i < nameLine.size(); i++) {
+			modDetailsStyle += "A";
+		}
+		for (size_t i = 0; i < (versionLine.size() + description.size() + idLine.size()); i++) {
+			modDetailsStyle += "B";
+		}
+
+		textBuffer->text(modDetails.c_str());
+		styleBuffer->text(modDetailsStyle.c_str());
+	} else {
+		auto error = ST::format("Error: Could not find mod '{}'", modId);
+
+		ST::string errorStyle;
+		for (size_t i = 0; i < error.size(); i++) {
+			errorStyle += "C";
+		}
+
+		textBuffer->text(error.c_str());
+		styleBuffer->text(errorStyle.c_str());
+	}
+
+	this->modDetails->buffer(textBuffer);
+	this->modDetails->highlight_data(styleBuffer, styleTable, styleTableSize, 'A', 0, 0);
+	this->modDetails->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS, 0);
+	this->modDetails->show();
+}
+
+void Launcher::hideModDetails() {
+	this->modDetails->hide();
+}
+
+void Launcher::selectAvailableMods(Fl_Widget* widget, void* userdata) {
 	Launcher* window = static_cast< Launcher* >( userdata );
 
-	const char* mod = menuButton->mvalue()->label();
-	window->modsCheckBrowser->add(mod);
-	window->modsCheckBrowser->redraw();
-	window->update(true, widget);
+	window->enableModsButton->activate();
+	window->disableModsButton->deactivate();
+	window->moveUpModsButton->deactivate();
+	window->moveDownModsButton->deactivate();
+	auto nenabled = window->enabledModsBrowser->size();
+	for (auto i = 1; i <= nenabled; i++) {
+		window->enabledModsBrowser->select(i, 0);
+	}
+	std::vector<ST::string> selectedMods;
+	auto navailable = window->availableModsBrowser->size();
+	for (auto i = 1; i <= navailable; i++) {
+		if (window->availableModsBrowser->visible(i) && window->availableModsBrowser->selected(i)) {
+			selectedMods.push_back(ST::string(static_cast<char*>(window->availableModsBrowser->data(i))));
+		}
+	}
+	if (selectedMods.size() == 1) {
+		window->showModDetails(selectedMods[0]);
+	} else {
+		window->hideModDetails();
+	}
+}
+
+void Launcher::selectEnabledMods(Fl_Widget* widget, void* userdata) {
+	Launcher* window = static_cast< Launcher* >( userdata );
+
+	window->enableModsButton->deactivate();
+	window->disableModsButton->activate();
+	window->moveUpModsButton->activate();
+	window->moveDownModsButton->activate();
+	auto navailable = window->availableModsBrowser->size();
+	for (auto i = 1; i <= navailable; i++) {
+		window->availableModsBrowser->select(i, 0);
+	}
+	std::vector<ST::string> selectedMods;
+	auto nenabled = window->enabledModsBrowser->size();
+	for (auto i = 1; i <= nenabled; i++) {
+		if (window->enabledModsBrowser->visible(i) && window->enabledModsBrowser->selected(i)) {
+			selectedMods.push_back(ST::string(static_cast<char*>(window->enabledModsBrowser->data(i))));
+		}
+	}
+	if (selectedMods.size() == 1) {
+		window->showModDetails(selectedMods[0]);
+	} else {
+		window->hideModDetails();
+	}
+}
+
+void Launcher::enableMods(Fl_Widget* widget, void* userdata) {
+	Launcher* window = static_cast< Launcher* >( userdata );
+
+	bool updated = false;
+	for (auto i = window->availableModsBrowser->size(); i > 0; i--) {
+		if (window->availableModsBrowser->selected(i) && window->availableModsBrowser->visible(i)) {
+			updated = true;
+			window->enabledModsBrowser->insert(1, window->availableModsBrowser->text(i));
+			window->enabledModsBrowser->data(1, window->availableModsBrowser->data(i));
+			window->enabledModsBrowser->select(1, 1);
+			window->availableModsBrowser->hide(i);
+		}
+	}
+
+	if (updated) {
+		window->selectEnabledMods(widget, userdata);
+		window->enabledModsBrowser->redraw();
+		window->availableModsBrowser->redraw();
+		window->update(true, widget);
+	}
+}
+
+void Launcher::disableMods(Fl_Widget* widget, void* userdata) {
+	Launcher* window = static_cast< Launcher* >( userdata );
+
+	bool updated = false;
+	for (auto i = window->enabledModsBrowser->size(); i > 0; i--) {
+		if (window->enabledModsBrowser->selected(i)) {
+			updated = true;
+
+			auto id = ST::string(static_cast<char*>(window->enabledModsBrowser->data(i)));
+			window->enabledModsBrowser->remove(i);
+			for (auto j = window->availableModsBrowser->size(); j > 0; j--) {
+				auto otherId = ST::string(static_cast<char*>(window->availableModsBrowser->data(j)));
+				if (id == otherId) {
+					window->availableModsBrowser->show(j);
+					window->availableModsBrowser->select(j, 1);
+				}
+			}
+		}
+	}
+
+	if (updated) {
+		window->selectAvailableMods(widget, userdata);
+		window->enabledModsBrowser->redraw();
+		window->availableModsBrowser->redraw();
+		window->update(true, widget);
+	}
 }
 
 void Launcher::moveUpMods(Fl_Widget* widget, void* userdata) {
 	Launcher* window = static_cast< Launcher* >( userdata );
-	int nitems = window->modsCheckBrowser->nitems();
-	int nchecked = window->modsCheckBrowser->nchecked();
-	if (nchecked == 0 || nchecked == nitems) {
-		return; // nothing to do
+	int nitems = window->enabledModsBrowser->size();
+
+	if (nitems <= 1) {
+		return;
 	}
 
-	std::vector<int> order;
-	for (int item = 1; item <= nitems; ++item) {
-		if (window->modsCheckBrowser->checked(item)) {
-			if (!order.empty() && !window->modsCheckBrowser->checked(order.back())) {
-				order.insert(order.end() - 1, item); // move up
-				continue;
-			}
+	// Fltk line indexing is 1 based
+	for (auto i = 2; i <= nitems; i++) {
+		if (window->enabledModsBrowser->selected(i) && !window->enabledModsBrowser->selected(i-1)) {
+			window->enabledModsBrowser->swap(i, i-1);
 		}
-		order.emplace_back(item);
 	}
 
-	std::vector<ST::string> text;
-	std::vector<int> checked;
-	for (int item : order) {
-		text.emplace_back(window->modsCheckBrowser->text(item));
-		checked.emplace_back(window->modsCheckBrowser->checked(item));
-	}
-
-	window->modsCheckBrowser->clear();
-	for (int i = 0; i < nitems; ++i) {
-		window->modsCheckBrowser->add(text[i].c_str(), checked[i]);
-	}
+	window->enabledModsBrowser->redraw();
 	window->update(true, widget);
 }
 
 void Launcher::moveDownMods(Fl_Widget* widget, void* userdata) {
 	Launcher* window = static_cast< Launcher* >( userdata );
-	int nitems = window->modsCheckBrowser->nitems();
-	int nchecked = window->modsCheckBrowser->nchecked();
-	if (nchecked == 0 || nchecked == nitems) {
-		return; // nothing to do
+	int nitems = window->enabledModsBrowser->size();
+
+	if (nitems <= 1) {
+		return;
 	}
 
-	std::vector<int> order;
-	for (int item = nitems; item >= 1; --item) {
-		if (window->modsCheckBrowser->checked(item)) {
-			if (!order.empty() && !window->modsCheckBrowser->checked(order.back())) {
-				order.insert(order.end() - 1, item); // move down
-				continue;
-			}
+	// Fltk line indexing is 1 based
+	for (auto i = nitems - 1; i > 0; i--) {
+		if (window->enabledModsBrowser->selected(i) && !window->enabledModsBrowser->selected(i+1)) {
+			window->enabledModsBrowser->swap(i, i+1);
 		}
-		order.emplace_back(item);
-	}
-	std::reverse(order.begin(), order.end());
-
-	std::vector<ST::string> text;
-	std::vector<int> checked;
-	for (int item : order) {
-		text.emplace_back(window->modsCheckBrowser->text(item));
-		checked.emplace_back(window->modsCheckBrowser->checked(item));
 	}
 
-	window->modsCheckBrowser->clear();
-	for (int i = 0; i < nitems; ++i) {
-		window->modsCheckBrowser->add(text[i].c_str(), checked[i]);
-	}
+	window->enabledModsBrowser->redraw();
 	window->update(true, widget);
 }
 
-void Launcher::removeMods(Fl_Widget* widget, void* userdata) {
-	Launcher* window = static_cast< Launcher* >( userdata );
-	int nchecked = window->modsCheckBrowser->nchecked();
-	if (nchecked == 0) {
-		return; // nothing to do
-	}
-
-	std::vector<ST::string> text;
-	int nitems = window->modsCheckBrowser->nitems();
-	for (int item = 1; item <= nitems; ++item) {
-		if (!window->modsCheckBrowser->checked(item)) {
-			text.emplace_back(window->modsCheckBrowser->text(item));
+void Launcher::selectGameVersion(Fl_Widget* widget, void* userdata)
+{
+	Launcher* window = static_cast<Launcher*>(userdata);
+	int currentResourceVersionIndex = window->gameVersionInput->value();
+	GameVersion currentResourceVersion = predefinedVersions.at(currentResourceVersionIndex);
+	if (currentResourceVersion == GameVersion::SIMPLIFIED_CHINESE)
+	{
+		//force enalbe Simplified Chinese Mod
+		for (auto i = window->availableModsBrowser->size(); i > 0; i--)
+		{
+			char* modId = static_cast<char*>(window->availableModsBrowser->data(i));
+			window->availableModsBrowser->select(i, strcmp(modId, SIMPLIFIED_CHINESE_MOD_NAME) == 0 ? 1 : 0);
 		}
+		enableMods(window->enableModsButton, userdata);
+	}
+	else
+	{
+		//force diable Simplified Chinese Mod
+		for (auto i = window->enabledModsBrowser->size(); i > 0; i--)
+		{
+			char* modId = static_cast<char*>(window->enabledModsBrowser->data(i));
+			window->enabledModsBrowser->select(i, strcmp(modId, SIMPLIFIED_CHINESE_MOD_NAME) == 0 ? 1 : 0);
+		}
+		disableMods(window->disableModsButton, userdata);
 	}
 
-	window->modsCheckBrowser->clear();
-	for (size_t i = 0; i < text.size(); ++i) {
-		window->modsCheckBrowser->add(text[i].c_str());
-	}
 	window->update(true, widget);
 }

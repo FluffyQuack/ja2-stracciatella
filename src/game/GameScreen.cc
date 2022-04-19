@@ -58,9 +58,10 @@
 #include "Video.h"
 #include "JAScreens.h"
 #include "UILayout.h"
-#include "GameState.h"
+#include "GameMode.h"
 #include "EditScreen.h"
 #include "Logger.h"
+#include "GameSettings.h"
 
 #define ARE_IN_FADE_IN( )		( gfFadeIn || gfFadeInitialized )
 
@@ -500,7 +501,7 @@ ScreenID MainGameScreenHandle(void)
 
 		if (uiNewScreen != GAME_SCREEN) return uiNewScreen;
 	}
-	else if (gfIntendOnEnteringEditor && GameState::getInstance()->isEditorMode())
+	else if (gfIntendOnEnteringEditor && GameMode::getInstance()->isEditorMode())
 	{
 		SLOGI("Aborting normal game mode and entering editor mode...");
 		SetPendingNewScreen(NO_PENDING_SCREEN);
@@ -525,6 +526,10 @@ ScreenID MainGameScreenHandle(void)
 		// Handle Interface Stuff
 		SetUpInterface( );
 		HandleTacticalPanelSwitch( );
+	} else {
+		if( gGameSettings.fOptions[TOPTION_MERC_CASTS_LIGHT] && NightTime()) {
+			SetRenderFlags( RENDER_FLAG_FULL );
+		}
 	}
 
 	// Handle Scroll Of World

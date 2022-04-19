@@ -332,11 +332,11 @@ GUIButtonRef giMapContractButton;
 
 INT32 giSortStateForMapScreenList = 0;
 
-INT32 giCommonGlowBaseTime = 0;
-INT32 giFlashAssignBaseTime = 0;
-INT32 giFlashContractBaseTime = 0;
+UINT32 guiCommonGlowBaseTime = 0;
+UINT32 guiFlashAssignBaseTime = 0;
+UINT32 guiFlashContractBaseTime = 0;
 UINT32 guiFlashCursorBaseTime = 0;
-INT32 giPotCharPathBaseTime = 0;
+UINT32 guiPotCharPathBaseTime = 0;
 
 static SGPVObject* guiCHARLIST;
 static SGPVObject* guiCHARINFO;
@@ -3722,6 +3722,13 @@ static void HandleCursorOverRifleAmmo(void)
 {
 	if (!fShowInventoryFlag) return;
 
+	// make sure sector inventory is updated if visible
+	if( fShowMapInventoryPool )	{
+		if(( GetJA2Clock() - guiMouseOverItemTime ) > 100 ) {
+			fMapPanelDirty = TRUE;
+		}
+	}
+
 	if( gbCheckForMouseOverItemPos == -1 )
 	{
 		return;
@@ -3735,6 +3742,11 @@ static void HandleCursorOverRifleAmmo(void)
 			{
 				fTeamPanelDirty = TRUE;
 			}
+		}
+
+		// also highlight in sector inventory
+		if( fShowMapInventoryPool )	{
+			HandleCompatibleAmmoUIForMapInventory( GetSelectedInfoChar(), gbCheckForMouseOverItemPos, ( iCurrentInventoryPoolPage * MAP_INVENTORY_POOL_SLOT_COUNT ), TRUE, TRUE );
 		}
 	}
 }
@@ -4121,13 +4133,11 @@ static void DisplayThePotentialPathForCurrentDestinationCharacterForMapScreenInt
 	// simply check if we want to refresh the screen to display path
 	static INT8 bOldDestChar = -1;
 	static INT16  sPrevMapX, sPrevMapY;
-	INT32 iDifference = 0;
-
 
 	if( bOldDestChar != bSelectedDestChar )
 	{
 		bOldDestChar = bSelectedDestChar;
-		giPotCharPathBaseTime = GetJA2Clock( );
+		guiPotCharPathBaseTime = GetJA2Clock( );
 
 		sPrevMapX = sMapX;
 		sPrevMapY = sMapY;
@@ -4138,7 +4148,7 @@ static void DisplayThePotentialPathForCurrentDestinationCharacterForMapScreenInt
 
 	if( ( sMapX != sPrevMapX) || ( sMapY != sPrevMapY ) )
 	{
-		giPotCharPathBaseTime = GetJA2Clock( );
+		guiPotCharPathBaseTime = GetJA2Clock( );
 
 		sPrevMapX = sMapX;
 		sPrevMapY = sMapY;
@@ -4150,14 +4160,14 @@ static void DisplayThePotentialPathForCurrentDestinationCharacterForMapScreenInt
 		fDrawTempPath = FALSE;
 	}
 
-	iDifference = GetJA2Clock( ) - giPotCharPathBaseTime ;
+	UINT32 uiDifference = GetJA2Clock() - guiPotCharPathBaseTime;
 
 	if (fTempPathAlreadyDrawn) return;
 
-	if( iDifference > MIN_WAIT_TIME_FOR_TEMP_PATH )
+	if (uiDifference > MIN_WAIT_TIME_FOR_TEMP_PATH)
 	{
 		fDrawTempPath = TRUE;
-		giPotCharPathBaseTime = GetJA2Clock( );
+		guiPotCharPathBaseTime = GetJA2Clock( );
 		fTempPathAlreadyDrawn = TRUE;
 	}
 }
@@ -6261,16 +6271,14 @@ static bool AnyMercsLeavingRealSoon();
 
 static void HandleContractTimeFlashForMercThatIsAboutLeave(void)
 {
-	INT32 iCurrentTime;
-
 	// grab the current time
-	iCurrentTime = GetJA2Clock();
+	UINT32 uiCurrentTime = GetJA2Clock();
 
 	// only bother checking once flash interval has elapsed
-	if( ( iCurrentTime - giFlashContractBaseTime ) >= DELAY_PER_FLASH_FOR_DEPARTING_PERSONNEL )
+	if( ( uiCurrentTime - guiFlashContractBaseTime ) >= DELAY_PER_FLASH_FOR_DEPARTING_PERSONNEL )
 	{
 		// update timer so that we only run check so often
-		giFlashContractBaseTime = iCurrentTime;
+		guiFlashContractBaseTime = uiCurrentTime;
 		fFlashContractFlag = !fFlashContractFlag;
 
 		// don't redraw unless we have to!
@@ -6762,16 +6770,14 @@ static void RemoveTeamPanelSortButtonsForMapScreen()
 
 static void HandleCommonGlowTimer(void)
 {
-	INT32 iCurrentTime = 0;
-
 	// grab the current time
-	iCurrentTime = GetJA2Clock();
+	UINT32 uiCurrentTime = GetJA2Clock();
 
 	// only bother checking once flash interval has elapsed
-	if( ( iCurrentTime - giCommonGlowBaseTime ) >= GLOW_DELAY )
+	if( ( uiCurrentTime - guiCommonGlowBaseTime ) >= GLOW_DELAY )
 	{
 		// update timer so that we only run check so often
-		giCommonGlowBaseTime = iCurrentTime;
+		guiCommonGlowBaseTime = uiCurrentTime;
 
 		// set flag to trigger glow higlight updates
 		gfGlowTimerExpired = TRUE;
@@ -6793,13 +6799,13 @@ static void HandleAssignmentsDoneAndAwaitingFurtherOrders(void)
 	}
 
 	// grab the current time
-	const INT32 iCurrentTime = GetJA2Clock();
+	const UINT32 uiCurrentTime = GetJA2Clock();
 
 	// only bother checking once flash interval has elapsed
-	if( ( iCurrentTime - giFlashAssignBaseTime ) >= ASSIGNMENT_DONE_FLASH_TIME )
+	if( ( uiCurrentTime - guiFlashAssignBaseTime ) >= ASSIGNMENT_DONE_FLASH_TIME )
 	{
 		// update timer so that we only run check so often
-		giFlashAssignBaseTime = iCurrentTime;
+		guiFlashAssignBaseTime = uiCurrentTime;
 
 		CFOR_EACH_IN_CHAR_LIST(c)
 		{

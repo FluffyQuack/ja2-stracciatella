@@ -45,6 +45,7 @@
 #include "JAScreens.h"
 #include "Video.h"
 #include "VSurface.h"
+#include "FileMan.h"
 
 #include "ContentManager.h"
 #include "GameInstance.h"
@@ -728,11 +729,13 @@ static void RenderSelectedItemBlownUp(void)
 	INT16             y;
 
 	// Display the enlarged item graphic
-	SGPVObject  const& vo = GetInterfaceGraphicForItem(item);
-	ETRLEObject const& e  = vo.SubregionProperties(item->getGraphicNum());
+	auto graphic = GetSmallInventoryGraphicForItem(item);
+	auto vo = graphic.first;
+	auto index = graphic.second;
+	ETRLEObject const& e  = vo->SubregionProperties(index);
 	x = screen_x - e.sOffsetX + (40 - e.usWidth)  / 2;
 	y = screen_y - e.sOffsetY + (20 - e.usHeight) / 2;
-	BltVideoObjectOutline(FRAME_BUFFER, &vo, item->getGraphicNum(), x, y, Get16BPPColor(FROMRGB(0, 140, 170)));
+	BltVideoObjectOutline(FRAME_BUFFER, vo, index, x, y, Get16BPPColor(FROMRGB(0, 140, 170)));
 
 	// Display the item name above it
 	SetFontAttributes(FONT10ARIAL, FONT_YELLOW);
@@ -804,8 +807,8 @@ static void RenderEditorInfo(void)
 			if( !gfWorldLoaded || giCurrentTilesetID < 0 ) {
 				MPrint(260, EDITOR_TASKBAR_POS_Y + 85, "No map currently loaded.");
 			} else {
-				RustPointer<char> filename(Path_filename(gFileForIO.c_str()));
-				MPrint(260, EDITOR_TASKBAR_POS_Y + 85, ST::format("File:  {}, Current Tileset:  {}", filename.get(), gTilesets[giCurrentTilesetID].zName));
+				ST::string filename = FileMan::getFileName(gFileForIO);
+				MPrint(260, EDITOR_TASKBAR_POS_Y + 85, ST::format("File:  {}, Current Tileset:  {}", filename, gTilesets[giCurrentTilesetID].zName));
 			}
 			break;
 		case TASK_TERRAIN:

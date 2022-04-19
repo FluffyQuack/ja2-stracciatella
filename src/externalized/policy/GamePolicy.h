@@ -36,6 +36,8 @@ public:
 	int32_t starting_cash_medium;
 	int32_t starting_cash_hard;
 
+	uint16_t squad_size;
+
 	/* Battle */
 	bool f_drop_everything;               /**< Enemy drop all equipment. */
 	bool f_all_dropped_visible;           /**< All dropped equipment is visible right away. */
@@ -73,7 +75,7 @@ public:
 	bool always_show_cursor_in_tactical;  //Fluffy (ForeverMouseCursor): Always show mouse cursor during tactical view (if false, no mourse cursor is shown when moving in real-time mode, selecting a merc, etc)
 	bool show_hit_chance;                 //Fluffy (ShowChanceToHit): Show chance-to-hit when pressing 'F' and next to mouse cursor when preparing an attack
 
-	float website_loading_speed_scale;    //Fluffy (UpgradeFromDialUp): Scale the loading speed of websites on the laptop. Setting this to 0 removes the loading entirely
+	float website_loading_time_scale;     //Fluffy (UpgradeFromDialUp): Scales the loading time of websites on the laptop. Lower value means faster loading. Setting this to 0.0 removes the loading entirely.
 
 	/* IMP */
 	int8_t imp_attribute_max;             // IMP character attribute maximum 0 to 100, vanilla 85

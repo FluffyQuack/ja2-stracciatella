@@ -1888,45 +1888,43 @@ static void LoadLoadPending(void)
 	guiGRAPHBAR    = AddVideoObjectFromFile(LAPTOPDIR "/graphsegment.sti");
 }
 
-
-static INT32 WWaitDelayIncreasedIfRaining(INT32 iUnitTime);
-
-
 static void DisplayLoadPending(void)
 {
 	// this function will display the load pending and return if the load is done
-	static INT32 iBaseTime  = 0;
-	static INT32 iTotalTime = 0;
+	static UINT32 uiBaseTime  = 0;
+	static UINT32 uiTotalTime = 0;
 
 	// if merc webpage, make it longer
-	// TEMP disables the loadpending
-	INT32 iLoadTime;
-	INT32 iUnitTime;
-
+	UINT32 uiUnitTime = UNIT_TIME;
 	if (fFastLoadFlag)
 	{
-		iUnitTime = (fConnectingToSubPage ? FASTEST_UNIT_TIME : FAST_UNIT_TIME);
+		uiUnitTime = fConnectingToSubPage ? FASTEST_UNIT_TIME : FAST_UNIT_TIME;
 	}
 	else if (fConnectingToSubPage)
 	{
-		iUnitTime = ALMOST_FAST_UNIT_TIME;
+		uiUnitTime = ALMOST_FAST_UNIT_TIME;
 	}
 	else if (guiCurrentLaptopMode == LAPTOP_MODE_MERC && !LaptopSaveInfo.fMercSiteHasGoneDownYet)
 	{
 		// if we are connecting the MERC site, and the MERC site hasnt yet moved
 		// to their new site, have the sloooww wait
-		iUnitTime = LONG_UNIT_TIME;
+		uiUnitTime = LONG_UNIT_TIME;
 	}
-	else
+
+	// increase delay if it's raining
+	if (guiEnvWeather & WEATHER_FORECAST_THUNDERSHOWERS)
 	{
-		iUnitTime = UNIT_TIME;
+		uiUnitTime += uiUnitTime * 0.8f;
+	}
+	else if (guiEnvWeather & WEATHER_FORECAST_SHOWERS)
+	{
+		uiUnitTime += uiUnitTime * 0.6f;
 	}
 
-	//Fluffy (UpgradeFromDialUp): Adjust loading speed based on config var
-	iUnitTime *= gamepolicy(website_loading_speed_scale);
+	//Fluffy (UpgradeFromDialUp): Adjust loading time based on config var
+	uiUnitTime *= gamepolicy(website_loading_time_scale);
 
-	iUnitTime += WWaitDelayIncreasedIfRaining(iUnitTime);
-	iLoadTime  = iUnitTime * 30;
+	UINT32 uiLoadTime = uiUnitTime * 30;
 
 	// we are now waiting on a web page to download, reset counter
 	if (!fLoadPendingFlag)
@@ -1934,34 +1932,34 @@ static void DisplayLoadPending(void)
 		fDoneLoadPending     = FALSE;
 		fFastLoadFlag        = FALSE;
 		fConnectingToSubPage = FALSE;
-		iBaseTime            = 0;
-		iTotalTime           = 0;
+		uiBaseTime           = 0;
+		uiTotalTime          = 0;
 		return;
 	}
-	if (iBaseTime == 0) iBaseTime = GetJA2Clock();
+	if (uiBaseTime == 0) uiBaseTime = GetJA2Clock();
 
 	// if total time is exceeded, return
-	if (iTotalTime >= iLoadTime)
+	if (uiTotalTime >= uiLoadTime)
 	{
 		// done loading, redraw screen
 		fLoadPendingFlag        = FALSE;
 		fFastLoadFlag           = FALSE;
-		iTotalTime              = 0;
-		iBaseTime               = 0;
+		uiTotalTime             = 0;
+		uiBaseTime              = 0;
 		fDoneLoadPending        = TRUE;
 		fConnectingToSubPage    = FALSE;
 		fPausedReDrawScreenFlag = TRUE;
 		return;
 	}
 
-	const INT32 iDifference = GetJA2Clock() - iBaseTime;
+	const UINT32 uiDifference = GetJA2Clock() - uiBaseTime;
 
 	// difference has been long enough or we are redrawing the screen
-	if (iDifference > iUnitTime)
+	if (uiDifference > uiUnitTime)
 	{
 		// LONG ENOUGH TIME PASSED
-		iBaseTime   = GetJA2Clock();
-		iTotalTime += iDifference;
+		uiBaseTime   = GetJA2Clock();
+		uiTotalTime += uiDifference;
 	}
 
 	// new mail, don't redraw
@@ -1989,9 +1987,10 @@ static void DisplayLoadPending(void)
 	// check to see if we are only updating screen, but not passed a new element in the load pending display
 
 	// decide how many time units are to be displayed, based on amount of time passed
-	for (INT32 i = 0, iTempTime = iTotalTime; i <= 30 && iTempTime > 0; ++i, iTempTime -= iUnitTime)
+	for (UINT32 i = 0, uiTempTime = uiTotalTime; i <= 30 && uiTempTime > 0; ++i, uiTempTime -= uiUnitTime)
 	{
 		BltVideoObject(FRAME_BUFFER, guiGRAPHBAR, 0, LAPTOP_BAR_X + UNIT_WIDTH * i, LAPTOP_BAR_Y);
+		if (uiUnitTime > uiTempTime) break; // prevent underflow
 	}
 
 	InvalidateRegion(DOWNLOAD_X, DOWNLOAD_Y, DOWNLOAD_X + 150, DOWNLOAD_Y + 100);
@@ -2435,32 +2434,32 @@ static void ShowLights(void)
 
 static void FlickerHDLight(void)
 {
-	static INT32 iBaseTime        = 0;
-	static INT32 iTotalDifference = 0;
+	static UINT32 uiBaseTime       = 0;
+	static UINT32 uiTotalDifference = 0;
 
 	if (fLoadPendingFlag) fFlickerHD = TRUE;
 	if (!fFlickerHD) return;
 
-	if (iBaseTime == 0) iBaseTime = GetJA2Clock();
+	if (uiBaseTime == 0) uiBaseTime = GetJA2Clock();
 
-	const INT32 iDifference = GetJA2Clock() - iBaseTime;
+	const UINT32 uiDifference = GetJA2Clock() - uiBaseTime;
 
-	if (iTotalDifference > HD_FLICKER_TIME && !fLoadPendingFlag)
+	if (uiTotalDifference > HD_FLICKER_TIME && !fLoadPendingFlag)
 	{
-		iBaseTime         = GetJA2Clock();
+		uiBaseTime         = GetJA2Clock();
 		fHardDriveLightOn = FALSE;
-		iBaseTime         = 0;
-		iTotalDifference  = 0;
+		uiBaseTime         = 0;
+		uiTotalDifference  = 0;
 		fFlickerHD        = FALSE;
 		InvalidateRegion(88, 466, 102, 477);
 		return;
 	}
 
-	if (iDifference > FLICKER_TIME)
+	if (uiDifference > FLICKER_TIME)
 	{
-		iTotalDifference += iDifference;
+		uiTotalDifference += uiDifference;
 
-		if (fLoadPendingFlag) iTotalDifference = 0;
+		if (fLoadPendingFlag) uiTotalDifference = 0;
 
 		fHardDriveLightOn = (Random(2) == 0);
 		InvalidateRegion(88, 466, 102, 477);
@@ -2472,24 +2471,24 @@ static BOOLEAN ExitLaptopDone(void)
 {
 	// check if this is the first time, to reset counter
 	static BOOLEAN fOldLeaveLaptopState = FALSE;
-	static INT32 iBaseTime              = 0;
+	static UINT32  uiBaseTime            = 0;
 
 	if (!fOldLeaveLaptopState)
 	{
 		fOldLeaveLaptopState = TRUE;
-		iBaseTime = GetJA2Clock();
+		uiBaseTime = GetJA2Clock();
 	}
 
 	fPowerLightOn = FALSE;
 
 	InvalidateRegion(44, 466, 58, 477);
 	// get the current difference
-	const INT32 iDifference = GetJA2Clock() - iBaseTime;
+	const UINT32 iDifference = GetJA2Clock() - uiBaseTime;
 
 	// did we wait long enough?
 	if (iDifference > EXIT_LAPTOP_DELAY_TIME)
 	{
-		iBaseTime = 0;
+		uiBaseTime = 0;
 		fOldLeaveLaptopState = FALSE;
 		return TRUE;
 	}
@@ -3214,7 +3213,7 @@ static void DisplayWebBookMarkNotify(void)
 // handle timer for bookmark notify
 static void HandleWebBookMarkNotifyTimer(void)
 {
-	static INT32 iBaseTime              = 0;
+	static UINT32  uiBaseTime            = 0;
 	static BOOLEAN fOldShowBookMarkInfo = FALSE;
 
 	// check if maxing or mining?
@@ -3243,25 +3242,25 @@ static void HandleWebBookMarkNotifyTimer(void)
 	// check if flag false, is so, leave
 	if (!fShowBookmarkInfo)
 	{
-		iBaseTime = 0;
+		uiBaseTime = 0;
 		return;
 	}
 
 	// check if this is the first time in here
-	if (iBaseTime == 0)
+	if (uiBaseTime == 0)
 	{
-		iBaseTime = GetJA2Clock();
+		uiBaseTime = GetJA2Clock();
 		return;
 	}
 
-	const INT32 iDifference = GetJA2Clock() - iBaseTime;
+	const UINT32 uiDifference = GetJA2Clock() - uiBaseTime;
 
 	fReDrawBookMarkInfo = TRUE;
 
-	if (iDifference > DISPLAY_TIME_FOR_WEB_BOOKMARK_NOTIFY)
+	if (uiDifference > DISPLAY_TIME_FOR_WEB_BOOKMARK_NOTIFY)
 	{
 		// waited long enough, stop showing
-		iBaseTime = 0;
+		uiBaseTime = 0;
 		fShowBookmarkInfo = FALSE;
 	}
 }
@@ -3270,9 +3269,9 @@ static void HandleWebBookMarkNotifyTimer(void)
 void ClearOutTempLaptopFiles(void)
 {
 	// clear out all temp files from laptop
-	GCM->deleteTempFile(FILES_DATA_FILE);
-	GCM->deleteTempFile(FINANCES_DATA_FILE);
-	GCM->deleteTempFile(HISTORY_DATA_FILE);
+	GCM->tempFiles()->deleteFile(FILES_DATA_FILE);
+	GCM->tempFiles()->deleteFile(FINANCES_DATA_FILE);
+	GCM->tempFiles()->deleteFile(HISTORY_DATA_FILE);
 }
 
 
@@ -3368,17 +3367,17 @@ void SaveLaptopInfoToSavedGame(HWFILE const f)
 	INJ_SKIP( d, 87)
 	Assert(d.getConsumed() == lengthof(data));
 
-	FileWrite(f, data, sizeof(data));
+	f->write(data, sizeof(data));
 
 	if (l.usNumberOfBobbyRayOrderUsed != 0)
 	{ // There is anything in the Bobby Ray Orders on delivery
 		size_t const size = sizeof(*l.BobbyRayOrdersOnDeliveryArray.data()) * l.BobbyRayOrdersOnDeliveryArray.size();
-		FileWrite(f, l.BobbyRayOrdersOnDeliveryArray.data(), size);
+		f->write(l.BobbyRayOrdersOnDeliveryArray.data(), size);
 	}
 
 	if (l.ubNumberLifeInsurancePayoutUsed != 0)
 	{ // There are any insurance payouts in progress
-		FileWrite(f, l.pLifeInsurancePayouts.data(), sizeof(LIFE_INSURANCE_PAYOUT) * l.pLifeInsurancePayouts.size());
+		f->write(l.pLifeInsurancePayouts.data(), sizeof(LIFE_INSURANCE_PAYOUT) * l.pLifeInsurancePayouts.size());
 	}
 }
 
@@ -3392,7 +3391,7 @@ void LoadLaptopInfoFromSavedGame(HWFILE const f)
 	l.pLifeInsurancePayouts.clear();
 
 	BYTE data[7440];
-	FileRead(f, data, sizeof(data));
+	f->read(data, sizeof(data));
 
 	DataReader d{data};
 	EXTR_BOOL( d, l.gfNewGameLaptop)
@@ -3462,7 +3461,7 @@ void LoadLaptopInfoFromSavedGame(HWFILE const f)
 	{ // There is anything in the Bobby Ray Orders on Delivery
 		l.BobbyRayOrdersOnDeliveryArray.resize(BobbyRayOrdersOnDeliveryArraySize);
 		size_t const size = sizeof(*l.BobbyRayOrdersOnDeliveryArray.data()) * BobbyRayOrdersOnDeliveryArraySize;
-		FileRead(f, l.BobbyRayOrdersOnDeliveryArray.data(), size);
+		f->read(l.BobbyRayOrdersOnDeliveryArray.data(), size);
 	}
 	else
 	{
@@ -3472,29 +3471,13 @@ void LoadLaptopInfoFromSavedGame(HWFILE const f)
 	if (l.ubNumberLifeInsurancePayoutUsed != 0)
 	{ // There are any Insurance Payouts in progress
 		l.pLifeInsurancePayouts.assign(numLifeInsurancePayouts, LIFE_INSURANCE_PAYOUT{});
-		FileRead(f, l.pLifeInsurancePayouts.data(), sizeof(LIFE_INSURANCE_PAYOUT) * numLifeInsurancePayouts);
+		f->read(l.pLifeInsurancePayouts.data(), sizeof(LIFE_INSURANCE_PAYOUT) * numLifeInsurancePayouts);
 	}
 	else
 	{
 		l.pLifeInsurancePayouts.clear();
 	}
 }
-
-
-static INT32 WWaitDelayIncreasedIfRaining(INT32 iUnitTime)
-{
-	INT32 iRetVal = 0;
-	if (guiEnvWeather & WEATHER_FORECAST_THUNDERSHOWERS)
-	{
-		iRetVal = iUnitTime * 0.8f;
-	}
-	else if (guiEnvWeather & WEATHER_FORECAST_SHOWERS)
-	{
-		iRetVal = iUnitTime * 0.6f;
-	}
-	return iRetVal;
-}
-
 
 // Used to determine delay if its raining
 static BOOLEAN IsItRaining(void)

@@ -100,7 +100,7 @@ void DisplayFrameRate( )
 		SetVideoOverlayText(g_fps_overlay, ST::format("FPS: {}", __min(uiFPS, 1000)));
 
 		// TIMER COUNTER
-		SetVideoOverlayText(g_counter_period_overlay, ST::format("Game Loop Time: {}", __min(giTimerDiag, 1000)));
+		SetVideoOverlayText(g_counter_period_overlay, ST::format("Game Loop Time: {}", __min(guiTimerDiag, 1000)));
 	}
 }
 
@@ -148,7 +148,7 @@ ScreenID InitScreenHandle(void)
 
 	if ( ubCurrentScreen == 255 )
 	{
-		if(isEnglishVersion())
+		if(isEnglishVersion() || isChineseVersion())
 		{
 			if( gfDoneWithSplashScreen )
 			{

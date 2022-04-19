@@ -47,7 +47,6 @@ static UINT16 gusMouseCursorWidth;
 static UINT16 gusMouseCursorHeight;
 static INT16  gsMouseCursorXOffset;
 static INT16  gsMouseCursorYOffset;
-
 INT16 gsMouseSizeYModifier = 0; //Fluffy (ShowChanceToHit): This can increase the size of gusMouseCursorHeight so image data (ie, text) outside the normal height of the mouse cursor can be copied onto screen buffer
 
 static SDL_Rect MouseBackground = { 0, 0, 0, 0 };
@@ -120,7 +119,12 @@ void VideoToggleFullScreen(void)
 
 void VideoSetBrightness(float brightness)
 {
-	SDL_SetWindowBrightness(g_game_window, brightness);
+	if (brightness >= 0)
+	{
+		// Do not set the brightness unless explicitly requested
+		// On Windows, setting the brightness resets color profile and some other disply options.
+		SDL_SetWindowBrightness(g_game_window, brightness);
+	}
 }
 
 

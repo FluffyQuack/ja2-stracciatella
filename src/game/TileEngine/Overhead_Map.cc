@@ -9,7 +9,7 @@
 #include "Game_Clock.h"
 #include "GameInstance.h"
 #include "GameLoop.h"
-#include "GameState.h"
+#include "GameMode.h"
 #include "Handle_Items.h"
 #include "Handle_UI.h"
 #include "HImage.h"
@@ -783,7 +783,7 @@ static void RenderOverheadOverlays(void)
 			0;
 		marker->CurrentShade(shade);
 
-		if (gfEditMode && GameState::getInstance()->isEditorMode() && gpSelected && gpSelected->pSoldier == &s)
+		if (gfEditMode && GameMode::getInstance()->isEditorMode() && gpSelected && gpSelected->pSoldier == &s)
 		{ //editor:  show the selected edited merc as the yellow one.
 			Blt8BPPDataTo16BPPBufferTransparent(pDestBuf, uiDestPitchBYTES, marker, sX, sY, 0);
 		}
@@ -848,8 +848,6 @@ static void RenderOverheadOverlays(void)
 
 static void ClickOverheadRegionCallback(MOUSE_REGION* reg, INT32 reason)
 {
-	INT16  sWorldScreenX, sWorldScreenY;
-
 	if( gfTacticalPlacementGUIActive )
 	{
 		HandleTacticalPlacementClicksInOverheadMap(reason);
@@ -858,11 +856,8 @@ static void ClickOverheadRegionCallback(MOUSE_REGION* reg, INT32 reason)
 
 	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
 	{
-		sWorldScreenX = ( gusMouseXPos - gsStartRestrictedX ) * 5;
-		sWorldScreenY = ( gusMouseYPos - gsStartRestrictedY ) * 5;
-
 		// Get new proposed center location.
-		const GridNo pos = GetMapPosFromAbsoluteScreenXY(sWorldScreenX, sWorldScreenY);
+		const GridNo pos = GetOverheadMouseGridNo();
 		INT16 cell_x;
 		INT16 cell_y;
 		ConvertGridNoToCenterCellXY(pos, &cell_x, &cell_y);

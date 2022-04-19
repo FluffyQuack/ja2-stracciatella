@@ -19,8 +19,9 @@
 #include <SDL.h>
 #include "UILayout.h"
 #include "GameRes.h"
-#include "GameState.h"
+#include "GameMode.h"
 #include "Timer.h"
+#include "Font.h"
 
 #include "DefaultContentManager.h"
 #include "GameInstance.h"
@@ -319,7 +320,7 @@ std::vector<ST::string> InitGlobalLocale()
 	{
 		problems.emplace_back(std::move(ST::format("SetConsoleCP(CP_UTF8) failed, using input code page {}", GetConsoleCP())));
 	}
-	 
+
 	// Ensure quick-edit mode is off, or else it will block execution
 	HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
 	SetConsoleMode(hInput, ENABLE_EXTENDED_FLAGS);
@@ -377,7 +378,7 @@ int main(int argc, char* argv[])
 
 		#ifdef __ANDROID__
 		JNIEnv* jniEnv = (JNIEnv*)SDL_AndroidGetJNIEnv();
-		
+
 		if (setGlobalJniEnv(jniEnv) == FALSE) {
 			auto rustError = getRustError();
 			if (rustError != NULL) {
@@ -397,10 +398,6 @@ int main(int argc, char* argv[])
 
 		RustPointer<EngineOptions> params(EngineOptions_create(configFolderPath.get(), argv, argc));
 		if (params == NULL) {
-			auto rustError = getRustError();
-			if (rustError != NULL) {
-				SLOGE("Failed to load configuration: %s", rustError);
-			}
 			return EXIT_FAILURE;
 		}
 
@@ -420,21 +417,16 @@ int main(int argc, char* argv[])
 
 		if (EngineOptions_shouldStartInDebugMode(params.get())) {
 			Logger_setLevel(LogLevel::Debug);
-			GameState::getInstance()->setDebugging(true);
+			GameMode::getInstance()->setDebugging(true);
 		}
 
 		if (EngineOptions_shouldRunEditor(params.get())) {
-			GameState::getInstance()->setEditorMode(false);
+			GameMode::getInstance()->setEditorMode(false);
 		}
 
 		uint16_t width = EngineOptions_getResolutionX(params.get());
 		uint16_t height = EngineOptions_getResolutionY(params.get());
-		bool result = g_ui.setScreenSize(width, height);
-		if(!result)
-		{
-			SLOGE("Failed to set screen resolution %d x %d", width, height);
-			return EXIT_FAILURE;
-		}
+		g_ui.setScreenSize(width, height);
 
 		if (EngineOptions_shouldRunUnittests(params.get())) {
 	#ifdef WITH_UNITTESTS
@@ -468,7 +460,6 @@ int main(int argc, char* argv[])
 		InitializeMemoryManager();
 
 		SLOGD("Initializing Game Resources");
-		FileMan::switchTmpFolder(configFolderPath.get());
 
 		DefaultContentManager *cm;
 
@@ -484,82 +475,65 @@ int main(int argc, char* argv[])
 
 		cm->logConfiguration();
 
-		if(!cm->loadGameData())
+		if (!cm->loadGameData())
 		{
-			SLOGI("Failed to load the game data.");
+			throw std::runtime_error("Failed to load the game data.");
 		}
-		else
+
+		GCM = cm;
+
+		g_ui.recalculatePositions();
+
+		SLOGD("Initializing Video Manager");
+		InitializeVideoManager(scalingQuality);
+		VideoSetBrightness(brightness);
+
+		SLOGD("Initializing Video Object Manager");
+		InitializeVideoObjectManager();
+
+		SLOGD("Initializing Video Surface Manager");
+		InitializeVideoSurfaceManager();
+
+		InitJA2SplashScreen();
+
+		// Initialize Font Manager
+		SLOGD("Initializing the Font Manager");
+		// Init the manager and copy the TransTable stuff into it.
+		InitializeFontManager();
+
+		SLOGD("Initializing Sound Manager");
+		InitializeSoundManager();
+
+		SLOGD("Initializing Random");
+		// Initialize random number generator
+		InitializeRandom(); // no Shutdown
+
+		SLOGD("Initializing Game Manager");
+		// Initialize the Game
+		InitializeGame();
+
+		gfGameInitialized = TRUE;
+
+		if(isEnglishVersion() || isChineseVersion())
 		{
-
-			GCM = cm;
-
-			SLOGD("Initializing Video Manager");
-			InitializeVideoManager(scalingQuality);
-			VideoSetBrightness(brightness);
-
-			SLOGD("Initializing Video Object Manager");
-			InitializeVideoObjectManager();
-
-			SLOGD("Initializing Video Surface Manager");
-			InitializeVideoSurfaceManager();
-
-			InitJA2SplashScreen();
-
-			// Initialize Font Manager
-			SLOGD("Initializing the Font Manager");
-			// Init the manager and copy the TransTable stuff into it.
-			InitializeFontManager();
-
-			SLOGD("Initializing Sound Manager");
-			InitializeSoundManager();
-
-			SLOGD("Initializing Random");
-			// Initialize random number generator
-			InitializeRandom(); // no Shutdown
-
-			SLOGD("Initializing Game Manager");
-			// Initialize the Game
-			InitializeGame();
-
-			gfGameInitialized = TRUE;
-
-			////////////////////////////////////////////////////////////
-
-			// some data convertion
-			// convertDialogQuotesToJson(cm, SE_RUSSIAN, "mercedt/051.edt", FileMan::joinPaths(exeFolder, "051.edt.json").c_str());
-			// convertDialogQuotesToJson(cm, SE_RUSSIAN, "mercedt/052.edt", FileMan::joinPaths(exeFolder, "052.edt.json").c_str());
-			// convertDialogQuotesToJson(cm, SE_RUSSIAN, "mercedt/055.edt", FileMan::joinPaths(exeFolder, "055.edt.json").c_str());
-
-			// writeItemsToJson(FileMan::joinPaths(exeFolder, "externalized/weapons.json").c_str(), FIRST_WEAPON, MAX_WEAPONS);
-			// writeMagazinesToJson(FileMan::joinPaths(exeFolder, "externalized/magazines.json").c_str());
-			// writeItemsToJson(FileMan::joinPaths(exeFolder, "externalized/items.json").c_str(), FIRST_EXPLOSIVE, MAXITEMS);
-
-			// readWeaponsFromJson(FileMan::joinPaths(exeFolder, "weapon.json").c_str());
-			// readWeaponsFromJson(FileMan::joinPaths(exeFolder, "weapon2.json").c_str());
-
-			////////////////////////////////////////////////////////////
-
-			if(isEnglishVersion())
-			{
-				SetIntroType(INTRO_SPLASH);
-			}
-
-			SLOGD("Running Game");
-
-			/* At this point the SGP is set up, which means all I/O, Memory, tools, etc.
-			* are available. All we need to do is attend to the gaming mechanics
-			* themselves */
-			MainLoop(gamepolicy(ms_per_game_cycle));
+			SetIntroType(INTRO_SPLASH);
 		}
+
+		SLOGD("Running Game");
+
+		/* At this point the SGP is set up, which means all I/O, Memory, tools, etc.
+		* are available. All we need to do is attend to the gaming mechanics
+		* themselves */
+		MainLoop(gamepolicy(ms_per_game_cycle));
 
 		delete cm;
 		GCM = NULL;
-	} catch (...) {
-        TerminationHandler();
-        return EXIT_FAILURE;
-	}
 
-	return EXIT_SUCCESS;
+		return EXIT_SUCCESS;
+	} catch (...) {
+		TerminationHandler();
+		return EXIT_FAILURE;
+	}
 }
 
 void TerminationHandler()
@@ -589,7 +563,7 @@ void TerminationHandler()
 		{
 		}
 	}
-	SLOGE(errorMessage.c_str());
+	STLOGE(errorMessage.c_str());
 	#ifdef __ANDROID__
 	jniEnv->CallVoidMethod(exceptionContainerSingleton, setAndroidExceptionMethodId,
                                    jniEnv->NewStringUTF(errorMessage.c_str()));

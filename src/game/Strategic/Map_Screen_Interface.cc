@@ -233,7 +233,7 @@ static MERC_LEAVE_ITEM* gpLeaveListHead[NUM_LEAVE_LIST_SLOTS];
 static UINT32 guiLeaveListOwnerProfileId[NUM_LEAVE_LIST_SLOTS];
 
 // timers for double click
-static INT32 giDblClickTimersForMoveBoxMouseRegions[MAX_POPUP_BOX_STRING_COUNT];
+static UINT32 guiDblClickTimersForMoveBoxMouseRegions[MAX_POPUP_BOX_STRING_COUNT];
 
 UINT32 guiSectorLocatorBaseTime = 0;
 
@@ -2575,18 +2575,19 @@ static void SelectAllOtherSoldiersInList(void);
 static void MoveMenuBtnCallback(MOUSE_REGION* pRegion, INT32 iReason)
 {
 	// btn callback handler for move box line regions
-	INT32 iMoveBoxLine = -1, iRegionType = -1, iListIndex = -1, iClickTime = 0;
+	INT32 iMoveBoxLine = -1, iRegionType = -1, iListIndex = -1;
+	UINT32 uiClickTime = 0;
 	SOLDIERTYPE *pSoldier = NULL;
 
 
 	iMoveBoxLine = MSYS_GetRegionUserData( pRegion, 0 );
 	iRegionType  = MSYS_GetRegionUserData( pRegion, 1 );
 	iListIndex   = MSYS_GetRegionUserData( pRegion, 2 );
-	iClickTime   = GetJA2Clock();
+	uiClickTime   = GetJA2Clock();
 
 	if( ( iReason & MSYS_CALLBACK_REASON_LBUTTON_UP )  )
 	{
-		if( iClickTime - giDblClickTimersForMoveBoxMouseRegions[ iMoveBoxLine ] < DBL_CLICK_DELAY_FOR_MOVE_MENU  )
+		if( uiClickTime - guiDblClickTimersForMoveBoxMouseRegions[ iMoveBoxLine ] < DBL_CLICK_DELAY_FOR_MOVE_MENU  )
 		{
 			// dbl click, and something is selected?
 			if ( IsAnythingSelectedForMoving() )
@@ -2598,7 +2599,7 @@ static void MoveMenuBtnCallback(MOUSE_REGION* pRegion, INT32 iReason)
 		}
 		else
 		{
-			giDblClickTimersForMoveBoxMouseRegions[ iMoveBoxLine ] = iClickTime;
+			guiDblClickTimersForMoveBoxMouseRegions[ iMoveBoxLine ] = uiClickTime;
 
 			if( iRegionType == SQUAD_REGION )
 			{
@@ -3614,7 +3615,7 @@ void EndUpdateBox( BOOLEAN fContinueTimeCompression )
 
 void InitTimersForMoveMenuMouseRegions()
 {
-	FOR_EACH(INT32, i, giDblClickTimersForMoveBoxMouseRegions) *i = 0;
+	FOR_EACH(UINT32, i, guiDblClickTimersForMoveBoxMouseRegions) *i = 0;
 }
 
 
@@ -4105,7 +4106,7 @@ void SaveLeaveItemList(HWFILE const f)
 		{
 			// Save to specify that a node DOES exist
 			BOOLEAN const node_exists = TRUE;
-			FileWrite(f, &node_exists, sizeof(BOOLEAN));
+			f->write(&node_exists, sizeof(BOOLEAN));
 
 			// Save number of items
 			UINT32 n_items = 0;
@@ -4113,7 +4114,7 @@ void SaveLeaveItemList(HWFILE const f)
 			{
 				++n_items;
 			}
-			FileWrite(f, &n_items, sizeof(UINT32));
+			f->write(&n_items, sizeof(UINT32));
 
 			for (MERC_LEAVE_ITEM const* i = head; i; i = i->pNext)
 			{
@@ -4123,21 +4124,21 @@ void SaveLeaveItemList(HWFILE const f)
 				INJ_SKIP(d, 4)
 				Assert(d.getConsumed() == lengthof(data));
 
-				FileWrite(f, data, sizeof(data));
+				f->write(data, sizeof(data));
 			}
 		}
 		else
 		{
 			// Save to specify that a node DOENST exist
 			BOOLEAN const node_exists = FALSE;
-			FileWrite(f, &node_exists, sizeof(BOOLEAN));
+			f->write(&node_exists, sizeof(BOOLEAN));
 		}
 	}
 
 	// Save the leave list profile IDs
 	for (INT32 i = 0; i < NUM_LEAVE_LIST_SLOTS; ++i)
 	{
-		FileWrite(f, &guiLeaveListOwnerProfileId[i], sizeof(UINT32));
+		f->write(&guiLeaveListOwnerProfileId[i], sizeof(UINT32));
 	}
 }
 
@@ -4151,12 +4152,12 @@ void LoadLeaveItemList(HWFILE const f)
 	{
 		// Load flag which specifies whether a node exists
 		BOOLEAN	node_exists;
-		FileRead(f, &node_exists, sizeof(BOOLEAN));
+		f->read(&node_exists, sizeof(BOOLEAN));
 		if (!node_exists) continue;
 
 		// Load the number specifing how many items there are in the list
 		UINT32 n_items;
-		FileRead(f, &n_items, sizeof(UINT32));
+		f->read(&n_items, sizeof(UINT32));
 
 		MERC_LEAVE_ITEM** anchor = &gpLeaveListHead[i];
 		for (UINT32 n = n_items; n != 0; --n)
@@ -4164,7 +4165,7 @@ void LoadLeaveItemList(HWFILE const f)
 			MERC_LEAVE_ITEM* const li = new MERC_LEAVE_ITEM{};
 
 			BYTE  data[40];
-			FileRead(f, data, sizeof(data));
+			f->read(data, sizeof(data));
 
 			DataReader d{data};
 			ExtractObject(d, &li->o);
@@ -4180,7 +4181,7 @@ void LoadLeaveItemList(HWFILE const f)
 	// Load the leave list profile IDs
 	for (INT32 i = 0; i < NUM_LEAVE_LIST_SLOTS; ++i)
 	{
-		FileRead(f, &guiLeaveListOwnerProfileId[i], sizeof(UINT32));
+		f->read(&guiLeaveListOwnerProfileId[i], sizeof(UINT32));
 	}
 }
 

@@ -323,7 +323,7 @@ void RevealRoofsAndItems(SOLDIERTYPE* const pSoldier, const BOOLEAN fShowLocator
 		range = (AdjustMaxSightRangeForEnvEffects(LightTrueLevel(pSoldier->sGridNo, pSoldier->bLevel), range) + range) / 2;
 	}
 
-	UINT32 Dir[6];
+	UINT32 Dir[6] = { 0 };
 	BuildSightDir(dir,&Dir[0],&Dir[1],&Dir[2],&Dir[3],&Dir[4]);
 	INT32 Inc[6];
 	for (cnt = 0; cnt < 5; cnt++)
@@ -434,7 +434,7 @@ void RevealRoofsAndItems(SOLDIERTYPE* const pSoldier, const BOOLEAN fShowLocator
 #ifdef _DEBUG
 			if (_KeyDown(SDLK_NUMLOCKCLEAR))
 			{
-				int cnt = GetJA2Clock( );
+				unsigned int cnt = GetJA2Clock();
 
 				gubFOVDebugInfoInfo[ marker ] = (UINT8)markercnt;
 				RenderFOVDebug( );

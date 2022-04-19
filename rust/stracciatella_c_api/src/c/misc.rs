@@ -7,8 +7,6 @@ use std::ffi::CString;
 use std::process::Command;
 use std::ptr;
 
-use log;
-
 use stracciatella::config::EngineOptions;
 use stracciatella::fs::resolve_existing_components;
 use stracciatella::get_assets_dir;
@@ -153,48 +151,6 @@ pub extern "C" fn checkIfRelativePathExists(
     let path = path_buf_from_c_str_or_panic(unsafe_c_str(path));
     let path = resolve_existing_components(&path, Some(&base), caseless);
     path.exists()
-}
-
-/// Returns a list of available mods.
-/// The caller is responsible for the returned memory.
-#[no_mangle]
-pub extern "C" fn findAvailableMods(engine_options: *mut EngineOptions) -> *mut VecCString {
-    let engine_options = unsafe_mut(engine_options);
-    let mut entries: Vec<_> = Vec::new();
-
-    // list all directories under assets dir
-    let mut assets_path = get_assets_dir();
-    assets_path.push("mods");
-    if let Ok(paths) = assets_path.read_dir() {
-        paths.for_each(|p| entries.push(p));
-    }
-
-    // list all directories under stracc home dir
-    let mut home_dir = engine_options.stracciatella_home.clone();
-    home_dir.push("mods");
-    if let Ok(paths) = home_dir.read_dir() {
-        paths.for_each(|p| entries.push(p));
-    }
-
-    let mut mods: Vec<_> = entries
-        .into_iter()
-        .filter_map(|x| x.ok()) // DirEntry
-        .filter_map(|x| {
-            if let Ok(metadata) = x.metadata() {
-                if metadata.is_dir() {
-                    return x.file_name().into_string().ok();
-                }
-            }
-            None
-        }) // String
-        .filter_map(|x| CString::new(x.as_bytes().to_owned()).ok()) // CString
-        .collect();
-
-    // remove duplicates
-    mods.sort();
-    mods.dedup();
-
-    into_ptr(VecCString::from(mods))
 }
 
 /// Executes a command.

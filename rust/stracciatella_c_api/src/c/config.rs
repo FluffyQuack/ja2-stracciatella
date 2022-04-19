@@ -5,14 +5,15 @@
 use std::ptr;
 
 use stracciatella::config::{
-    find_stracciatella_home, Cli, EngineOptions, Ja2Json, Resolution, ScalingQuality,
-    VanillaVersion,
+    find_stracciatella_home, Cli, EngineOptions, EngineOptionsError, Ja2Json, Resolution,
+    ScalingQuality, VanillaVersion,
 };
 
 use crate::c::common::*;
 
 /// Creates `EngineOptions` with the provided command line arguments.
 /// Loads values from `(stracciatella_home)/ja2.json`, creating it if it does not exist.
+/// Logs relevant information when creating failed
 /// The caller is responsible for the returned memory.
 #[no_mangle]
 pub extern "C" fn EngineOptions_create(
@@ -34,8 +35,12 @@ pub extern "C" fn EngineOptions_create(
             no_rust_error();
             into_ptr(engine_options)
         }
-        Err(msg) => {
-            remember_rust_error(format!("EngineOptions_create: {}", msg));
+        Err(err) => {
+            if let EngineOptionsError::Cli(_) = err {
+                log::info!("{}", Cli::usage())
+            }
+            log::error!("{}", err);
+            remember_rust_error(err.to_string());
             ptr::null_mut()
         }
     }
@@ -108,6 +113,34 @@ pub extern "C" fn EngineOptions_setVanillaGameDir(
     let engine_options = unsafe_mut(ptr);
     let vanilla_game_dir = path_buf_from_c_str_or_panic(unsafe_c_str(game_dir_ptr));
     engine_options.vanilla_game_dir = vanilla_game_dir;
+}
+
+/// Gets the `EngineOptions.save_game_dir` path.
+/// The caller is responsible for the returned memory.
+#[no_mangle]
+pub extern "C" fn EngineOptions_getSaveGameDir(ptr: *const EngineOptions) -> *mut c_char {
+    let engine_options = unsafe_ref(ptr);
+    let save_game_dir = c_string_from_path_or_panic(&engine_options.save_game_dir);
+    save_game_dir.into_raw()
+}
+
+/// Sets the `EngineOptions.save_game_dir` path.
+#[no_mangle]
+pub extern "C" fn EngineOptions_setSaveGameDir(
+    ptr: *mut EngineOptions,
+    save_game_dir_ptr: *const c_char,
+) {
+    let engine_options = unsafe_mut(ptr);
+    let save_game_dir = path_buf_from_c_str_or_panic(unsafe_c_str(save_game_dir_ptr));
+    engine_options.save_game_dir = save_game_dir;
+}
+
+/// Checks if mod is enabled
+#[no_mangle]
+pub extern "C" fn EngineOptions_isModEnabled(ptr: *mut EngineOptions, name: *const c_char) -> bool {
+    let engine_options = unsafe_mut(ptr);
+    let name = str_from_c_str_or_panic(unsafe_c_str(name)).to_owned();
+    engine_options.is_mod_enabled(&name)
 }
 
 /// Gets the length of `EngineOptions.mods`.
@@ -299,7 +332,6 @@ mod tests {
     use std::fs;
 
     use stracciatella::config::{EngineOptions, Resolution};
-    use stracciatella::parse_json_config;
     use tempfile::TempDir;
 
     use crate::c::common::*;
@@ -323,12 +355,15 @@ mod tests {
         let temp_dir = write_temp_folder_with_ja2_json(b"Invalid JSON");
         let stracciatella_home = temp_dir.path().join(".ja2");
 
-        engine_options.stracciatella_home = stracciatella_home.clone();
+        engine_options.stracciatella_home = stracciatella_home;
         engine_options.resolution = Resolution(100, 100);
 
         assert_eq!(EngineOptions_write(&mut engine_options), true);
 
-        let got_engine_options = parse_json_config(&stracciatella_home).unwrap();
+        let mut got_engine_options = EngineOptions::default();
+        Ja2Json::from_stracciatella_home(&engine_options.stracciatella_home)
+            .apply_to_engine_options(&mut got_engine_options)
+            .unwrap();
 
         assert_eq!(got_engine_options.resolution, engine_options.resolution);
     }
@@ -351,9 +386,10 @@ mod tests {
             config_file_contents,
             r##"{
   "game_dir": "",
+  "save_game_dir": "",
   "mods": [],
   "res": "100x100",
-  "brightness": 1.0,
+  "brightness": -1.0,
   "resversion": "ENGLISH",
   "fullscreen": false,
   "scaling": "PERFECT",
@@ -380,5 +416,6 @@ mod tests {
         t!(VanillaVersion::POLISH, "Polish");
         t!(VanillaVersion::RUSSIAN, "Russian");
         t!(VanillaVersion::RUSSIAN_GOLD, "Russian (Gold)");
+        t!(VanillaVersion::SIMPLIFIED_CHINESE, "Simplified Chinese");
     }
 }

@@ -2022,15 +2022,17 @@ static UINT32 DisplayInvSlot(UINT8 const slot_num, UINT16 const item_idx, UINT16
 	{
 		// Display the item graphic
 		const ItemModel * item = GCM->getItem(item_idx);
-		SGPVObject  const& item_vo = GetInterfaceGraphicForItem(item);
-		ETRLEObject const& e       = item_vo.SubregionProperties(item->getGraphicNum());
+		auto graphic = GetSmallInventoryGraphicForItem(item);
+		auto item_vo = graphic.first;
+		auto index = graphic.second;
+		ETRLEObject const& e       = item_vo->SubregionProperties(index);
 		INT16              cen_x   = x + 7 + ABS(SKI_INV_WIDTH - 3 - e.usWidth)  / 2 - e.sOffsetX;
 		INT16              cen_y   = y +     ABS(SKI_INV_HEIGHT    - e.usHeight) / 2 - e.sOffsetY;
 		if (gamepolicy(f_draw_item_shadow))
 		{
-			BltVideoObjectOutlineShadow(FRAME_BUFFER, &item_vo, item->getGraphicNum(), cen_x - 2, cen_y + 2);
+			BltVideoObjectOutlineShadow(FRAME_BUFFER, item_vo, index, cen_x - 2, cen_y + 2);
 		}
-		BltVideoObjectOutline(      FRAME_BUFFER, &item_vo, item->getGraphicNum(), cen_x,     cen_y, outline);	}
+		BltVideoObjectOutline(      FRAME_BUFFER, item_vo, index, cen_x,     cen_y, outline);	}
 
 	{
 		// Display the status of the item
@@ -4997,26 +4999,24 @@ static void CrossOutUnwantedItems(void)
 
 static void HandleCheckIfEnoughOnTheTable(void)
 {
-	static INT32 iLastTime = 0;
-	INT32  iDifference = 0, iRand = 0;
+	static UINT32 uiLastTime = 0;
 	UINT32 uiPlayersOfferAreaValue = CalculateTotalPlayersValue();
 	UINT32 uiArmsDealersItemsCost = CalculateTotalArmsDealerCost();
 
-	if( ( iLastTime == 0 ) || gfResetShopKeepIdleQuote )
+	if (uiLastTime == 0 || gfResetShopKeepIdleQuote)
 	{
-		iLastTime = GetJA2Clock();
+		uiLastTime = GetJA2Clock();
 		gfResetShopKeepIdleQuote = FALSE;
 	}
 
-	iDifference = GetJA2Clock() - iLastTime;
-
-	iRand = Random( 100 );
+	UINT32 uiDifference = GetJA2Clock() - uiLastTime;
+	UINT32 uiRand = Random(100);
 
 	// delay for shopkeeper passed?
-	if( iDifference > DELAY_FOR_SHOPKEEPER_IDLE_QUOTE )
+	if (uiDifference > DELAY_FOR_SHOPKEEPER_IDLE_QUOTE)
 	{
 		// random chance enough?
-		if( iRand > CHANCE_FOR_SHOPKEEPER_IDLE_QUOTE )
+		if (uiRand > CHANCE_FOR_SHOPKEEPER_IDLE_QUOTE)
 		{
 			// is there enough on the table
 			if( ( uiArmsDealersItemsCost > uiPlayersOfferAreaValue ) && ( uiPlayersOfferAreaValue ) )

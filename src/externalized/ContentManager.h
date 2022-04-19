@@ -6,6 +6,8 @@
 
 #include "Facts.h"
 #include "ItemSystem.h"
+#include "MercSystem.h"
+#include "DirFs.h"
 
 #include <string_theory/string>
 
@@ -39,20 +41,21 @@ class SamSiteAirControlModel;
 class ShippingDestinationModel;
 class StrategicAIPolicy;
 class StrategicMapSecretModel;
+class SGPFile;
 class TownModel;
 class UndergroundSectorModel;
+class VehicleModel;
 struct AmmoTypeModel;
 struct CalibreModel;
 struct LoadingScreen;
 struct MagazineModel;
 struct RPCSmallFaceModel;
-struct SGPFile;
 struct WeaponModel;
 struct ARMY_COMPOSITION;
 struct PATROL_GROUP;
 struct GARRISON_GROUP;
 
-class ContentManager : public ItemSystem
+class ContentManager : public ItemSystem, public MercSystem
 {
 public:
 	virtual ~ContentManager() {};
@@ -77,23 +80,20 @@ public:
 	/** Open map for reading. */
 	virtual SGPFile* openMapForReading(const ST::string& mapName) const = 0;
 
-	/** Open user's private file (e.g. saved game, settings) for reading. */
-	virtual SGPFile* openUserPrivateFileForReading(const ST::string& filename) const = 0;
-
 	/* Open a game resource file for reading. */
 	virtual SGPFile* openGameResForReading(const ST::string& filename) const = 0;
 
 	/* Checks if a game resource exists. */
 	virtual bool doesGameResExists(const ST::string& filename) const = 0;
 
-	/** Get folder for screenshots. */
-	virtual ST::string getScreenshotFolder() const = 0;
+	/** User private file (e.g. settings) */
+	virtual DirFs* userPrivateFiles() const = 0;
 
-	/** Get folder for video capture. */
-	virtual ST::string getVideoCaptureFolder() const = 0;
+	/** Save game files */
+	virtual DirFs* saveGameFiles() const = 0;
 
-	/** Get folder for saved games. */
-	virtual ST::string getSavedGamesFolder() const = 0;
+	/** Temp files */
+	virtual DirFs* tempFiles() const = 0;
 
 	/** Load encrypted string from game resource file. */
 	virtual ST::string loadEncryptedString(const ST::string& fileName, uint32_t seek_chars, uint32_t read_chars) const = 0;
@@ -116,9 +116,6 @@ public:
 	virtual const ST::string* getCalibreNameForBobbyRay(uint8_t index) const = 0;
 
 	virtual const AmmoTypeModel* getAmmoType(uint8_t index) = 0;
-
-	virtual const ItemModel* getItem(uint16_t index) const = 0;
-	virtual const std::map<uint16_t, uint16_t> getMapItemReplacements() const = 0;
 
 	virtual const std::vector<std::vector<const WeaponModel*> > & getNormalGunChoice() const = 0;
 	virtual const std::vector<std::vector<const WeaponModel*> > & getExtendedGunChoice() const = 0;
@@ -171,7 +168,7 @@ public:
 	virtual int16_t getSectorLandType(uint8_t sectorID, uint8_t sectorLevel) const = 0;
 	virtual const std::map<uint8_t, const NpcPlacementModel*>& listNpcPlacements() const = 0;
 	virtual const NpcPlacementModel* getNpcPlacement(uint8_t profileId) const = 0;
-	
+
 	/* Params for the given NPC_ACTION if found, or return an empty instance */
 	virtual const NpcActionParamsModel* getNpcActionParams(uint16_t actionCode) const = 0;
 
@@ -187,6 +184,9 @@ public:
 	/* Gets eyes and mouths offsets for the RPC small portraits. Returns null if none defined. */
 	virtual const RPCSmallFaceModel* getRPCSmallFaceOffsets(uint8_t profileID) const = 0;
 
+	/* Gets all vehicle types */
+	virtual const VehicleModel* getVehicle(uint8_t vehicleID) const = 0;
+
 	/* Gets loading screen for the sector. Returns NULL if the sector does not have an associated loading screen */
 	virtual const LoadingScreen* getLoadingScreenForSector(uint8_t sectorId, uint8_t sectorLevel, bool isNight) const = 0;
 
@@ -197,30 +197,8 @@ public:
 
 	virtual const ST::string& getLandTypeString(size_t index) const = 0;
 
-	/** Does temp file exist. */
-	virtual bool doesTempFileExist(const ST::string& filename) const = 0;
+	virtual const std::map<UINT32, UINT16>* getTranslationTable() const = 0;
 
-	/** Open temporary file for writing. */
-	virtual SGPFile* openTempFileForWriting(const ST::string& filename, bool truncate) const = 0;
-
-	/** Open temporary file for reading. */
-	virtual SGPFile* openTempFileForReading(const ST::string& filename) const = 0;
-
-	/** Open temporary file for read/write. */
-	virtual SGPFile* openTempFileForReadWrite(const ST::string& filename) const = 0;
-
-	/** Open temporary file for appending. */
-	virtual SGPFile* openTempFileForAppend(const ST::string& filename) const = 0;
-
-	/** Delete temporary file. */
-	virtual void deleteTempFile(const ST::string& filename) const = 0;
-
-	/** Create temporary directory. Does not fail if it exists already. */
-	virtual void createTempDir(const ST::string& dirname) const = 0;
-
-	/** List temporary directory. Pass empty string to list the temp dir itself. */
-	virtual std::vector<ST::string> findAllFilesInTempDir(const ST::string& dirname, bool sortResults = false, bool recursive = false, bool returnOnlyNames = false) const = 0;
-
-	/** Erase all files within temporary directory. */
-	virtual void eraseTempDir(const ST::string& dirname) const = 0;
+	/* Gets the enabled mods and their version strings as a map */
+	virtual const std::vector<std::pair<ST::string, ST::string>> getEnabledMods() const = 0;
 };

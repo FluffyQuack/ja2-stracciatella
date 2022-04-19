@@ -1,89 +1,86 @@
-#include "Directories.h"
-#include "Font.h"
-#include "Interface_Control.h"
-#include "Isometric_Utils.h"
-#include "Local.h"
-#include "Soldier_Ani.h"
-#include "Timer_Control.h"
-#include "VObject.h"
-#include "SysUtil.h"
-#include "Overhead.h"
-#include "MouseSystem.h"
-#include "Button_System.h"
-#include "Interface.h"
-#include "VSurface.h"
-#include "Input.h"
-#include "Handle_UI.h"
-#include "RenderWorld.h"
-#include "Cursors.h"
-#include "Radar_Screen.h"
-#include "Font_Control.h"
-#include "Render_Dirty.h"
-#include "Sound_Control.h"
 #include "Interface_Panels.h"
 #include "Animation_Control.h"
-#include "Soldier_Control.h"
-#include "PathAI.h"
-#include "Weapons.h"
+#include "Assignments.h"
+#include "Boxing.h"
+#include "Button_System.h"
+#include "ContentManager.h"
+#include "Cursor_Control.h"
+#include "Cursors.h"
+#include "Debug.h"
+#include "Dialogue_Control.h"
+#include "Directories.h"
+#include "Drugs_And_Alcohol.h"
+#include "English.h"
 #include "Faces.h"
-#include "MapScreen.h"
-#include "Message.h"
-#include "Text.h"
+#include "Finances.h"
+#include "Font.h"
+#include "Font_Control.h"
+#include "GameInstance.h"
+#include "GamePolicy.h"
+#include "GameScreen.h"
+#include "GameSettings.h"
+#include "Game_Clock.h"
+#include "HImage.h"
+#include "Handle_UI.h"
+#include "Input.h"
+#include "Interface.h"
+#include "Interface_Control.h"
 #include "Interface_Items.h"
 #include "Interface_Utils.h"
-#include "Game_Clock.h"
-#include "Soldier_Macros.h"
-#include "StrategicMap.h"
-#include "Soldier_Functions.h"
-#include "GameScreen.h"
-#include "Assignments.h"
+#include "Isometric_Utils.h"
+#include "Items.h"
+#include "JAScreens.h"
+#include "Keys.h"
+#include "LOS.h"
+#include "LaptopSave.h"
+#include "Local.h"
+#include "Logger.h"
+#include "MapScreen.h"
+#include "Map_Screen_Interface.h"
+#include "Map_Screen_Interface_Map.h"
+#include "Message.h"
+#include "MessageBoxScreen.h"
+#include "MouseSystem.h"
+#include "OppList.h"
+#include "Options_Screen.h"
+#include "Overhead.h"
+#include "Overhead_Map.h"
+#include "PathAI.h"
 #include "Points.h"
+#include "Radar_Screen.h"
+#include "RenderWorld.h"
+#include "Render_Dirty.h"
+#include "ScreenIDs.h"
+#include "ShopKeeper_Interface.h"
+#include "Soldier_Add.h"
+#include "Soldier_Ani.h"
+#include "Soldier_Control.h"
+#include "Soldier_Functions.h"
+#include "Soldier_Macros.h"
+#include "Sound_Control.h"
 #include "Squads.h"
 #include "Strategic.h"
-#include "Map_Screen_Interface_Map.h"
-#include "Overhead_Map.h"
-#include "Map_Screen_Interface.h"
-#include "Options_Screen.h"
-#include "ShopKeeper_Interface.h"
-#include "English.h"
-#include "Keys.h"
-#include "Soldier_Add.h"
-#include "Vehicles.h"
-#include "GameSettings.h"
-#include "Dialogue_Control.h"
-#include "Items.h"
-#include "Drugs_And_Alcohol.h"
-#include "LOS.h"
-#include "OppList.h"
-#include "VObject_Blitters.h"
-#include "Finances.h"
-#include "LaptopSave.h"
-#include "Cursor_Control.h"
-#include "MessageBoxScreen.h"
-#include "WordWrap.h"
-#include "Boxing.h"
-#include "Video.h"
-#include "Debug.h"
-#include "JAScreens.h"
-#include "ScreenIDs.h"
+#include "StrategicMap.h"
+#include "SysUtil.h"
+#include "Text.h"
+#include "Timer_Control.h"
 #include "UILayout.h"
-
-#include "ContentManager.h"
-#include "GameInstance.h"
+#include "VObject.h"
+#include "VObject_Blitters.h"
+#include "VSurface.h"
+#include "Vehicles.h"
+#include "Video.h"
 #include "WeaponModels.h"
-#include "Logger.h"
-
-#include "policy/GamePolicy.h"
-#include "HImage.h"
-
-#include <string_theory/format>
-#include <string_theory/string>
+#include "Weapons.h"
+#include "WordWrap.h"
 
 #include <algorithm>
 #include <iterator>
+#include <string_theory/format>
+#include <string_theory/string>
 
 // DEFINES FOR VARIOUS PANELS
-#define SM_ITEMDESC_START_X			214
+#define SM_ITEMDESC_START_X			214 + INTERFACE_START_X
 #define SM_ITEMDESC_START_Y			1 + INV_INTERFACE_START_Y
 #define SM_ITEMDESC_HEIGHT			128
 #define SM_ITEMDESC_WIDTH			314
@@ -144,9 +141,9 @@
 #define SM_LOOKB_Y				108
 #define SM_STEALTHMODE_X			187
 #define SM_STEALTHMODE_Y			73
-#define SM_DONE_X				543
+#define SM_DONE_X				(g_ui.m_teamPanelSlotsTotalWidth + 45)
 #define SM_DONE_Y				4
-#define SM_MAPSCREEN_X				589
+#define SM_MAPSCREEN_X				(g_ui.m_teamPanelSlotsTotalWidth + 91)
 #define SM_MAPSCREEN_Y				4
 
 
@@ -207,11 +204,11 @@
 #define TM_FACE_WIDTH				48
 #define TM_FACE_HEIGHT				43
 
-#define TM_ENDTURN_X				507
+#define TM_ENDTURN_X				(g_ui.m_teamPanelSlotsTotalWidth + 9)
 #define TM_ENDTURN_Y				9
-#define TM_ROSTERMODE_X			507
+#define TM_ROSTERMODE_X			(g_ui.m_teamPanelSlotsTotalWidth + 9)
 #define TM_ROSTERMODE_Y			45
-#define TM_DISK_X				507
+#define TM_DISK_X				(g_ui.m_teamPanelSlotsTotalWidth + 9)
 #define TM_DISK_Y				81
 
 #define TM_NAME_X				11
@@ -309,11 +306,12 @@ GUIButtonRef iSMPanelButtons[NUM_SM_BUTTONS];
 GUIButtonRef iTEAMPanelButtons[NUM_TEAM_BUTTONS];
 
 // Video Surface for Single Merc Panel
-static SGPVObject* guiSMPanel;
+static SGPVSurfaceAuto* guiSMPanel;
 static SGPVObject* guiSMObjects;
 static SGPVObject* guiSMObjects2;
 
-static SGPVObject* guiTEAMPanel;
+// Video surface for Team panel
+static SGPVSurfaceAuto* guiTEAMPanel;
 static SGPVObject* guiTEAMObjects;
 static SGPVObject* guiVEHINV;
 
@@ -326,6 +324,7 @@ MOUSE_REGION        gSM_SELMERCMoneyRegion;
 static MOUSE_REGION gSM_SELMERCEnemyIndicatorRegion;
 static MOUSE_REGION gTEAM_PanelRegion;
 
+static SGPVSurfaceAuto* CreateVideoSurfaceFromObjectFile(const ST::string& filename, UINT16 usRegionIndex);
 
 // Globals - for one - the current merc here
 SOLDIERTYPE *gpSMCurrentMerc = NULL;
@@ -344,9 +343,7 @@ struct TeamPanelSlot
 	MOUSE_REGION second_hand;
 };
 
-static TeamPanelSlot gTeamPanel[NUM_TEAM_SLOTS];
-
-#define FOR_EACH_TEAM_PANEL_SLOT(iter)		FOR_EACH(TeamPanelSlot, iter, gTeamPanel)
+static std::vector<TeamPanelSlot> gTeamPanel;
 
 
 // Wraps up check for AP-s get from a different soldier for in a vehicle...
@@ -526,11 +523,11 @@ void UpdateForContOverPortrait( SOLDIERTYPE *pSoldier, BOOLEAN fOn )
 	}
 	else
 	{
-		FOR_EACH_TEAM_PANEL_SLOT(i)
+		for (TeamPanelSlot& i : gTeamPanel)
 		{
-			if (i->merc != pSoldier)
+			if (i.merc != pSoldier)
 				continue;
-			if (!IsMouseInRegion(i->face))
+			if (!IsMouseInRegion(i.face))
 				continue;
 			HandleMouseOverSoldierFaceForContMove(pSoldier, fOn);
 		}
@@ -598,7 +595,8 @@ static void UpdateSMPanel()
 		if (!s.bStealthMode) stance_gfx += 3;
 		giSMStealthImages = UseLoadedButtonImage(iSMPanelImages[STANCE_IMAGES], stance_gfx + 2, stance_gfx,
 								-1, stance_gfx + 1, -1);
-		giSMStealthButton = QuickCreateButton(giSMStealthImages, SM_STEALTHMODE_X,
+		giSMStealthButton = QuickCreateButton(giSMStealthImages,
+							INTERFACE_START_X + SM_STEALTHMODE_X,
 							INV_INTERFACE_START_Y + SM_STEALTHMODE_Y,
 							MSYS_PRIORITY_HIGH - 1, BtnStealthModeCallback);
 		giSMStealthButton->SetFastHelpText(TacticalStr[TOGGLE_STEALTH_MODE_POPUPTEXT]);
@@ -854,14 +852,50 @@ static void FillEmptySpaceAtBottom()
 {
 	if(g_ui.isBigScreen())
 	{
-		ColorFillVideoSurfaceArea(guiSAVEBUFFER, 640, g_ui.get_INV_INTERFACE_START_Y(),
+		ColorFillVideoSurfaceArea(guiSAVEBUFFER, 0, g_ui.get_INV_INTERFACE_START_Y(),
+						INTERFACE_START_X, g_ui.m_screenHeight, 0);
+		ColorFillVideoSurfaceArea(guiSAVEBUFFER, INTERFACE_START_X + g_ui.m_teamPanelWidth, g_ui.get_INV_INTERFACE_START_Y(),
 						g_ui.m_screenWidth, g_ui.m_screenHeight, 0);
 	}
 }
 
-void InitializeSMPanel(void)
+/** Fill up some space with a textured space filler */
+static void DrawFillerOnSurface(SGPVSurface* vsSurface, SGPBox const &dest)
 {
-	guiSMPanel    = AddVideoObjectFromFile(INTERFACEDIR "/inventory_bottom_panel.sti");
+	SGPVSurfaceAuto* vsFiller = CreateVideoSurfaceFromObjectFile(INTERFACEDIR "/overheadinterface.sti", 0);
+
+	// clip and blit the big panel from the overheadinterface graphics
+	SGPBox const src  = {80, 42, (UINT16)MIN(dest.w, 560), (UINT16)MIN(dest.h, 112)};
+	BltStretchVideoSurface(vsSurface, vsFiller, &src, &dest);
+
+	delete vsFiller;
+}
+
+void InitializeSMPanel()
+{
+	// Assemble the SMPanel from graphic objects.
+	// For visual consistency, the SMPanel should fill up the same width as the TEAMPanel, that the buttons and
+	// minimap are in the bottom-right corner.
+	SGPVObject* voSMPanel = AddVideoObjectFromFile(INTERFACEDIR "/inventory_bottom_panel.sti");
+	guiSMPanel = new SGPVSurfaceAuto(g_ui.m_teamPanelWidth, INV_INTERFACE_HEIGHT, PIXEL_DEPTH);
+	if (g_ui.m_teamPanelWidth > 640)
+	{
+		// The team panel is longer than default
+		// need a second blit, and we will start from the right
+		BltVideoObject(guiSMPanel, voSMPanel, 0, g_ui.m_teamPanelWidth - 640, 0);
+	}
+	// draw the basic Single-Merc panel
+	BltVideoObject(guiSMPanel, voSMPanel, 0, 0, 0);
+	DeleteVideoObject(voSMPanel);
+
+	INT16 sFillerWidth = g_ui.m_teamPanelWidth - 640;
+	if (sFillerWidth > 0)
+	{
+		// draw a space filler if needed
+		SGPBox const dest = {SM_INVINTERFACE_WIDTH, 2, static_cast<UINT16>(sFillerWidth), INV_INTERFACE_HEIGHT - 6};
+		DrawFillerOnSurface(guiSMPanel, dest);
+	}
+
 	guiSMObjects  = AddVideoObjectFromFile(INTERFACEDIR "/inventory_gold_front.sti");
 	guiSMObjects2 = AddVideoObjectFromFile(INTERFACEDIR "/inv_frn.sti");
 
@@ -875,16 +909,17 @@ void InitializeSMPanel(void)
 	// Create buttons
 	CreateSMPanelButtons();
 
+	const INT32 dx = INTERFACE_START_X;
 	const INT32 dy = INV_INTERFACE_START_Y;
 
 	// Set viewports
 	// Define region for panel
-	MSYS_DefineRegion(&gSMPanelRegion, 0, dy, SCREEN_WIDTH, SCREEN_HEIGHT, MSYS_PRIORITY_NORMAL, CURSOR_NORMAL, MSYS_NO_CALLBACK, MSYS_NO_CALLBACK);
+	MSYS_DefineRegion(&gSMPanelRegion, dx, dy, SCREEN_WIDTH, SCREEN_HEIGHT, MSYS_PRIORITY_NORMAL, CURSOR_NORMAL, MSYS_NO_CALLBACK, MSYS_NO_CALLBACK);
 
 	INT32 x;
 	INT32 y;
 
-	x = SM_SELMERC_FACE_X;
+	x = dx + SM_SELMERC_FACE_X;
 	y = dy + SM_SELMERC_FACE_Y;
 
 	//DEfine region for selected guy panel
@@ -896,7 +931,7 @@ void InitializeSMPanel(void)
 				MSYS_NO_CALLBACK, SelectedMercEnemyIndicatorCallback);
 
 	//DEfine region for money button
-	x = MONEY_X;
+	x = dx + MONEY_X;
 	y = dy + MONEY_Y;
 	MSYS_DefineRegion(&gSM_SELMERCMoneyRegion, x, y, x + MONEY_WIDTH, y + MONEY_HEIGHT, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, SMInvMoneyButtonCallback);
 	gSM_SELMERCMoneyRegion.SetFastHelpText(TacticalStr[MONEY_BUTTON_HELP_TEXT]);
@@ -908,7 +943,7 @@ void InitializeSMPanel(void)
 	}
 
 	//DEfine region for selected guy panel
-	MSYS_DefineRegion(&gSM_SELMERCBarsRegion, 62, dy + 2, 85, dy + 51, MSYS_PRIORITY_NORMAL, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, SelectedMercButtonCallback);
+	MSYS_DefineRegion(&gSM_SELMERCBarsRegion, dx + 62, dy + 2, dx + 85, dy + 51, MSYS_PRIORITY_NORMAL, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, SelectedMercButtonCallback);
 
 	InitInvSlotInterface(g_ui.m_invSlotPositionTac, &g_ui.m_invCamoRegion, SMInvMoveCallback, SMInvClickCallback, SMInvMoveCamoCallback, SMInvClickCamoCallback);
 	InitKeyRingInterface(KeyRingItemPanelButtonCallback);
@@ -1010,25 +1045,26 @@ void CreateSMPanelButtons(void)
 	// SET BUTTONS TO -1
 	std::fill(std::begin(iSMPanelButtons), std::end(iSMPanelButtons), GUIButtonRef::NoButton());
 
+	const INT32 dx = INTERFACE_START_X;
 	const INT32 dy = INV_INTERFACE_START_Y;
 
-	MakeButtonT(SM_MAP_SCREEN_BUTTON, iSMPanelImages[MAPSCREEN_IMAGES],  SM_MAPSCREEN_X,   dy + SM_MAPSCREEN_Y,   BtnMapScreenCallback,  TacticalStr[MAPSCREEN_POPUPTEXT]);
-	MakeButtonT(SM_DONE_BUTTON,       iSMPanelImages[DONE_IMAGES],       SM_DONE_X,        dy + SM_DONE_Y,        BtnSMDoneCallback,     TacticalStr[END_TURN_POPUPTEXT]);
-	MakeButtonN(TALK_BUTTON,          iSMPanelImages[TALK_IMAGES],       SM_TALKB_X,       dy + SM_TALKB_Y,       BtnTalkCallback,       TacticalStr[TALK_CURSOR_POPUPTEXT]);
-	MakeButtonN(MUTE_BUTTON,          iSMPanelImages[MUTE_IMAGES],       SM_MUTEB_X,       dy + SM_MUTEB_Y,       BtnMuteCallback,       TacticalStr[TOGGLE_MUTE_POPUPTEXT]);
-	MakeButtonT(STANCEUP_BUTTON,      iSMPanelImages[STANCEUP_IMAGES],   SM_STANCEUPB_X,   dy + SM_STANCEUPB_Y,   BtnStanceUpCallback,   TacticalStr[CHANGE_STANCE_UP_POPUPTEXT]);
-	MakeButtonN(UPDOWN_BUTTON,        iSMPanelImages[UPDOWN_IMAGES],     SM_UPDOWNB_X,     dy + SM_UPDOWNB_Y,     BtnUpdownCallback,     TacticalStr[CURSOR_LEVEL_POPUPTEXT]);
-	MakeButtonT(CLIMB_BUTTON,         iSMPanelImages[CLIMB_IMAGES],      SM_CLIMBB_X,      dy + SM_CLIMBB_Y,      BtnClimbCallback,      TacticalStr[JUMPCLIMB_POPUPTEXT]);
-	MakeButtonT(STANCEDOWN_BUTTON,    iSMPanelImages[STANCEDOWN_IMAGES], SM_STANCEDOWNB_X, dy + SM_STANCEDOWNB_Y, BtnStanceDownCallback, TacticalStr[CHANGE_STANCE_DOWN_POPUPTEXT]);
-	MakeButtonN(HANDCURSOR_BUTTON,    iSMPanelImages[HANDCURSOR_IMAGES], SM_HANDCURSORB_X, dy + SM_HANDCURSORB_Y, BtnHandCursorCallback, TacticalStr[EXAMINE_CURSOR_POPUPTEXT]);
-	MakeButtonT(PREVMERC_BUTTON,      iSMPanelImages[PREVMERC_IMAGES],   SM_PREVMERCB_X,   dy + SM_PREVMERCB_Y,   BtnPrevMercCallback,   TacticalStr[PREV_MERC_POPUPTEXT]);
-	MakeButtonT(NEXTMERC_BUTTON,      iSMPanelImages[NEXTMERC_IMAGES],   SM_NEXTMERCB_X,   dy + SM_NEXTMERCB_Y,   BtnNextMercCallback,   TacticalStr[NEXT_MERC_POPUPTEXT]);
-	MakeButtonT(OPTIONS_BUTTON,       iSMPanelImages[OPTIONS_IMAGES],    SM_OPTIONSB_X,    dy + SM_OPTIONSB_Y,    BtnOptionsCallback,    TacticalStr[CHANGE_OPTIONS_POPUPTEXT]);
+	MakeButtonT(SM_MAP_SCREEN_BUTTON, iSMPanelImages[MAPSCREEN_IMAGES],  dx + SM_MAPSCREEN_X,   dy + SM_MAPSCREEN_Y,   BtnMapScreenCallback,  TacticalStr[MAPSCREEN_POPUPTEXT]);
+	MakeButtonT(SM_DONE_BUTTON,       iSMPanelImages[DONE_IMAGES],       dx + SM_DONE_X,        dy + SM_DONE_Y,        BtnSMDoneCallback,     TacticalStr[END_TURN_POPUPTEXT]);
+	MakeButtonN(TALK_BUTTON,          iSMPanelImages[TALK_IMAGES],       dx + SM_TALKB_X,       dy + SM_TALKB_Y,       BtnTalkCallback,       TacticalStr[TALK_CURSOR_POPUPTEXT]);
+	MakeButtonN(MUTE_BUTTON,          iSMPanelImages[MUTE_IMAGES],       dx + SM_MUTEB_X,       dy + SM_MUTEB_Y,       BtnMuteCallback,       TacticalStr[TOGGLE_MUTE_POPUPTEXT]);
+	MakeButtonT(STANCEUP_BUTTON,      iSMPanelImages[STANCEUP_IMAGES],   dx + SM_STANCEUPB_X,   dy + SM_STANCEUPB_Y,   BtnStanceUpCallback,   TacticalStr[CHANGE_STANCE_UP_POPUPTEXT]);
+	MakeButtonN(UPDOWN_BUTTON,        iSMPanelImages[UPDOWN_IMAGES],     dx + SM_UPDOWNB_X,     dy + SM_UPDOWNB_Y,     BtnUpdownCallback,     TacticalStr[CURSOR_LEVEL_POPUPTEXT]);
+	MakeButtonT(CLIMB_BUTTON,         iSMPanelImages[CLIMB_IMAGES],      dx + SM_CLIMBB_X,      dy + SM_CLIMBB_Y,      BtnClimbCallback,      TacticalStr[JUMPCLIMB_POPUPTEXT]);
+	MakeButtonT(STANCEDOWN_BUTTON,    iSMPanelImages[STANCEDOWN_IMAGES], dx + SM_STANCEDOWNB_X, dy + SM_STANCEDOWNB_Y, BtnStanceDownCallback, TacticalStr[CHANGE_STANCE_DOWN_POPUPTEXT]);
+	MakeButtonN(HANDCURSOR_BUTTON,    iSMPanelImages[HANDCURSOR_IMAGES], dx + SM_HANDCURSORB_X, dy + SM_HANDCURSORB_Y, BtnHandCursorCallback, TacticalStr[EXAMINE_CURSOR_POPUPTEXT]);
+	MakeButtonT(PREVMERC_BUTTON,      iSMPanelImages[PREVMERC_IMAGES],   dx + SM_PREVMERCB_X,   dy + SM_PREVMERCB_Y,   BtnPrevMercCallback,   TacticalStr[PREV_MERC_POPUPTEXT]);
+	MakeButtonT(NEXTMERC_BUTTON,      iSMPanelImages[NEXTMERC_IMAGES],   dx + SM_NEXTMERCB_X,   dy + SM_NEXTMERCB_Y,   BtnNextMercCallback,   TacticalStr[NEXT_MERC_POPUPTEXT]);
+	MakeButtonT(OPTIONS_BUTTON,       iSMPanelImages[OPTIONS_IMAGES],    dx + SM_OPTIONSB_X,    dy + SM_OPTIONSB_Y,    BtnOptionsCallback,    TacticalStr[CHANGE_OPTIONS_POPUPTEXT]);
 #if 0
 	MakeButtonN(BURSTMODE_BUTTON,     iSMPanelImages[BURSTMODE_IMAGES],  SM_BURSTMODEB_X,  dy + SM_BURSTMODEB_Y,  BtnBurstModeCallback,  TacticalStr[TOGGLE_BURSTMODE_POPUPTEXT]);
 #endif
-	MakeButtonT(BURSTMODE_BUTTON,     iBurstButtonImages[WM_NORMAL],     SM_BURSTMODEB_X,  dy + SM_BURSTMODEB_Y,  BtnBurstModeCallback,  TacticalStr[TOGGLE_BURSTMODE_POPUPTEXT]);
-	MakeButtonN(LOOK_BUTTON,          iSMPanelImages[LOOK_IMAGES],       SM_LOOKB_X,       dy + SM_LOOKB_Y,       BtnLookCallback,       TacticalStr[LOOK_CURSOR_POPUPTEXT]);
+	MakeButtonT(BURSTMODE_BUTTON,     iBurstButtonImages[WM_NORMAL],     dx + SM_BURSTMODEB_X,  dy + SM_BURSTMODEB_Y,  BtnBurstModeCallback,  TacticalStr[TOGGLE_BURSTMODE_POPUPTEXT]);
+	MakeButtonN(LOOK_BUTTON,          iSMPanelImages[LOOK_IMAGES],       dx + SM_LOOKB_X,       dy + SM_LOOKB_Y,       BtnLookCallback,       TacticalStr[LOOK_CURSOR_POPUPTEXT]);
 }
 
 
@@ -1053,11 +1089,11 @@ void RemoveSMPanelButtons(void)
 }
 
 
-void ShutdownSMPanel(void)
+void ShutdownSMPanel()
 {
 	// All buttons and regions and video objects and video surfaces will be deleted at shutddown of SGM
 	// We may want to delete them at the interm as well, to free up room for other panels
-	DeleteVideoObject(guiSMPanel);
+	delete guiSMPanel;
 	DeleteVideoObject(guiSMObjects);
 	DeleteVideoObject(guiSMObjects2);
 
@@ -1210,11 +1246,12 @@ void RenderSMPanel(DirtyLevel* const dirty_level)
 
 	if (InItemDescriptionBox()) HandleItemDescriptionBox(dirty_level);
 
+	INT32 const dx = INTERFACE_START_X;
 	INT32 const dy = INV_INTERFACE_START_Y;
 
 	if (*dirty_level == DIRTYLEVEL2)
 	{
-		BltVideoObject(guiSAVEBUFFER, guiSMPanel, 0, INTERFACE_START_X, dy);
+		BltVideoSurface(guiSAVEBUFFER, guiSMPanel, dx, dy, NULL);
 
 		{
 			SGPVObject const* gfx;
@@ -1232,14 +1269,14 @@ void RenderSMPanel(DirtyLevel* const dirty_level)
 			{
 				goto no_plate;
 			}
-			INT32 const x = SM_SELMERC_PLATE_X;
+			INT32 const x = SM_SELMERC_PLATE_X + dx;
 			INT32 const y = SM_SELMERC_PLATE_Y + dy;
 			BltVideoObject(guiSAVEBUFFER, gfx, 0, x, y);
 			RestoreExternBackgroundRect(x, y, SM_SELMERC_PLATE_WIDTH, SM_SELMERC_PLATE_HEIGHT);
 		}
 no_plate:
 
-		RenderSoldierFace(s, SM_SELMERC_FACE_X, dy + SM_SELMERC_FACE_Y);
+		RenderSoldierFace(s, dx + SM_SELMERC_FACE_X, dy + SM_SELMERC_FACE_Y);
 
 		if (InItemDescriptionBox())
 		{
@@ -1255,30 +1292,30 @@ no_plate:
 			for (UINT32 i = 0; i != 5; ++i)
 			{
 				INT32 const y = dy + 7 + i * 10;
-				MPrint( 92, y, pShortAttributeStrings[i]);
-				MPrint(137, y, pShortAttributeStrings[i + 5]);
+				MPrint( dx + 92, y, pShortAttributeStrings[i]);
+				MPrint(dx + 137, y, pShortAttributeStrings[i + 5]);
 			}
 
-			MPrint(SM_ARMOR_LABEL_X - StringPixLength(pInvPanelTitleStrings[0], BLOCKFONT2) / 2, dy + SM_ARMOR_LABEL_Y, pInvPanelTitleStrings[0]);
-			MPrint(SM_ARMOR_PERCENT_X, dy + SM_ARMOR_PERCENT_Y, "%");
+			MPrint(dx + SM_ARMOR_LABEL_X - StringPixLength(pInvPanelTitleStrings[0], BLOCKFONT2) / 2, dy + SM_ARMOR_LABEL_Y, pInvPanelTitleStrings[0]);
+			MPrint(dx + SM_ARMOR_PERCENT_X, dy + SM_ARMOR_PERCENT_Y, "%");
 
-			MPrint(SM_WEIGHT_LABEL_X - StringPixLength(pInvPanelTitleStrings[1], BLOCKFONT2), dy + SM_WEIGHT_LABEL_Y, pInvPanelTitleStrings[1]);
-			MPrint(SM_WEIGHT_PERCENT_X, dy + SM_WEIGHT_PERCENT_Y, "%");
+			MPrint(dx + SM_WEIGHT_LABEL_X - StringPixLength(pInvPanelTitleStrings[1], BLOCKFONT2), dy + SM_WEIGHT_LABEL_Y, pInvPanelTitleStrings[1]);
+			MPrint(dx + SM_WEIGHT_PERCENT_X, dy + SM_WEIGHT_PERCENT_Y, "%");
 
-			MPrint(SM_CAMO_LABEL_X - StringPixLength(pInvPanelTitleStrings[2], BLOCKFONT2), dy + SM_CAMO_LABEL_Y, pInvPanelTitleStrings[2]);
-			MPrint(SM_CAMO_PERCENT_X, dy + SM_CAMO_PERCENT_Y, "%");
+			MPrint(dx + SM_CAMO_LABEL_X - StringPixLength(pInvPanelTitleStrings[2], BLOCKFONT2), dy + SM_CAMO_LABEL_Y, pInvPanelTitleStrings[2]);
+			MPrint(dx + SM_CAMO_PERCENT_X, dy + SM_CAMO_PERCENT_Y, "%");
 
 			MERCPROFILESTRUCT& p = GetProfile(s.ubProfile);
-			PrintStat(s.uiChangeAgilityTime,      AGIL_INCREASE,     s.bAgility,      SM_AGI_X,    dy + SM_AGI_Y,    p.sAgilityGain*2);
-			PrintStat(s.uiChangeDexterityTime,    DEX_INCREASE,      s.bDexterity,    SM_DEX_X,    dy + SM_DEX_Y,    p.sDexterityGain*2);
-			PrintStat(s.uiChangeStrengthTime,     STRENGTH_INCREASE, s.bStrength,     SM_STR_X,    dy + SM_STR_Y,    p.sStrengthGain*2);
-			PrintStat(s.uiChangeLeadershipTime,   LDR_INCREASE,      s.bLeadership,   SM_CHAR_X,   dy + SM_CHAR_Y,   p.sLeadershipGain*2);
-			PrintStat(s.uiChangeWisdomTime,       WIS_INCREASE,      s.bWisdom,       SM_WIS_X,    dy + SM_WIS_Y,    p.sWisdomGain*2);
-			PrintStat(s.uiChangeLevelTime,        LVL_INCREASE,      s.bExpLevel,     SM_EXPLVL_X, dy + SM_EXPLVL_Y, p.sExpLevelGain*100/(350*p.bExpLevel));
-			PrintStat(s.uiChangeMarksmanshipTime, MRK_INCREASE,      s.bMarksmanship, SM_MRKM_X,   dy + SM_MRKM_Y,   p.sMarksmanshipGain*4);
-			PrintStat(s.uiChangeExplosivesTime,   EXP_INCREASE,      s.bExplosive,    SM_EXPL_X,   dy + SM_EXPL_Y,   p.sExplosivesGain*4);
-			PrintStat(s.uiChangeMechanicalTime,   MECH_INCREASE,     s.bMechanical,   SM_MECH_X,   dy + SM_MECH_Y,   p.sMechanicGain*4);
-			PrintStat(s.uiChangeMedicalTime,      MED_INCREASE,      s.bMedical,      SM_MED_X,    dy + SM_MED_Y,    p.sMedicalGain*4);
+			PrintStat(s.uiChangeAgilityTime,      AGIL_INCREASE,     s.bAgility,      dx + SM_AGI_X,    dy + SM_AGI_Y,    p.sAgilityGain*2);
+			PrintStat(s.uiChangeDexterityTime,    DEX_INCREASE,      s.bDexterity,    dx + SM_DEX_X,    dy + SM_DEX_Y,    p.sDexterityGain*2);
+			PrintStat(s.uiChangeStrengthTime,     STRENGTH_INCREASE, s.bStrength,     dx + SM_STR_X,    dy + SM_STR_Y,    p.sStrengthGain*2);
+			PrintStat(s.uiChangeLeadershipTime,   LDR_INCREASE,      s.bLeadership,   dx + SM_CHAR_X,   dy + SM_CHAR_Y,   p.sLeadershipGain*2);
+			PrintStat(s.uiChangeWisdomTime,       WIS_INCREASE,      s.bWisdom,       dx + SM_WIS_X,    dy + SM_WIS_Y,    p.sWisdomGain*2);
+			PrintStat(s.uiChangeLevelTime,        LVL_INCREASE,      s.bExpLevel,     dx + SM_EXPLVL_X, dy + SM_EXPLVL_Y, p.sExpLevelGain*100/(350*p.bExpLevel));
+			PrintStat(s.uiChangeMarksmanshipTime, MRK_INCREASE,      s.bMarksmanship, dx + SM_MRKM_X,   dy + SM_MRKM_Y,   p.sMarksmanshipGain*4);
+			PrintStat(s.uiChangeExplosivesTime,   EXP_INCREASE,      s.bExplosive,    dx + SM_EXPL_X,   dy + SM_EXPL_Y,   p.sExplosivesGain*4);
+			PrintStat(s.uiChangeMechanicalTime,   MECH_INCREASE,     s.bMechanical,   dx + SM_MECH_X,   dy + SM_MECH_Y,   p.sMechanicGain*4);
+			PrintStat(s.uiChangeMedicalTime,      MED_INCREASE,      s.bMedical,      dx + SM_MED_X,    dy + SM_MED_Y,    p.sMedicalGain*4);
 
 			SetFontForeground(s.bLife >= OKLIFE ? STATS_TEXT_FONT_COLOR : FONT_MCOLOR_DKGRAY);
 
@@ -1288,32 +1325,32 @@ no_plate:
 
 			// Display armour value
 			sString = ST::format("{3d}", ArmourPercent(&s));
-			FindFontRightCoordinates(SM_ARMOR_X, dy + SM_ARMOR_Y, SM_PERCENT_WIDTH, SM_PERCENT_HEIGHT, sString, BLOCKFONT2, &usX, &usY);
+			FindFontRightCoordinates(dx + SM_ARMOR_X, dy + SM_ARMOR_Y, SM_PERCENT_WIDTH, SM_PERCENT_HEIGHT, sString, BLOCKFONT2, &usX, &usY);
 			MPrint(usX, usY , sString);
 
 			// Display weight value
 			sString = ST::format("{3d}", CalculateCarriedWeight(&s));
-			FindFontRightCoordinates(SM_WEIGHT_X, dy + SM_WEIGHT_Y, SM_PERCENT_WIDTH, SM_PERCENT_HEIGHT, sString, BLOCKFONT2, &usX, &usY);
+			FindFontRightCoordinates(dx + SM_WEIGHT_X, dy + SM_WEIGHT_Y, SM_PERCENT_WIDTH, SM_PERCENT_HEIGHT, sString, BLOCKFONT2, &usX, &usY);
 			MPrint(usX, usY, sString);
 
 			// Display camo value
 			sString = ST::format("{3d}", s.bCamo);
-			FindFontRightCoordinates(SM_CAMO_X, dy + SM_CAMO_Y, SM_PERCENT_WIDTH, SM_PERCENT_HEIGHT, sString, BLOCKFONT2, &usX, &usY);
+			FindFontRightCoordinates(dx + SM_CAMO_X, dy + SM_CAMO_Y, SM_PERCENT_WIDTH, SM_PERCENT_HEIGHT, sString, BLOCKFONT2, &usX, &usY);
 			MPrint(usX, usY, sString);
 
 			SetFontDestBuffer(FRAME_BUFFER);
 
-			RestoreExternBackgroundRect(INTERFACE_START_X, INV_INTERFACE_START_Y, SCREEN_WIDTH - INTERFACE_START_X, SCREEN_HEIGHT - INV_INTERFACE_START_Y);
+			RestoreExternBackgroundRect(0, INV_INTERFACE_START_Y, SCREEN_WIDTH, SCREEN_HEIGHT - INV_INTERFACE_START_Y);
 		}
 
 		// Render name
 		UINT8 const fg = s.bStealthMode ? FONT_MCOLOR_LTYELLOW : FONT_MCOLOR_LTGRAY;
 		SetFontAttributes(BLOCKFONT2, fg);
 
-		INT32 const x = SM_SELMERCNAME_X;
-		INT32 const y = SM_SELMERCNAME_Y + dy;
-		INT32 const w = SM_SELMERCNAME_WIDTH;
-		INT32 const h = SM_SELMERCNAME_HEIGHT;
+		INT16 const x = SM_SELMERCNAME_X + dx;
+		INT16 const y = SM_SELMERCNAME_Y + dy;
+		INT16 const w = SM_SELMERCNAME_WIDTH;
+		INT16 const h = SM_SELMERCNAME_HEIGHT;
 		RestoreExternBackgroundRect(x, y, w, h);
 		INT16 sFontX;
 		INT16 sFontY;
@@ -1328,8 +1365,8 @@ no_plate:
 		// Display AP
 		if (!(s.uiStatusFlags & SOLDIER_DEAD))
 		{
-			PrintAP(&s, SM_SELMERC_AP_X, dy + SM_SELMERC_AP_Y, SM_SELMERC_AP_WIDTH, SM_SELMERC_AP_HEIGHT);
-			DrawSoldierUIBars(s, SM_SELMERC_HEALTH_X, dy + SM_SELMERC_HEALTH_Y, TRUE, FRAME_BUFFER);
+			PrintAP(&s, dx + SM_SELMERC_AP_X, dy + SM_SELMERC_AP_Y, SM_SELMERC_AP_WIDTH, SM_SELMERC_AP_HEIGHT);
+			DrawSoldierUIBars(s, dx + SM_SELMERC_HEALTH_X, dy + SM_SELMERC_HEALTH_Y, TRUE, FRAME_BUFFER);
 		}
 	}
 
@@ -1341,8 +1378,8 @@ no_plate:
 	if (gfSMDisableForItems && *dirty_level != DIRTYLEVEL0)
 	{
 		SGPRect ClipRect;
-		ClipRect.iLeft = 87;
-		ClipRect.iRight = 536;
+		ClipRect.iLeft = dx + 87;
+		ClipRect.iRight = dx + 536;
 		ClipRect.iTop = INV_INTERFACE_START_Y;
 		ClipRect.iBottom = SCREEN_HEIGHT;
 		SGPVSurface::Lock l(FRAME_BUFFER);
@@ -2240,14 +2277,26 @@ static void TMClickFirstHandInvCallback(MOUSE_REGION* pRegion, INT32 iReason);
 static void TMClickSecondHandInvCallback(MOUSE_REGION* pRegion, INT32 iReason);
 
 
-void InitializeTEAMPanel(void)
+void InitializeTEAMPanel()
 {
 	// INit viewport region
 	// Set global mouse regions
 	// Define region for viewport
 	MSYS_DefineRegion(&gViewportRegion, 0, 0, gsVIEWPORT_END_X, gsVIEWPORT_END_Y, MSYS_PRIORITY_NORMAL, VIDEO_NO_CURSOR, MSYS_NO_CALLBACK, MSYS_NO_CALLBACK);
 
-	guiTEAMPanel   = AddVideoObjectFromFile(INTERFACEDIR "/bottom_bar.sti");
+	// Create the TEAMpanel from graphic objects.
+	guiTEAMPanel = new SGPVSurfaceAuto(g_ui.m_teamPanelWidth, TEAMPANEL_HEIGHT, PIXEL_DEPTH);
+
+	SGPVSurfaceAuto* vsTEAMPanel = CreateVideoSurfaceFromObjectFile(INTERFACEDIR "/bottom_bar.sti", 0);
+	BltVideoSurface(guiTEAMPanel, vsTEAMPanel, 0, 0, NULL);
+	for (int i = 6; i < NUM_TEAM_SLOTS; i++)
+	{	// extend the panel if needed
+		SGPBox const rect = {5 * TEAMPANEL_SLOT_WIDTH, 0,
+					TEAMPANEL_SLOT_WIDTH + TEAMPANEL_BUTTONSBOX_WIDTH, TEAMPANEL_HEIGHT};
+		BltVideoSurface(guiTEAMPanel, vsTEAMPanel, i * TEAMPANEL_SLOT_WIDTH, 0, &rect);
+	}
+	delete vsTEAMPanel;
+
 	guiTEAMObjects = AddVideoObjectFromFile(INTERFACEDIR "/gold_front.sti");
 	guiVEHINV      = AddVideoObjectFromFile(INTERFACEDIR "/inventor.sti");
 
@@ -2260,12 +2309,10 @@ void InitializeTEAMPanel(void)
 	// Define region for panel
 	MSYS_DefineRegion(&gTEAM_PanelRegion, 0, gsVIEWPORT_END_Y, SCREEN_WIDTH, SCREEN_HEIGHT, MSYS_PRIORITY_NORMAL, CURSOR_NORMAL, MSYS_NO_CALLBACK, MSYS_NO_CALLBACK);
 
-	INT32       dx = 0;
+	INT32       dx = INTERFACE_START_X;
 	INT32 const dy = INTERFACE_START_Y;
-	FOR_EACH_TEAM_PANEL_SLOT(i)
+	for (TeamPanelSlot& tp : gTeamPanel)
 	{
-		TeamPanelSlot& tp = *i;
-
 		INT32 const face_x = dx + TM_FACE_X;
 		INT32 const face_y = dy + TM_FACE_Y;
 		MakeRegion(tp, tp.face, face_x, face_y, TM_FACE_WIDTH, TM_FACE_HEIGHT,
@@ -2296,27 +2343,27 @@ void InitializeTEAMPanel(void)
 }
 
 
-void ShutdownTEAMPanel(void)
+void ShutdownTEAMPanel()
 {
 	// All buttons and regions and video objects and video surfaces will be deleted at shutddown of SGM
 	// We may want to delete them at the interm as well, to free up room for other panels
-	DeleteVideoObject(guiTEAMPanel);
+	delete guiTEAMPanel;
 	DeleteVideoObject(guiTEAMObjects);
 	DeleteVideoObject(guiVEHINV);
 
 	MSYS_RemoveRegion(&gTEAM_PanelRegion);
 	MSYS_RemoveRegion(&gViewportRegion);
 
-	FOR_EACH_TEAM_PANEL_SLOT(i)
+	for (TeamPanelSlot& i : gTeamPanel)
 	{
-		MSYS_RemoveRegion(&i->face);
-		MSYS_RemoveRegion(&i->enemy_indicator);
-		MSYS_RemoveRegion(&i->bars);
-		MSYS_RemoveRegion(&i->left_bars);
-		MSYS_RemoveRegion(&i->first_hand);
-		MSYS_RemoveRegion(&i->second_hand);
+		MSYS_RemoveRegion(&i.face);
+		MSYS_RemoveRegion(&i.enemy_indicator);
+		MSYS_RemoveRegion(&i.bars);
+		MSYS_RemoveRegion(&i.left_bars);
+		MSYS_RemoveRegion(&i.first_hand);
+		MSYS_RemoveRegion(&i.second_hand);
 
-		SOLDIERTYPE* const s = i->merc;
+		SOLDIERTYPE* const s = i.merc;
 		if (s) HandleMouseOverSoldierFaceForContMove(s, FALSE);
 	}
 
@@ -2352,14 +2399,14 @@ void RenderTEAMPanel(DirtyLevel const dirty_level)
 		MarkAButtonDirty(iTEAMPanelButtons[TEAM_MAP_SCREEN_BUTTON]);
 		MarkAButtonDirty(iTEAMPanelButtons[CHANGE_SQUAD_BUTTON]);
 
-		BltVideoObject(guiSAVEBUFFER, guiTEAMPanel, 0, INTERFACE_START_X, INTERFACE_START_Y);
+		BltVideoSurface(guiSAVEBUFFER, guiTEAMPanel, INTERFACE_START_X, INTERFACE_START_Y, NULL);
 
 		// LOOP THROUGH ALL MERCS ON TEAM PANEL
-		INT32       dx = 0;
+		INT32       dx = INTERFACE_START_X;
 		INT32 const dy = INTERFACE_START_Y;
-		FOR_EACH_TEAM_PANEL_SLOT(i)
+		for (TeamPanelSlot& i : gTeamPanel)
 		{
-			SOLDIERTYPE const* const s  = i->merc;
+			SOLDIERTYPE const* const s  = i.merc;
 			if (s)
 			{
 				RenderSoldierFace(*s, dx + TM_FACE_X, dy + TM_FACE_Y);
@@ -2395,7 +2442,7 @@ void RenderTEAMPanel(DirtyLevel const dirty_level)
 					help_buf = GetHelpTextForItem(s->inv[HANDPOS]);
 					help = help_buf;
 				}
-				i->first_hand.SetFastHelpText(help);
+				i.first_hand.SetFastHelpText(help);
 
 				// Add text for seonc hand popup
 				if (s->uiStatusFlags & (SOLDIER_PASSENGER | SOLDIER_DRIVER))
@@ -2411,7 +2458,7 @@ void RenderTEAMPanel(DirtyLevel const dirty_level)
 					help_buf = GetHelpTextForItem(s->inv[SECONDHANDPOS]);
 					help = help_buf;
 				}
-				i->second_hand.SetFastHelpText(help);
+				i.second_hand.SetFastHelpText(help);
 
 				// Restore AP/LIFE POSIITONS
 
@@ -2440,11 +2487,11 @@ void RenderTEAMPanel(DirtyLevel const dirty_level)
 	}
 
 	// Loop through all mercs and make go
-	INT32       dx = 0;
+	INT32       dx = INTERFACE_START_X;
 	INT32 const dy = INTERFACE_START_Y;
-	FOR_EACH_TEAM_PANEL_SLOT(i)
+	for (TeamPanelSlot& i : gTeamPanel)
 	{
-		SOLDIERTYPE* const s = i->merc;
+		SOLDIERTYPE* const s = i.merc;
 		if (s)
 		{
 			// Update animations....
@@ -2457,7 +2504,7 @@ void RenderTEAMPanel(DirtyLevel const dirty_level)
 			if (dirty_level != DIRTYLEVEL0)
 			{
 				// Update stats!
-				if (dirty_level == DIRTYLEVEL2) SetStatsHelp(i->bars, *s);
+				if (dirty_level == DIRTYLEVEL2) SetStatsHelp(i.bars, *s);
 
 				const INT32 x = dx + TM_AP_X;
 				const INT32 y = dy + TM_AP_Y;
@@ -2519,12 +2566,13 @@ void CreateTEAMPanelButtons(void)
 	iTEAMPanelImages[ROSTERMODE_IMAGES] = UseLoadedButtonImage(iTEAMPanelImages[ENDTURN_IMAGES],  1, 4);
 	iTEAMPanelImages[DISK_IMAGES]       = UseLoadedButtonImage(iTEAMPanelImages[ENDTURN_IMAGES],  2, 5);
 
+	const INT32 dx = INTERFACE_START_X;
 	const INT32 dy = INTERFACE_START_Y;
-	MakeButtonTeam(TEAM_DONE_BUTTON, iTEAMPanelImages[ENDTURN_IMAGES], TM_ENDTURN_X, dy + TM_ENDTURN_Y,
+	MakeButtonTeam(TEAM_DONE_BUTTON, iTEAMPanelImages[ENDTURN_IMAGES], dx + TM_ENDTURN_X, dy + TM_ENDTURN_Y,
 			BtnEndTurnCallback, TacticalStr[END_TURN_POPUPTEXT]);
-	MakeButtonTeam(TEAM_MAP_SCREEN_BUTTON, iTEAMPanelImages[ROSTERMODE_IMAGES], TM_ROSTERMODE_X,
+	MakeButtonTeam(TEAM_MAP_SCREEN_BUTTON, iTEAMPanelImages[ROSTERMODE_IMAGES], dx + TM_ROSTERMODE_X,
 			dy + TM_ROSTERMODE_Y, BtnRostermodeCallback, TacticalStr[MAPSCREEN_POPUPTEXT]);
-	MakeButtonTeam(CHANGE_SQUAD_BUTTON, iTEAMPanelImages[DISK_IMAGES], TM_DISK_X, dy + TM_DISK_Y,
+	MakeButtonTeam(CHANGE_SQUAD_BUTTON, iTEAMPanelImages[DISK_IMAGES], dx + TM_DISK_X, dy + TM_DISK_Y,
 			BtnSquadCallback, TacticalStr[CHANGE_SQUAD_POPUPTEXT]);
 }
 
@@ -2588,11 +2636,11 @@ static void UpdateTEAMPanel(void)
 		DisableButton(iTEAMPanelButtons[CHANGE_SQUAD_BUTTON]);
 
 		// OK, disable item regions.......
-		FOR_EACH_TEAM_PANEL_SLOT(i)
+		for (TeamPanelSlot& i : gTeamPanel)
 		{
-			i->enemy_indicator.Disable();
-			i->first_hand.Disable();
-			i->second_hand.Disable();
+			i.enemy_indicator.Disable();
+			i.first_hand.Disable();
+			i.second_hand.Disable();
 		}
 
 		//disable the radar map region
@@ -2603,11 +2651,11 @@ static void UpdateTEAMPanel(void)
 	{
 		EnableButton(iTEAMPanelButtons[CHANGE_SQUAD_BUTTON]);
 
-		FOR_EACH_TEAM_PANEL_SLOT(i)
+		for (TeamPanelSlot& i : gTeamPanel)
 		{
-			i->enemy_indicator.Enable();
-			i->first_hand.Enable();
-			i->second_hand.Enable();
+			i.enemy_indicator.Enable();
+			i.first_hand.Enable();
+			i.second_hand.Enable();
 		}
 
 		gRadarRegion.Enable();
@@ -3086,9 +3134,9 @@ static void TMClickSecondHandInvCallback(MOUSE_REGION* pRegion, INT32 iReason)
 
 static BOOLEAN PlayerExistsInSlot(const SOLDIERTYPE* const s)
 {
-	FOR_EACH_TEAM_PANEL_SLOT(i)
+	for (TeamPanelSlot& i : gTeamPanel)
 	{
-		if (i->merc == s) return TRUE;
+		if (i.merc == s) return TRUE;
 	}
 	return FALSE;
 }
@@ -3099,10 +3147,10 @@ static void RemovePlayerFromInterfaceTeamSlot(TeamPanelSlot&);
 
 BOOLEAN RemovePlayerFromTeamSlot(const SOLDIERTYPE* const s)
 {
-	FOR_EACH_TEAM_PANEL_SLOT(i)
+	for (TeamPanelSlot& i : gTeamPanel)
 	{
-		if (i->merc != s) continue;
-		RemovePlayerFromInterfaceTeamSlot(*i);
+		if (i.merc != s) continue;
+		RemovePlayerFromInterfaceTeamSlot(i);
 		return TRUE;
 	}
 	return FALSE;
@@ -3114,19 +3162,25 @@ static void AddPlayerToInterfaceTeamSlot(SOLDIERTYPE* const s)
 	if (PlayerExistsInSlot(s)) return;
 
 	// Find a free slot
-	FOR_EACH_TEAM_PANEL_SLOT(i)
+	for (TeamPanelSlot& i : gTeamPanel)
 	{
-		if (i->merc) continue;
-		i->merc = s;
+		if (i.merc) continue;
+		i.merc = s;
 		fInterfacePanelDirty = DIRTYLEVEL2;
 		break;
 	}
 }
 
 
-void InitTEAMSlots(void)
+void InitTEAMSlots()
 {
-	FOR_EACH_TEAM_PANEL_SLOT(i) i->merc = 0;
+	if (NUM_TEAM_SLOTS < gamepolicy(squad_size))
+	{
+		SLOGW("The team panel does not have enough space to display all soldiers in a squad. "
+		      "You should either increase the game resolution or decrease the squad size");
+	}
+	gTeamPanel.resize(NUM_TEAM_SLOTS);
+	std::fill_n(gTeamPanel.begin(), NUM_TEAM_SLOTS, TeamPanelSlot{NULL});
 }
 
 
@@ -3137,12 +3191,12 @@ SOLDIERTYPE* GetPlayerFromInterfaceTeamSlot(UINT8 ubPanelSlot)
 }
 
 
-void RemoveAllPlayersFromSlot(void)
+void RemoveAllPlayersFromSlot()
 {
-	FOR_EACH_TEAM_PANEL_SLOT(i)
+	for (TeamPanelSlot& i : gTeamPanel)
 	{
-		if (!i->merc) continue;
-		RemovePlayerFromInterfaceTeamSlot(*i);
+		if (!i.merc) continue;
+		RemovePlayerFromInterfaceTeamSlot(i);
 	}
 }
 
@@ -3150,7 +3204,7 @@ void RemoveAllPlayersFromSlot(void)
 static void RemovePlayerFromInterfaceTeamSlot(TeamPanelSlot& tp)
 {
 	SOLDIERTYPE* const s = tp.merc;
-	tp.merc = 0;
+	tp.merc = NULL;
 
 	if (!(s->uiStatusFlags & SOLDIER_DEAD))
 	{
@@ -3174,7 +3228,7 @@ void RenderTownIDString(void)
 	SetFontAttributes(COMPFONT, 183);
 	ST::string zTownIDString = GetSectorIDString(gWorldSectorX, gWorldSectorY, gbWorldSectorZ, TRUE);
 	zTownIDString = ReduceStringLength(zTownIDString, 80, COMPFONT);
-	FindFontCenterCoordinates(548, SCREEN_HEIGHT - 55, 80, 16, zTownIDString, COMPFONT, &sFontX, &sFontY);
+	FindFontCenterCoordinates(INTERFACE_START_X + g_ui.m_teamPanelSlotsTotalWidth + 50, SCREEN_HEIGHT - 55, 80, 16, zTownIDString, COMPFONT, &sFontX, &sFontY);
 	MPrint(sFontX, sFontY, zTownIDString);
 }
 
@@ -3223,9 +3277,9 @@ SOLDIERTYPE* FindNextMercInTeamPanel(SOLDIERTYPE* const prev)
 {
 	bool         seen_prev = false;
 	SOLDIERTYPE* before    = 0;
-	FOR_EACH_TEAM_PANEL_SLOT(i)
+	for (TeamPanelSlot& i : gTeamPanel)
 	{
-		SOLDIERTYPE* const s = i->merc;
+		SOLDIERTYPE* const s = i.merc;
 		if (!s) continue;
 
 		if (s == prev)
@@ -3327,7 +3381,7 @@ void KeyRingItemPanelButtonCallback(MOUSE_REGION* pRegion, INT32 iReason)
 		}
 		else
 		{
-			InitKeyRingPopup( pSoldier, 0, sStartYPosition, sWidth, sHeight );
+			InitKeyRingPopup( pSoldier, INTERFACE_START_X, sStartYPosition, sWidth, sHeight );
 		}
 	}
 }
@@ -3405,8 +3459,8 @@ void KeyRingSlotInvClickCallback( MOUSE_REGION * pRegion, INT32 iReason )
 			BOOLEAN fOKToGo = FALSE;
 			BOOLEAN fDeductPoints = FALSE;
 
-			if( ( gpItemPointer ->usItem < FIRST_KEY ) || ( gpItemPointer ->usItem > KEY_32 ) )
-			{
+			// return if item is not a key
+			if (GCM->getItem(gpItemPointer->usItem)->getItemClass() != IC_KEY) {
 				return;
 			}
 
@@ -3789,4 +3843,15 @@ void LoadInterfacePanelGraphics()
 void DeleteInterfacePanelGraphics()
 {
 	DeleteVideoObject(guiCLOSE);
+}
+
+static SGPVSurfaceAuto* CreateVideoSurfaceFromObjectFile(const ST::string& filename, UINT16 usRegionIndex)
+{
+	SGPVObject* vo = AddVideoObjectFromFile(filename.c_str());
+	auto r = vo->SubregionProperties(usRegionIndex);
+	auto* sf = new SGPVSurfaceAuto(r.usWidth, r.usHeight, PIXEL_DEPTH);
+	BltVideoObject(sf, vo, usRegionIndex, 0, 0);
+	DeleteVideoObject(vo);
+
+	return sf;
 }

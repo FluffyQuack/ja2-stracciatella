@@ -8,8 +8,6 @@
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
-use dunce;
-
 use crate::unicode::Nfc;
 
 //------------
@@ -19,9 +17,7 @@ use crate::unicode::Nfc;
 pub use std::fs::create_dir;
 pub use std::fs::create_dir_all;
 pub use std::fs::metadata;
-pub use std::fs::read;
 pub use std::fs::read_dir;
-pub use std::fs::rename;
 pub use std::fs::set_permissions;
 pub use std::fs::write;
 pub use std::fs::File;
@@ -57,6 +53,18 @@ pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), io::Error> {
         }
     }
     std::fs::remove_file(path)
+}
+
+/// An implementation of `std::fs::rename` that handles files on different file systems
+pub fn rename<P: AsRef<Path>>(from: P, to: P) -> Result<(), io::Error> {
+    match std::fs::rename(&from, &to) {
+        Ok(()) => Ok(()),
+        #[cfg(target_os = "linux")]
+        Err(e) if e.raw_os_error() == Some(libc::EXDEV) => {
+            std::fs::copy(&from, &to).and_then(|_| remove_file(&from))
+        }
+        Err(e) => Err(e),
+    }
 }
 
 //-------
@@ -230,4 +238,10 @@ pub fn free_space(path: &Path) -> io::Result<u64> {
         return Ok(1024 * 1024 * 1024);
     }
     Err(io::Error::new(io::ErrorKind::Other, "not implemented"))
+}
+
+/// Cleans a filename from special characters, so it can be used safely for the filesystem
+/// Note that the filename should not contain the extension
+pub fn clean_basename<T: AsRef<Path>>(basename: T) -> PathBuf {
+    PathBuf::from(slug::slugify(&basename.as_ref().to_string_lossy()))
 }

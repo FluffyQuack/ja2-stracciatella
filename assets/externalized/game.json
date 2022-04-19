@@ -69,6 +69,12 @@
   //  vanilla value: 0
   "enemy_weapon_minimal_status": 0,
 
+  // Maxiumum number of soldiers in one squad.
+  // Larger squad sizes requires the wider screen to display all members. For a squad size of n, the screen must be at
+  // least (640 + (n-6)*83) pixels wide. For example, squad size of 8 requires the screen to be at least 806px wide.
+  // vanilla value: 6
+  "squad_size": 6,
+
   // Enable improvements over vanilla game's tactical AI
   "ai": {
     //  Make the AI a bit smarter and let it target heads and legs sometimes.
@@ -116,15 +122,15 @@
 
   //  Always show mouse cursor during tactical view (if false, no mourse cursor is shown when moving in real-time mode, selecting a merc, etc)
   //  vanilla setting: false
-  "always_show_cursor_in_tactical": true,
+  "always_show_cursor_in_tactical": false,
 
-  //  Show chance-to-hit when pressing 'F' and next to mouse cursor when preparing an attack
+  //  Show chance-to-hit next to mouse cursor when preparing an attack
   //  vanilla setting: false
-  "show_hit_chance": true,
+  "show_hit_chance": false,
 
-  //  Scale the loading speed of websites on the laptop. Setting this to 0.0 removes the loading entirely.
+  //  Scales the loading time of websites on the laptop. Lower value means faster loading. Setting this to 0.0 removes the loading entirely.
   //  vanilla setting: 1.0
-  "website_loading_speed_scale": 0.05,
+  "website_loading_time_scale": 1.0,
 
   //  IMP creation tweaks
   "imp": {
@@ -146,7 +152,7 @@
     "pick_skills_directly": false,
 
     //  Load an IMP merc from a previous save game by typing in same nickname on IMP form.
-    //  Make sure to use the same capitalization!
+    //  Make sure to put in only the nickname and use the same capitalization!
     //  This setting must be already enabled during saving to enable a later load.
     //  vanilla setting: false, false
     "load_saved_merc_by_nickname": false,

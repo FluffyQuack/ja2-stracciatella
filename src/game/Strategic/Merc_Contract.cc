@@ -75,15 +75,15 @@ BOOLEAN										gfInContractMenuFromRenewSequence = FALSE;
 
 void SaveContractRenewalDataToSaveGameFile(HWFILE const hFile)
 {
-	FileWrite(hFile, ContractRenewalList,    sizeof(ContractRenewalList));
-	FileWrite(hFile, &ubNumContractRenewals, sizeof(ubNumContractRenewals));
+	hFile->write(ContractRenewalList,    sizeof(ContractRenewalList));
+	hFile->write(&ubNumContractRenewals, sizeof(ubNumContractRenewals));
 }
 
 
 void LoadContractRenewalDataFromSaveGameFile(HWFILE const hFile)
 {
-	FileRead(hFile, ContractRenewalList,    sizeof(ContractRenewalList));
-	FileRead(hFile, &ubNumContractRenewals, sizeof(ubNumContractRenewals));
+	hFile->read(ContractRenewalList,    sizeof(ContractRenewalList));
+	hFile->read(&ubNumContractRenewals, sizeof(ubNumContractRenewals));
 }
 
 
@@ -737,7 +737,7 @@ static void CalculateMedicalDepositRefund(SOLDIERTYPE const& s)
 	}
 	else if (s.bLife > 0)
 	{ // The merc is injured, refund a partial amount
-		refund = (2 * refund * s.bLifeMax / s.bLifeMax + 1) / 2;
+		refund = (2 * refund * s.bLife / s.bLifeMax + 1) / 2;
 		AddTransactionToPlayersBook(PARTIAL_MEDICAL_REFUND, pid, now, refund);
 		msg_offset = AIM_MEDICAL_DEPOSIT_PARTIAL_REFUND;
 		msg_length = AIM_MEDICAL_DEPOSIT_PARTIAL_REFUND_LENGTH;

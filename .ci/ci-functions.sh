@@ -33,6 +33,17 @@ linux-install-appimage-build-tools () {
     sudo chmod +x /usr/bin/linuxdeploy
     sudo curl -sSfL -o /usr/bin/appimagelint https://github.com/TheAssassin/appimagelint/releases/download/continuous/appimagelint-x86_64.AppImage
     sudo chmod +x /usr/bin/appimagelint
+
+    ###
+    ### See #1431. This whole block can be removed when CI runners use Ubuntu 21.04 or newer
+    linux-install-via-apt-get zstd
+    curl -sL -o "tar-1.34.tar.gz" https://ftp.gnu.org/gnu/tar/tar-1.34.tar.gz
+    tar zxf "tar-1.34.tar.gz"
+    cd tar-1.34 && ./configure && make && sudo make install
+    sudo cp /usr/local/bin/tar /usr/bin/tar
+    which tar
+    tar --version
+    ###
 }
 
 linux-install-via-android-sdkmanager () {
@@ -70,9 +81,10 @@ windows-install-rustup () {
 
 windows-install-google-cloud-sdk () {
     export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+    export CLOUDSDK_PYTHON="C:\\Python39\\python.exe"
     local ARCHIVE_PATH="$HOMEPATH\google-cloud.zip"
     local UNZIP_PATH="$USERPROFILE"
-    curl -sSf -o "$ARCHIVE_PATH" https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-299.0.0-windows-x86.zip
+    curl -sSf -o "$ARCHIVE_PATH" https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-366.0.0-windows-x86.zip
     unzip -q "$ARCHIVE_PATH" -d $UNZIP_PATH
     export PATH="$PATH;$UNZIP_PATH\google-cloud-sdk\bin"
 }

@@ -1249,9 +1249,11 @@ static INT32 LineOfSightTest(GridNo start_pos, FLOAT dStartZ, GridNo end_pos, FL
 		} while( (iCurrTileX == iOldTileX) && (iCurrTileY == iOldTileY) && (iLoop < iDistance));
 
 		// leaving a tile, check to see if it had gas in it
-		if ( pMapElement->ubExtFlags[0] & (MAPELEMENT_EXT_SMOKE | MAPELEMENT_EXT_TEARGAS | MAPELEMENT_EXT_MUSTARDGAS) )
+		INT32 iCubesZ = CONVERT_HEIGHTUNITS_TO_INDEX(FIXEDPT_TO_INT32(qCurrZ));
+		UINT8 bTileLevel = iCubesZ > 3 ? 1 : 0;
+		if (pMapElement->ubExtFlags[bTileLevel] & (MAPELEMENT_EXT_SMOKE | MAPELEMENT_EXT_TEARGAS | MAPELEMENT_EXT_MUSTARDGAS))
 		{
-			if ( (pMapElement->ubExtFlags[0] & MAPELEMENT_EXT_SMOKE) && !fSmell )
+			if ((pMapElement->ubExtFlags[bTileLevel] & MAPELEMENT_EXT_SMOKE) && !fSmell)
 			{
 				bSmoke++;
 
@@ -1996,10 +1998,10 @@ static BOOLEAN BulletHitMerc(BULLET* pBullet, STRUCTURE* pStructure, BOOLEAN fIn
 		}
 		iDamage = BulletImpact(pFirer, &tgt, ubHitLocation, iImpact, sHitBy, &ubSpecial);
 		// handle hit here...
-		if( pFirer->bTeam == 0 )
+		if (pFirer->bTeam == 0)
 		{
 			// issue #1140 : sync usShotsFired with usShotsHit and so that merc statistic <= 100%
-			if (pFirer->target->bLife > 0) gMercProfiles[ pFirer->ubProfile ].usShotsHit++;
+			if (pFirer->target && pFirer->target->bLife > 0) gMercProfiles[ pFirer->ubProfile ].usShotsHit++;
 		}
 
 		// intentionally shot
@@ -3388,7 +3390,7 @@ INT8 FireBulletGivenTarget(SOLDIERTYPE* const pFirer, const FLOAT dEndX, const F
 			ddVerticAngle = ddOrigVerticAngle;
 
 			// first bullet, roll to hit...
-			if ( sHitBy >= 0 )
+			if (sHitBy > 0)
 			{
 				// calculate by hand (well, without angles) to match LOS
 				pBullet->qIncrX = FloatToFixed( dDeltaX / (FLOAT)iDistance );
@@ -3440,7 +3442,7 @@ INT8 FireBulletGivenTarget(SOLDIERTYPE* const pFirer, const FLOAT dEndX, const F
 
 		// NB we can only apply correction for leftovers if the bullet is going to hit
 		// because otherwise the increments are not right for the calculations!
-		if ( pBullet->sHitBy >= 0 )
+		if (pBullet->sHitBy > 0)
 		{
 			pBullet->qCurrX += ( FloatToFixed( dDeltaX ) - pBullet->qIncrX * iDistance ) / 2;
 			pBullet->qCurrY += ( FloatToFixed( dDeltaY ) - pBullet->qIncrY * iDistance ) / 2;

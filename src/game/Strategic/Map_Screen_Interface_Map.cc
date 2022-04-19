@@ -394,8 +394,8 @@ static UINT16 gusUndergroundNearBlack;
 
 BOOLEAN gfMilitiaPopupCreated = FALSE;
 
-INT32 giAnimateRouteBaseTime = 0;
-INT32 giPotHeliPathBaseTime = 0;
+UINT32 guiAnimateRouteBaseTime = 0;
+UINT32 guiPotHeliPathBaseTime = 0;
 
 // sam and mine icons
 static SGPVObject* guiSAMICON;
@@ -414,7 +414,7 @@ void InitMapScreenInterfaceMap()
 	pTownPoints.push_back(SGPPoint());
 
 	auto towns = GCM->getTowns();
-	for (auto& pair : GCM->getTowns()) 
+	for (auto& pair : GCM->getTowns())
 	{
 		auto town = pair.second;
 		sBaseSectorList.push_back(town->getBaseSector());
@@ -1486,7 +1486,6 @@ static BOOLEAN TraceCharAnimatedRoute(PathSt* const pPath, const BOOLEAN fForceU
 	static BOOLEAN fPauseFlag=TRUE;
 	static UINT8 ubCounter=1;
 
-	INT32 iDifference=0;
 	INT32 iArrow=-1;
 	INT32 iX = 0, iY = 0;
 	INT32 iPastX, iPastY;
@@ -1529,26 +1528,26 @@ static BOOLEAN TraceCharAnimatedRoute(PathSt* const pPath, const BOOLEAN fForceU
 	}
 
 	// Check Timer
-	if (giAnimateRouteBaseTime==0)
+	if (guiAnimateRouteBaseTime==0)
 	{
-		giAnimateRouteBaseTime=GetJA2Clock();
+		guiAnimateRouteBaseTime=GetJA2Clock();
 		return FALSE;
 	}
 
 	// check difference in time
-	iDifference=GetJA2Clock()-giAnimateRouteBaseTime;
+	UINT32 uiDifference = GetJA2Clock() - guiAnimateRouteBaseTime;
 
 	// if pause flag, check time, if time passed, reset, continue on, else return
 	if(fPauseFlag)
 	{
-		if(iDifference < PAUSE_DELAY)
+		if (uiDifference < PAUSE_DELAY)
 		{
 			return FALSE;
 		}
 		else
 		{
 			fPauseFlag=FALSE;
-		giAnimateRouteBaseTime=GetJA2Clock();
+		guiAnimateRouteBaseTime=GetJA2Clock();
 		}
 	}
 
@@ -1556,7 +1555,7 @@ static BOOLEAN TraceCharAnimatedRoute(PathSt* const pPath, const BOOLEAN fForceU
 	// if is checkflag and change in status, return TRUE;
 	if(!fForceUpDate)
 	{
-		if(iDifference < ARROW_DELAY)
+		if (uiDifference < ARROW_DELAY)
 		{
 			if (!fUpDateFlag)
 				return FALSE;
@@ -1564,7 +1563,7 @@ static BOOLEAN TraceCharAnimatedRoute(PathSt* const pPath, const BOOLEAN fForceU
 		else
 		{
 			// sufficient time, update base time
-			giAnimateRouteBaseTime=GetJA2Clock();
+			guiAnimateRouteBaseTime=GetJA2Clock();
 			fUpDateFlag=!fUpDateFlag;
 
 			fNextNode=TRUE;
@@ -2014,13 +2013,11 @@ void DisplayThePotentialPathForHelicopter(INT16 sMapX, INT16 sMapY )
 	// simply check if we want to refresh the screen to display path
 	static BOOLEAN fOldShowAirCraft = FALSE;
 	static INT16  sOldMapX, sOldMapY;
-	INT32 iDifference = 0;
-
 
 	if( fOldShowAirCraft != fShowAircraftFlag )
 	{
 		fOldShowAirCraft = fShowAircraftFlag;
-		giPotHeliPathBaseTime = GetJA2Clock( );
+		guiPotHeliPathBaseTime = GetJA2Clock( );
 
 		sOldMapX = sMapX;
 		sOldMapY = sMapY;
@@ -2031,7 +2028,7 @@ void DisplayThePotentialPathForHelicopter(INT16 sMapX, INT16 sMapY )
 
 	if( ( sMapX != sOldMapX) || ( sMapY != sOldMapY ) )
 	{
-		giPotHeliPathBaseTime = GetJA2Clock( );
+		guiPotHeliPathBaseTime = GetJA2Clock( );
 
 		sOldMapX = sMapX;
 		sOldMapY = sMapY;
@@ -2046,17 +2043,17 @@ void DisplayThePotentialPathForHelicopter(INT16 sMapX, INT16 sMapY )
 		fDrawTempHeliPath = FALSE;
 	}
 
-	iDifference = GetJA2Clock( ) - giPotHeliPathBaseTime ;
+	UINT32 uiDifference = GetJA2Clock() - guiPotHeliPathBaseTime;
 
 	if( fTempPathAlreadyDrawn )
 	{
 		return;
 	}
 
-	if( iDifference > MIN_WAIT_TIME_FOR_TEMP_PATH )
+	if (uiDifference > MIN_WAIT_TIME_FOR_TEMP_PATH)
 	{
 		fDrawTempHeliPath = TRUE;
-		giPotHeliPathBaseTime = GetJA2Clock( );
+		guiPotHeliPathBaseTime = GetJA2Clock( );
 		fTempPathAlreadyDrawn = TRUE;
 	}
 }
@@ -2569,7 +2566,7 @@ static void DrawSite(const INT16 sector_x, const INT16 sector_y, const SGPVObjec
 	UINT16 max_w;
 	UINT16 max_h;
 	UINT8  vo_idx;
-	
+
 	GetScreenXYFromMapXY(sector_x, sector_y, &x, &y);
 	++x;
 	max_w = MAP_GRID_X - 1;

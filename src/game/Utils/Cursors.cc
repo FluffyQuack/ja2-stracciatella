@@ -1326,7 +1326,7 @@ static void DrawMouseText(void)
 		SetFontDestBuffer(MOUSE_BUFFER);
 		FindFontCenterCoordinates(0, 0, gsCurMouseWidth, gsCurMouseHeight, gzHitChance, TINYFONT1, &sX, &sY);
 		SetFontAttributes(TINYFONT1, FONT_MCOLOR_WHITE);
-		if (gzLocation.empty()) //Fluffy (ShowChanceToHit)
+		if(gzLocation.empty()) //Fluffy (ShowChanceToHit)
 			MPrint(sX, sY + 12, gzHitChance); // Below cursor
 		else
 		{

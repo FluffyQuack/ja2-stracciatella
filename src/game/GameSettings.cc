@@ -30,7 +30,7 @@
 #include <string_theory/format>
 
 
-#define GAME_SETTINGS_FILE "../Ja2.set"
+#define GAME_SETTINGS_FILE "Ja2.set"
 
 GAME_SETTINGS		gGameSettings;
 GAME_OPTIONS		gGameOptions;
@@ -47,11 +47,11 @@ void LoadGameSettings(void)
 {
 	try
 	{
-		AutoSGPFile f(GCM->openUserPrivateFileForReading(GAME_SETTINGS_FILE));
+		AutoSGPFile f(GCM->userPrivateFiles()->openForReading(GAME_SETTINGS_FILE));
 
 		BYTE data[76];
-		if (FileGetSize(f) != sizeof(data)) goto fail;
-		FileRead(f, data, sizeof(data));
+		if (f->size() != sizeof(data)) goto fail;
+		f->read(data, sizeof(data));
 
 		UINT8          music_volume;
 		UINT8          sound_volume;
@@ -77,7 +77,7 @@ void LoadGameSettings(void)
 		if (settings_version < GAME_SETTING_CURRENT_VERSION) goto fail;
 
 		// Do checking to make sure the settings are valid
-		if (g.bLastSavedGameSlot < 0 || (NUM_SAVE_GAMES * NUM_SAVE_GAMES_TABS) <= g.bLastSavedGameSlot) g.bLastSavedGameSlot = -1;
+		if (g.bLastSavedGameSlot < 0) g.bLastSavedGameSlot = -1;
 
 		// Make sure that at least subtitles or speech is enabled
 		if (!g.fOptions[TOPTION_SUBTITLES] && !g.fOptions[TOPTION_SPEECH])
@@ -135,8 +135,8 @@ void SaveGameSettings(void)
 	INJ_SKIP(d, 20)
 	Assert(d.getConsumed() == lengthof(data));
 
-	AutoSGPFile f(FileMan::openForWriting(GAME_SETTINGS_FILE));
-	FileWrite(f, data, sizeof(data));
+	AutoSGPFile f(GCM->userPrivateFiles()->openForWriting(GAME_SETTINGS_FILE, true));
+	f->write(data, sizeof(data));
 }
 
 
@@ -193,25 +193,6 @@ void InitGameOptions()
 	gGameOptions.ubGameSaveMode    = DIF_CAN_SAVE;
 
 }
-
-
-void CDromEjectionErrorMessageBoxCallBack(MessageBoxReturnValue const bExitValue)
-{
-	if( bExitValue == MSG_BOX_RETURN_OK )
-	{
-		guiPreviousOptionScreen = GAME_SCREEN;
-
-		//if we are in a game, save the game
-		if( gTacticalStatus.fHasAGameBeenStarted )
-		{
-			SaveGame( SAVE__ERROR_NUM, pMessageStrings[ MSG_CDROM_SAVE ] );
-		}
-
- 		//quit the game
-		requestGameExit();
-	}
-}
-
 
 void DisplayGameSettings( )
 {

@@ -399,9 +399,12 @@ void DisplayHiddenInterrupt( SOLDIERTYPE * pSoldier )
 
 	// Stop our guy....
 	SOLDIERTYPE* const latest = LatestInterruptGuy();
-	AdjustNoAPToFinishMove(latest, TRUE);
-	// Stop him from going to prone position if doing a turn while prone
-	latest->fTurningFromPronePosition = FALSE;
+	if (latest)
+	{
+		AdjustNoAPToFinishMove(latest, TRUE);
+		// Stop him from going to prone position if doing a turn while prone
+		latest->fTurningFromPronePosition = FALSE;
+	}
 
 	// get rid of any old overlay message
 	const MESSAGE_TYPES msg =
@@ -1685,14 +1688,14 @@ void SaveTeamTurnsToTheSaveGameFile(HWFILE const f)
 	INJ_SKIP(   d, 17)
 	Assert(d.getConsumed() == lengthof(data));
 
-	FileWrite(f, data, sizeof(data));
+	f->write(data, sizeof(data));
 }
 
 
 void LoadTeamTurnsFromTheSavedGameFile(HWFILE const f)
 {
 	BYTE data[174];
-	FileRead(f, data, sizeof(data));
+	f->read(data, sizeof(data));
 
 	DataReader d{data};
 	EXTR_SKIP(d, 1)

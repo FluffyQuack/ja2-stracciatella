@@ -14,17 +14,21 @@ use std::fmt;
 use std::io;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use log::{info, warn};
 
 use crate::fs;
+use crate::mods::ModManager;
+use crate::mods::ModPath;
 use crate::unicode::Nfc;
 use crate::vfs::dir::DirFs;
 use crate::vfs::slf::SlfFs;
 use crate::EngineOptions;
 
-pub trait VfsFile: io::Read + io::Seek + io::Write + fmt::Debug + fmt::Display {
+pub trait VfsFile:
+    io::Read + io::Seek + io::Write + fmt::Debug + fmt::Display + Send + Sync
+{
     /// Returns the length of the file
     fn len(&self) -> io::Result<u64>;
 
@@ -34,7 +38,7 @@ pub trait VfsFile: io::Read + io::Seek + io::Write + fmt::Debug + fmt::Display {
     }
 }
 
-pub trait VfsLayer: fmt::Debug + fmt::Display {
+pub trait VfsLayer: fmt::Debug + fmt::Display + Send + Sync {
     // Opens a file in the VFS Layer
     fn open(&self, file_path: &Nfc) -> io::Result<Box<dyn VfsFile>>;
     // Lists a directory in the VFS Layer
@@ -60,7 +64,7 @@ pub trait VfsLayer: fmt::Debug + fmt::Display {
 #[derive(Debug, Default)]
 pub struct Vfs {
     /// List of entries.
-    pub entries: Vec<Rc<dyn VfsLayer>>,
+    pub entries: Vec<Arc<dyn VfsLayer + Send + Sync>>,
 }
 
 /// A virtual filesystem that mounts other filesystems.
@@ -82,7 +86,7 @@ impl Vfs {
     }
 
     /// Adds an overlay filesystem backed by a filesystem directory.
-    pub fn add_dir(&mut self, path: &Path) -> Result<Rc<dyn VfsLayer>, VfsInitError> {
+    pub fn add_dir(&mut self, path: &Path) -> Result<Arc<dyn VfsLayer>, VfsInitError> {
         let dir_fs = DirFs::new(&path).map_err(|error| VfsInitError {
             path: path.to_owned(),
             error,
@@ -92,7 +96,7 @@ impl Vfs {
     }
 
     /// Adds an overlay filesystem backed by a SLF file.
-    pub fn add_slf(&mut self, file: Box<dyn VfsFile>) -> Result<Rc<dyn VfsLayer>, VfsInitError> {
+    pub fn add_slf(&mut self, file: Box<dyn VfsFile>) -> Result<Arc<dyn VfsLayer>, VfsInitError> {
         let path = PathBuf::from(format!("{}", file));
         let slf_fs = SlfFs::new(file).map_err(|error| VfsInitError { path, error })?;
         self.entries.push(slf_fs.clone());
@@ -101,7 +105,7 @@ impl Vfs {
 
     /// Adds an overlay filesystem backed by android assets
     #[cfg(target_os = "android")]
-    pub fn add_android_assets(&mut self, path: &Path) -> Result<Rc<dyn VfsLayer>, VfsInitError> {
+    pub fn add_android_assets(&mut self, path: &Path) -> Result<Arc<dyn VfsLayer>, VfsInitError> {
         let asset_manager_fs =
             android::AssetManagerFs::new(&path).map_err(|error| VfsInitError {
                 path: path.to_owned(),
@@ -114,7 +118,7 @@ impl Vfs {
     /// Adds an overlay for all SLF files in dir
     pub fn add_slf_files_from(
         &mut self,
-        layer: Rc<dyn VfsLayer>,
+        layer: Arc<dyn VfsLayer>,
         required: bool,
     ) -> Result<(), VfsInitError> {
         let slf_paths = layer
@@ -141,7 +145,7 @@ impl Vfs {
     /// Adds the editor.slf layer to VFS
     fn add_editor_slf_layer(
         &mut self,
-        externalized_layer: Rc<dyn VfsLayer>,
+        externalized_layer: Arc<dyn VfsLayer>,
     ) -> Result<(), VfsInitError> {
         let editor_slf =
             map_not_found_to_option(externalized_layer.open(&Nfc::caseless_path(EDITOR_SLF_NAME)))
@@ -163,9 +167,10 @@ impl Vfs {
     }
 
     /// Initializes the VFS overlays from EngineOptions
-    pub fn init_from_engine_options(
+    pub fn init(
         &mut self,
         engine_options: &EngineOptions,
+        mod_manager: &ModManager,
     ) -> Result<(), VfsInitError> {
         let vanilla_game_dir = engine_options.vanilla_game_dir.clone();
         let vanilla_data_dir =
@@ -177,51 +182,32 @@ impl Vfs {
         );
 
         // Add mod directories
-        for mod_name in engine_options.mods.iter() {
-            // First are mod directories in home directory then mods in externalized directory (only one of them is required)
-            let mod_path =
-                Path::new(MODS_DIR).join(Path::new(&format!("{}/{}", &mod_name, DATA_DIR)));
-            let mod_in_home = fs::resolve_existing_components(
-                &mod_path,
-                Some(&engine_options.stracciatella_home),
-                true,
-            );
-            #[cfg(not(target_os = "android"))]
-            let mod_in_externalized = DirFs::new(&fs::resolve_existing_components(
-                &mod_path,
-                Some(&engine_options.assets_dir),
-                true,
-            ));
-            #[cfg(target_os = "android")]
-            let mod_in_externalized = android::AssetManagerFs::new(&mod_path);
-            let mod_in_externalized =
-                map_not_found_to_option(mod_in_externalized).map_err(|e| VfsInitError {
-                    path: mod_path.clone(),
-                    error: e,
+        for mod_id in engine_options.mods.iter() {
+            let mod_path = mod_manager
+                .get_mod_by_id(mod_id)
+                .map(|m| m.path())
+                .ok_or_else(|| VfsInitError {
+                    path: mod_id.into(),
+                    error: ErrorKind::NotFound.into(),
                 })?;
+            let mod_path = mod_path.join(DATA_DIR);
 
-            match (mod_in_home.exists(), mod_in_externalized) {
-                (false, None) => {
-                    return Err(VfsInitError {
-                        path: mod_path,
-                        error: ErrorKind::NotFound.into(),
-                    });
-                }
-                (true, None) => {
-                    let layer = self.add_dir(&mod_in_home)?;
+            match mod_path {
+                ModPath::Path(p) => {
+                    let p = fs::resolve_existing_components(&p, None, true);
+                    let layer = self.add_dir(&p)?;
                     self.add_slf_files_from(layer, false)?;
                 }
-                (false, Some(mod_in_externalized)) => {
-                    self.entries.push(mod_in_externalized.clone());
-                    self.add_slf_files_from(mod_in_externalized, false)?;
-                }
-                (true, Some(mod_in_externalized)) => {
-                    let layer = self.add_dir(&mod_in_home)?;
+                #[cfg(target_os = "android")]
+                ModPath::AndroidAssetPath(p) => {
+                    let layer = android::AssetManagerFs::new(&p).map_err(|e| VfsInitError {
+                        path: p.into(),
+                        error: e,
+                    })?;
+                    self.entries.push(layer.clone());
                     self.add_slf_files_from(layer, false)?;
-                    self.entries.push(mod_in_externalized.clone());
-                    self.add_slf_files_from(mod_in_externalized, false)?;
                 }
-            };
+            }
         }
 
         // Next is home data dir (does not need to exist)
@@ -341,5 +327,118 @@ fn map_not_found_to_option<T>(result: io::Result<T>) -> io::Result<Option<T>> {
                 Err(e)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::{tempdir, TempDir};
+
+    use crate::{config::EngineOptions, mods::ModManager};
+
+    use super::Vfs;
+
+    #[test]
+    fn missing_game_data_dir_should_fail() {
+        let (engine_options, _temp_dir) = create_test_engine_options();
+        let mod_manager = ModManager::new_unchecked(&engine_options);
+
+        let mut vfs = Vfs::new();
+        vfs.init(&engine_options, &mod_manager).unwrap_err();
+    }
+
+    #[test]
+    fn game_data_dir_without_any_slf_files_should_fail() {
+        let (engine_options, _temp_dir) = create_test_engine_options();
+        let mod_manager = ModManager::new_unchecked(&engine_options);
+
+        let data_path = engine_options.vanilla_game_dir.join("data");
+        std::fs::create_dir(&data_path).expect("create `data` dir");
+
+        let mut vfs = Vfs::new();
+        vfs.init(&engine_options, &mod_manager).unwrap_err();
+    }
+
+    #[test]
+    fn game_data_dir_should_be_case_insensitive() {
+        let (engine_options, _temp_dir) = create_test_engine_options();
+        let mod_manager = ModManager::new_unchecked(&engine_options);
+
+        let data_path = engine_options.vanilla_game_dir.join("data");
+        std::fs::create_dir(&data_path).expect("create `data` dir");
+        std::fs::write(&data_path.join("empty.slf"), EMPTY_SLF_BYTES).expect("write `empty.slf`");
+
+        let mut vfs = Vfs::new();
+        vfs.init(&engine_options, &mod_manager).unwrap();
+
+        let (engine_options, _temp_dir) = create_test_engine_options();
+        let mod_manager = ModManager::new_unchecked(&engine_options);
+
+        let data_path = engine_options.vanilla_game_dir.join("dAtA");
+        std::fs::create_dir(&data_path).expect("create `dAtA` dir");
+        std::fs::write(&data_path.join("empty.slf"), EMPTY_SLF_BYTES).expect("write `empty.slf`");
+
+        let mut vfs = Vfs::new();
+        vfs.init(&engine_options, &mod_manager).unwrap();
+    }
+
+    #[test]
+    fn missing_mod_data_dir_should_fail() {
+        let (mut engine_options, _temp_dir) = create_test_engine_options();
+        engine_options.mods = vec!["test-mod".to_owned()];
+        let mod_manager = ModManager::new_unchecked(&engine_options);
+
+        let data_path = engine_options.vanilla_game_dir.join("data");
+        std::fs::create_dir(&data_path).expect("create `data` dir");
+        std::fs::write(&data_path.join("empty.slf"), EMPTY_SLF_BYTES).expect("write `empty.slf`");
+
+        let mut vfs = Vfs::new();
+        vfs.init(&engine_options, &mod_manager).unwrap_err();
+    }
+
+    #[test]
+    fn mod_data_dir_should_be_case_insensitive() {
+        let (mut engine_options, _temp_dir) = create_test_engine_options();
+        engine_options.mods = vec!["test-mod".to_owned()];
+        // mod directory has to be created before mod_manager is initialized, so it will pick it up as a mod
+        std::fs::create_dir_all(&engine_options.stracciatella_home.join("mods/test-mod/data"))
+            .expect("create `test-mod/data` dir");
+        let mod_manager = ModManager::new_unchecked(&engine_options);
+
+        let data_path = engine_options.vanilla_game_dir.join("data");
+        std::fs::create_dir(&data_path).expect("create `data` dir");
+        std::fs::write(&data_path.join("empty.slf"), EMPTY_SLF_BYTES).expect("write `empty.slf`");
+
+        let mut vfs = Vfs::new();
+        vfs.init(&engine_options, &mod_manager).unwrap();
+
+        crate::fs::remove_dir_all(&engine_options.stracciatella_home.join("mods/test-mod/data"))
+            .expect("remove `test-mod/data` dir");
+        std::fs::create_dir_all(&engine_options.stracciatella_home.join("mods/test-mod/dAtA"))
+            .expect("create `test-mod/dAtA` dir");
+
+        let mut vfs = Vfs::new();
+        vfs.init(&engine_options, &mod_manager).unwrap();
+    }
+
+    const EMPTY_SLF_BYTES: &[u8] = include_bytes!("test_fixtures/empty.slf");
+
+    fn create_test_engine_options() -> (EngineOptions, TempDir) {
+        let temp_dir = tempdir().expect("temp_dir");
+        let mut engine_options = EngineOptions::default();
+
+        let home_dir = temp_dir.path().join("home");
+        let assets_dir = temp_dir.path().join("assets");
+        let vanilla_game_dir = temp_dir.path().join("game_dir");
+
+        std::fs::create_dir(&home_dir).expect("home_dir");
+        std::fs::create_dir_all(&assets_dir.join("externalized")).expect("assets_dir");
+        std::fs::create_dir(&vanilla_game_dir).expect("vanilla_game_dir");
+
+        engine_options.stracciatella_home = home_dir;
+        engine_options.assets_dir = assets_dir;
+        engine_options.vanilla_game_dir = vanilla_game_dir;
+
+        (engine_options, temp_dir)
     }
 }
