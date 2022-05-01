@@ -11,7 +11,7 @@ DefaultGamePolicy::DefaultGamePolicy(rapidjson::Document *json)
 	middle_mouse_look = gp.getOptionalBool("middle_mouse_look", true);
 
 	f_draw_item_shadow = gp.getOptionalBool("draw_item_shadow", true);
-	ms_per_game_cycle = gp.getOptionalInt("ms_per_game_cycle", 25);
+	ms_per_game_cycle = gp.getOptionalInt("ms_per_game_cycle", 8); //Fluffy (Personal): Increased framerate as personal preference
 	ms_per_time_slice = gp.getOptionalInt("ms_per_time_slice", 10);
 
 	starting_cash_easy = gp.getOptionalInt("starting_cash_easy", 45000);
@@ -49,9 +49,9 @@ DefaultGamePolicy::DefaultGamePolicy(rapidjson::Document *json)
 	chance_to_hit_maximum = gp.getOptionalInt("chance_to_hit_maximum", 99);
 	chance_to_hit_minimum = gp.getOptionalInt("chance_to_hit_minimum", 1);
 
-	always_show_cursor_in_tactical = gp.getOptionalBool("always_show_cursor_in_tactical", false); //Fluffy (ForeverMouseCursor)
-	show_hit_chance = gp.getOptionalBool("show_hit_chance", false); //Fluffy (ShowChanceToHit)
-	website_loading_time_scale = gp.getOptionalDouble("website_loading_time_scale", 1.0); //Fluffy (UpgradeFromDialUp)
+	always_show_cursor_in_tactical = gp.getOptionalBool("always_show_cursor_in_tactical", true); //Fluffy (ForeverMouseCursor) (false is supposed to be default, but I set true as personal default)
+	show_hit_chance = gp.getOptionalBool("show_hit_chance", true); //Fluffy (ShowChanceToHit) (false is supposed to be default, but I set true as personal default)
+	website_loading_time_scale = gp.getOptionalDouble("website_loading_time_scale", 0.05); //Fluffy (UpgradeFromDialUp) (1.0 is supposed to be default, but I set 0.05 as personal default)
 
 	JsonObjectReader imp = JsonObjectReader(gp.GetValue("imp"));
 	imp_load_saved_merc_by_nickname = imp.getOptionalBool("load_saved_merc_by_nickname");
