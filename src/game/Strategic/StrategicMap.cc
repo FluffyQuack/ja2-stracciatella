@@ -851,6 +851,7 @@ static void SetupProfileInsertionDataForCivilians(void)
 	}
 }
 
+Observable<INT16, INT16, INT8> OnEnterSector;
 
 static void EnterSector(const SGPSector& sector)
 {
@@ -921,6 +922,8 @@ static void EnterSector(const SGPSector& sector)
 	/* This function will either hide or display the tree tops, depending on the
 	 * game setting */
 	SetTreeTopStateForMap();
+
+	OnEnterSector(sector.x, sector.y, sector.z);
 }
 
 
