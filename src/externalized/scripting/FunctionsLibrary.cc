@@ -97,11 +97,6 @@ void PlaceItem(const INT16 sGridNo, OBJECTTYPE* const pObject, const INT8 ubVisi
 	AddItemToPool(sGridNo, pObject, static_cast<Visibility>(ubVisibility), 0, 0, 0);
 }
 
-MERCPROFILESTRUCT* GetMercProfile(const UINT8 ubProfileID)
-{
-	return &(GetProfile(ubProfileID));
-}
-
 ExtraGameStatesTable GetGameStates(const std::string key)
 {
 	auto stateKey = ST::format("scripts:{}", key);
