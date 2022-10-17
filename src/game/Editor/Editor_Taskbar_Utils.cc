@@ -750,7 +750,7 @@ static void RenderSelectedItemBlownUp(void)
 	}
 	else
 	{
-		item_name = ItemNames[o.usItem];
+		item_name = item->getName();
 	}
 	x  = screen_x - (StringPixLength(item_name, FONT10ARIAL) - 40) / 2;
 	y -= 10;
@@ -794,7 +794,7 @@ static void RenderEditorInfo(void)
 	SetFontAttributes(FONT12POINT1, FONT_BLACK, NO_SHADOW);
 
 	//Display the mapindex position
-	const GridNo iMapIndex = GetMouseMapPos();
+	const GridNo iMapIndex = guiCurrentCursorGridNo;
 	if (iMapIndex != NOWHERE)
 		FPSText = ST::format("   ({})   ", iMapIndex);
 	else
@@ -907,7 +907,7 @@ void ProcessEditorRendering()
 	//rendered with hilites, in case the mouse is over one.
 	gfRenderHilights = TRUE;
 
-	RenderButtonsFastHelp();
+	RenderFastHelp();
 
 }
 

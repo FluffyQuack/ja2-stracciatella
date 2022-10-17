@@ -78,8 +78,15 @@ void HandleTacticalPanelSwitch()
 	g_switch_panel = false;
 
 	SOLDIERTYPE* const s = g_new_panel_soldier;
-	SetCurrentInterfacePanel(s ? SM_PANEL : TEAM_PANEL);
-	SetCurrentTacticalPanelCurrentMerc(s);
+	if (s)
+	{
+		SetCurrentInterfacePanel(SM_PANEL);
+		SetCurrentTacticalPanelCurrentMerc(s);
+	}
+	else
+	{
+		SetCurrentInterfacePanel(TEAM_PANEL);
+	}
 
 	if (guiCurrentScreen != SHOPKEEPER_SCREEN) // XXX necessary?
 	{
@@ -448,7 +455,7 @@ void RenderTopmostTacticalInterface()
 	}
 
 	// CHECK IF OUR CURSOR IS OVER AN INV POOL
-	GridNo       const usMapPos = GetMouseMapPos();
+	GridNo       const usMapPos = guiCurrentCursorGridNo;
 	SOLDIERTYPE* const sel      = GetSelectedMan();
 	if (usMapPos != NOWHERE && gfUIOverItemPoolGridNo != NOWHERE && sel)
 	{

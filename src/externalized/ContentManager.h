@@ -58,7 +58,7 @@ struct GARRISON_GROUP;
 class ContentManager : public ItemSystem, public MercSystem
 {
 public:
-	virtual ~ContentManager() {};
+	virtual ~ContentManager() noexcept(false) {};
 
 	virtual void logConfiguration() const = 0;
 
@@ -97,8 +97,6 @@ public:
 
 	/** Load encrypted string from game resource file. */
 	virtual ST::string loadEncryptedString(const ST::string& fileName, uint32_t seek_chars, uint32_t read_chars) const = 0;
-
-	virtual ST::string loadEncryptedString(SGPFile* File, uint32_t seek_chars, uint32_t read_chars) const = 0;
 
 	/** Load dialogue quote from file. */
 	virtual ST::string* loadDialogQuoteFromFile(const ST::string& filename, int quote_number) = 0;
@@ -146,7 +144,7 @@ public:
 	virtual const std::vector<const CreatureLairModel*>& getCreatureLairs() const = 0;
 	virtual const CreatureLairModel* getCreatureLair(uint8_t lairId) const = 0;
 	virtual const CreatureLairModel* getCreatureLairByMineId(uint8_t mineId) const = 0;
-	virtual const MineModel* getMineForSector(uint8_t sectorX, uint8_t sectorY, uint8_t sectorZ) const = 0;
+	virtual const MineModel* getMineForSector(const SGPSector& sector) const = 0;
 	virtual const MineModel* getMine(uint8_t mineId) const = 0;
 	virtual const std::vector<const MineModel*>& getMines() const = 0;
 	virtual const std::vector<const SamSiteModel*>& getSamSites() const = 0;

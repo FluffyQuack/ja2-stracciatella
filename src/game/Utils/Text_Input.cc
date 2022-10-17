@@ -11,7 +11,6 @@
 #include "Timer_Control.h"
 #include "Font_Control.h"
 #include "Sound_Control.h"
-#include "MemMan.h"
 #include "MouseSystem.h"
 
 #include <string_theory/string>
@@ -242,8 +241,8 @@ static TEXTINPUTNODE* AllocateTextInputNode(BOOLEAN const start_editing)
 }
 
 
-static void MouseClickedInTextRegionCallback(MOUSE_REGION* reg, INT32 reason);
-static void MouseMovedInTextRegionCallback(MOUSE_REGION* reg, INT32 reason);
+static void MouseClickedInTextRegionCallback(MOUSE_REGION* reg, UINT32 reason);
+static void MouseMovedInTextRegionCallback(MOUSE_REGION* reg, UINT32 reason);
 
 
 /* After calling InitTextInputMode, you want to define one or more text input
@@ -331,7 +330,7 @@ void SetInputFieldString(UINT8 ubField, const ST::string& str)
 	}
 	else
 	{
-		SLOGA("Attempting to illegally set text into user field %d", curr->ubID);
+		SLOGA("Attempting to illegally set text into user field {}", curr->ubID);
 	}
 }
 
@@ -366,7 +365,7 @@ void SetInputFieldStringWithNumericStrictValue( UINT8 ubField, INT32 iNumber )
 	TEXTINPUTNODE* const curr = GetTextInputField(ubField);
 	if (!curr) return;
 
-	AssertMsg(!curr->fUserField, String("Attempting to illegally set text into user field %d", curr->ubID));
+	AssertMsg(!curr->fUserField, ST::format("Attempting to illegally set text into user field {}", curr->ubID));
 	if (iNumber < 0) //negative number converts to blank string
 	{
 		curr->str = ST::null;
@@ -887,9 +886,9 @@ static size_t CalculateCursorPos(INT32 const click_x)
 
 
 //Internally used to continue highlighting text
-static void MouseMovedInTextRegionCallback(MOUSE_REGION* const reg, INT32 const reason)
+static void MouseMovedInTextRegionCallback(MOUSE_REGION* const reg, UINT32 const reason)
 {
-	if (!gfLeftButtonState) return;
+	if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT) && !IsMainFingerDown()) return;
 
 	if (reason & MSYS_CALLBACK_REASON_MOVE       ||
 			reason & MSYS_CALLBACK_REASON_LOST_MOUSE ||
@@ -916,9 +915,9 @@ static void MouseMovedInTextRegionCallback(MOUSE_REGION* const reg, INT32 const 
 
 
 //Internally used to calculate where to place the cursor.
-static void MouseClickedInTextRegionCallback(MOUSE_REGION* const reg, INT32 const reason)
+static void MouseClickedInTextRegionCallback(MOUSE_REGION* const reg, UINT32 const reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_DWN)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_DWN)
 	{
 		SetActiveFieldMouse(reg);
 		//Signifies that we are typing text now.
@@ -1189,7 +1188,7 @@ void SetTextInputCursor(UINT16 const new_cursor)
 UINT16 GetExclusive24HourTimeValueFromField( UINT8 ubField )
 {
 	TEXTINPUTNODE const* const curr = GetTextInputField(ubField);
-	AssertMsg(curr, String("GetExclusive24HourTimeValueFromField: Invalid field %d", ubField));
+	AssertMsg(curr, ST::format("GetExclusive24HourTimeValueFromField: Invalid field {}", ubField));
 	if (!curr) return 0xffff;
 
 	UINT16 usTime;
@@ -1225,12 +1224,12 @@ void SetExclusive24HourTimeValue( UINT8 ubField, UINT16 usTime )
 		SetInputFieldString(ubField, ST::null);
 		return;
 	}
-	usTime = MIN( 1439, usTime );
+	usTime = std::min(1439, int(usTime));
 
 	TEXTINPUTNODE* const curr = GetTextInputField(ubField);
 	if (!curr) return;
 
-	AssertMsg(!curr->fUserField, String("Attempting to illegally set text into user field %d", curr->ubID));
+	AssertMsg(!curr->fUserField, ST::format("Attempting to illegally set text into user field {}", curr->ubID));
 	curr->str = ST::null;
 	curr->str += static_cast<char>((usTime / 600) + 0x30); //10 hours
 	curr->str += static_cast<char>((usTime / 60 % 10) + 0x30); //1 hour

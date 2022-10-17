@@ -34,7 +34,6 @@
 #include "Game_Clock.h"
 #include "Handle_Doors.h"
 #include "Map_Screen_Interface.h"
-#include "MemMan.h"
 #include "FileMan.h"
 
 #include "ContentManager.h"
@@ -127,7 +126,7 @@ bool SoldierHasKey(SOLDIERTYPE const& s, UINT8 const key_id)
 
 bool KeyExistsInKeyRing(SOLDIERTYPE const& s, UINT8 const key_id)
 {
-	if (!s.pKeyRing) return FALSE; // No key ring
+	if (!s.pKeyRing) return false; // No key ring
 
 	KEY_ON_RING const* const end = s.pKeyRing + NUM_KEYS;
 	for (KEY_ON_RING const* i = s.pKeyRing; i != end; ++i)
@@ -214,9 +213,8 @@ BOOLEAN AttemptToLockDoor(const SOLDIERTYPE* pSoldier, DOOR* pDoor)
 BOOLEAN AttemptToCrowbarLock( SOLDIERTYPE * pSoldier, DOOR * pDoor )
 {
 	INT32 iResult;
-	INT8  bStress, bSlot;
 
-	bSlot = FindUsableObj( pSoldier, CROWBAR );
+	INT8 bSlot = FindUsableObj(pSoldier, CROWBAR);
 	if ( bSlot == ITEM_NOT_FOUND )
 	{
 		// error!
@@ -247,7 +245,7 @@ BOOLEAN AttemptToCrowbarLock( SOLDIERTYPE * pSoldier, DOOR * pDoor )
 	}
 
 	// possibly damage crowbar
-	bStress = __min( EffectiveStrength( pSoldier ), LockTable[pDoor->ubLockID].ubSmashDifficulty + 30 );
+	int bStress = std::min(int(EffectiveStrength(pSoldier)), LockTable[pDoor->ubLockID].ubSmashDifficulty + 30);
 	// reduce crowbar status by random % between 0 and 5%
 	DamageObj( &(pSoldier->inv[ bSlot ]), (INT8) PreRandom( bStress / 20 ) );
 
@@ -567,7 +565,7 @@ void HandleDoorTrap(SOLDIERTYPE& s, DOOR const& d)
 			s.attacker = &s;
 			s.bBeingAttackedCount++;
 			gTacticalStatus.ubAttackBusyCount++;
-			SLOGD("Trap gone off. Busy count: %d", gTacticalStatus.ubAttackBusyCount);
+			SLOGD("Trap gone off. Busy count: {}", gTacticalStatus.ubAttackBusyCount);
 
 			SoldierTakeDamage(&s, 10 + PreRandom(10), 3 + PreRandom(3) * 1000,
 						TAKE_DAMAGE_ELECTRICITY, NULL);
@@ -580,7 +578,7 @@ void HandleDoorTrap(SOLDIERTYPE& s, DOOR const& d)
 			s.attacker = &s;
 			s.bBeingAttackedCount++;
 			gTacticalStatus.ubAttackBusyCount++;
-			SLOGD("Trap gone off. Busy count: %d", gTacticalStatus.ubAttackBusyCount);
+			SLOGD("Trap gone off. Busy count: {}", gTacticalStatus.ubAttackBusyCount);
 
 			SoldierTakeDamage(&s, 20 + PreRandom(20), 6 + PreRandom(6) * 1000, TAKE_DAMAGE_ELECTRICITY, NULL);
 			break;
@@ -647,12 +645,9 @@ BOOLEAN AttemptToBlowUpLock( SOLDIERTYPE * pSoldier, DOOR * pDoor )
 
 		// Not sure if this makes sense, but the explosive is small.
 		// Double the damage here as we are damaging a lock rather than a person
-		pDoor->bLockDamage += Explosive[GCM->getItem(SHAPED_CHARGE)->getClassIndex()].ubDamage * 2;
-		if (pDoor->bLockDamage > LockTable[ pDoor->ubLockID ].ubSmashDifficulty )
+		if (pDoor->damageLock(Explosive[GCM->getItem(SHAPED_CHARGE)->getClassIndex()].ubDamage * 2))
 		{
-			// succeeded! door can never be locked again, so remove from door list...
-			RemoveDoorInfoFromTable( pDoor->sGridNo );
-			// award experience points?
+			// Lock destroyed, award experience points?
 			return( TRUE );
 		}
 	}
@@ -669,6 +664,21 @@ BOOLEAN AttemptToBlowUpLock( SOLDIERTYPE * pSoldier, DOOR * pDoor )
 		IgniteExplosionXY(NULL, pSoldier->sX, pSoldier->sY, gpWorldLevelData[pSoldier->sGridNo].sHeight, pSoldier->sGridNo, SHAPED_CHARGE, 0);
 	}
 	return( FALSE );
+}
+
+bool DOOR::damageLock(int const additionalDamage)
+{
+	bLockDamage = std::min<int>(INT8_MAX, bLockDamage + additionalDamage);
+	if (bLockDamage > LockTable[ubLockID].ubSmashDifficulty)
+	{
+		// Display message!
+		ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, TacticalStr[LOCK_HAS_BEEN_DESTROYED]);
+
+		// succeeded! door can never be locked again, so remove from door list...
+		RemoveDoorInfoFromTable(sGridNo);
+		return true;
+	}
+	return false;
 }
 
 //File I/O for loading the door information from the map.  This automatically allocates
@@ -782,20 +792,20 @@ void UpdateDoorPerceivedValue( DOOR *pDoor )
 }
 
 
-void SaveDoorTableToDoorTableTempFile(INT16 const x, INT16 const y, INT8 const z)
+void SaveDoorTableToDoorTableTempFile(const SGPSector& sector)
 {
-	AutoSGPFile f(GCM->tempFiles()->openForWriting(GetMapTempFileName(SF_DOOR_TABLE_TEMP_FILES_EXISTS, x, y, z), true));
+	AutoSGPFile f(GCM->tempFiles()->openForWriting(GetMapTempFileName(SF_DOOR_TABLE_TEMP_FILES_EXISTS, sector), true));
 	Assert(DoorTable.size() <= UINT8_MAX);
 	UINT8 numDoors = static_cast<UINT8>(DoorTable.size());
 	f->writeArray(numDoors, DoorTable.data());
 	// Set the sector flag indicating that there is a Door table temp file present
-	SetSectorFlag(x, y, z, SF_DOOR_TABLE_TEMP_FILES_EXISTS);
+	SetSectorFlag(sector, SF_DOOR_TABLE_TEMP_FILES_EXISTS);
 }
 
 
 void LoadDoorTableFromDoorTableTempFile()
 {
-	ST::string const zMapName = GetMapTempFileName( SF_DOOR_TABLE_TEMP_FILES_EXISTS, gWorldSectorX, gWorldSectorY, gbWorldSectorZ );
+	ST::string const zMapName = GetMapTempFileName( SF_DOOR_TABLE_TEMP_FILES_EXISTS, gWorldSector);
 
 	//If the file doesnt exists, its no problem.
 	if (!GCM->tempFiles()->exists(zMapName)) return;
@@ -1001,7 +1011,7 @@ static void SynchronizeDoorStatusToStructureData(DOOR_STATUS const& d)
 	STRUCTURE *base = FindBaseStructure(s);
 	if (!base)
 	{
-		STLOGW("Door structure data at {} was not found", d.sGridNo);
+		SLOGW("Door structure data at {} was not found", d.sGridNo);
 		return;
 	}
 	INT16 sBaseGridNo = base->sGridNo;
@@ -1146,18 +1156,18 @@ static void InternalUpdateDoorsPerceivedValue(DOOR_STATUS& d)
 }
 
 
-void SaveDoorStatusArrayToDoorStatusTempFile(INT16 const x, INT16 const y, INT8 const z)
+void SaveDoorStatusArrayToDoorStatusTempFile(const SGPSector& sector)
 {
 	// Turn off any door busy flags
 	FOR_EACH_DOOR_STATUS(d) d.ubFlags &= ~DOOR_BUSY;
 
-	AutoSGPFile f(GCM->tempFiles()->openForWriting(GetMapTempFileName(SF_DOOR_STATUS_TEMP_FILE_EXISTS, x, y, z), true));
+	AutoSGPFile f(GCM->tempFiles()->openForWriting(GetMapTempFileName(SF_DOOR_STATUS_TEMP_FILE_EXISTS, sector), true));
 	Assert(gpDoorStatus.size() <= UINT8_MAX);
 	UINT8 numDoorStatus = static_cast<UINT8>(gpDoorStatus.size());
 	f->writeArray(numDoorStatus, gpDoorStatus.data());
 
 	// Set the flag indicating that there is a door status array
-	SetSectorFlag(x, y, z, SF_DOOR_STATUS_TEMP_FILE_EXISTS);
+	SetSectorFlag(sector, SF_DOOR_STATUS_TEMP_FILE_EXISTS);
 }
 
 
@@ -1165,7 +1175,7 @@ void LoadDoorStatusArrayFromDoorStatusTempFile()
 {
 	TrashDoorStatusArray();
 
-	AutoSGPFile f(GCM->tempFiles()->openForReading(GetMapTempFileName(SF_DOOR_STATUS_TEMP_FILE_EXISTS, gWorldSectorX, gWorldSectorY, gbWorldSectorZ)));
+	AutoSGPFile f(GCM->tempFiles()->openForReading(GetMapTempFileName(SF_DOOR_STATUS_TEMP_FILE_EXISTS, gWorldSector)));
 
 	// Load the number of elements in the door status array
 	UINT8 numDoorStatus = 0;
@@ -1221,7 +1231,7 @@ void LoadKeyTableFromSaveedGameFile(HWFILE const f)
 void ExamineDoorsOnEnteringSector()
 {
 	// If this is Omerta, don't do it
-	if (GetTownIdForSector(SECTOR(gWorldSectorX, gWorldSectorY)) == OMERTA) return;
+	if (GetTownIdForSector(gWorldSector) == OMERTA) return;
 
 	// Check time
 	if (GetWorldTotalMin() - gTacticalStatus.uiTimeSinceLastInTactical < 30) return;
@@ -1247,7 +1257,7 @@ void DropKeysInKeyRing(SOLDIERTYPE& s, GridNo const gridno, INT8 const level, Vi
 	KEY_ON_RING* const key_ring = s.pKeyRing;
 	if (!key_ring) return; // No key ring
 
-	bool const here = !use_unloaded && s.sSectorX == gWorldSectorX && s.sSectorY == gWorldSectorY && s.bSectorZ == gbWorldSectorZ;
+	bool const here = !use_unloaded && s.sSector == gWorldSector;
 	for (KEY_ON_RING* i = key_ring; i != key_ring + NUM_KEYS; ++i)
 	{
 		KEY_ON_RING& k = *i;
@@ -1270,7 +1280,7 @@ void DropKeysInKeyRing(SOLDIERTYPE& s, GridNo const gridno, INT8 const level, Vi
 		}
 		else
 		{
-			AddItemsToUnLoadedSector(s.sSectorX, s.sSectorY, s.bSectorZ, gridno, 1, &o, level, WOLRD_ITEM_FIND_SWEETSPOT_FROM_GRIDNO | WORLD_ITEM_REACHABLE, 0, visible);
+			AddItemsToUnLoadedSector(s.sSector, gridno, 1, &o, level, WORLD_ITEM_FIND_SWEETSPOT_FROM_GRIDNO | WORLD_ITEM_REACHABLE, 0, visible);
 		}
 	}
 }

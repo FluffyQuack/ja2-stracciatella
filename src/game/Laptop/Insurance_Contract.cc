@@ -27,7 +27,6 @@
 #include "Button_System.h"
 #include "Video.h"
 #include "VSurface.h"
-#include "MemMan.h"
 #include "Debug.h"
 #include "ScreenIDs.h"
 #include "JAScreens.h"
@@ -125,11 +124,11 @@ UINT16              gusCurrentInsuranceMercIndex;
 static MOUSE_REGION gSelectedInsuranceContractLinkRegion[2];
 
 static BUTTON_PICS* guiInsContractPrevButtonImage;
-static void BtnInsContractPrevButtonCallback(GUI_BUTTON *btn, INT32 reason);
+static void BtnInsContractPrevButtonCallback(GUI_BUTTON *btn, UINT32 reason);
 static GUIButtonRef guiInsContractPrevBackButton;
 
 static BUTTON_PICS* guiInsContractNextButtonImage;
-static void BtnInsContractNextButtonCallBack(GUI_BUTTON *btn, INT32 reason);
+static void BtnInsContractNextButtonCallBack(GUI_BUTTON *btn, UINT32 reason);
 static GUIButtonRef guiInsContractNextBackButton;
 
 
@@ -149,7 +148,7 @@ static InsuranceInfo insurance_info[3];
 
 static void SetNumberOfDisplayedInsuranceMercs(void)
 {
-	gubNumberofDisplayedInsuranceGrids = MIN(g_n_insurable_mercs - gusCurrentInsuranceMercIndex, 3);
+	gubNumberofDisplayedInsuranceGrids = std::min(g_n_insurable_mercs - gusCurrentInsuranceMercIndex, 3U);
 }
 
 
@@ -166,7 +165,7 @@ static GUIButtonRef MakeButtonBig(BUTTON_PICS* img, const ST::string& text, INT1
 
 static void BuildInsuranceArray(void);
 static void CreateDestroyInsuranceContractFormButtons(BOOLEAN fCreate);
-static void SelectInsuranceContractRegionCallBack(MOUSE_REGION* pRegion, INT32 iReason);
+static void SelectInsuranceContractRegionCallBack(MOUSE_REGION* pRegion, UINT32 iReason);
 
 
 void EnterInsuranceContract()
@@ -359,9 +358,9 @@ void RenderInsuranceContract()
 }
 
 
-static void BtnInsContractPrevButtonCallback(GUI_BUTTON *btn, INT32 reason)
+static void BtnInsContractPrevButtonCallback(GUI_BUTTON *btn, UINT32 reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		if (gusCurrentInsuranceMercIndex > 2) gusCurrentInsuranceMercIndex -= 3;
 		// signal that we want to change the number of forms on the page
@@ -370,9 +369,9 @@ static void BtnInsContractPrevButtonCallback(GUI_BUTTON *btn, INT32 reason)
 }
 
 
-static void BtnInsContractNextButtonCallBack(GUI_BUTTON *btn, INT32 reason)
+static void BtnInsContractNextButtonCallBack(GUI_BUTTON *btn, UINT32 reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		gusCurrentInsuranceMercIndex += 3;
 		// signal that we want to change the number of forms on the page
@@ -585,9 +584,9 @@ catch (...) { return FALSE; }
 static void HandleAcceptButton(SOLDIERTYPE* s);
 
 
-static void BtnInsuranceAcceptClearFormButtonCallback(GUI_BUTTON* btn, INT32 reason)
+static void BtnInsuranceAcceptClearFormButtonCallback(GUI_BUTTON* btn, UINT32 reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		UINT         const idx = btn->GetUserData();
 		SOLDIERTYPE* const s   = insurance_info[idx].soldier;
@@ -600,9 +599,9 @@ static void BtnInsuranceAcceptClearFormButtonCallback(GUI_BUTTON* btn, INT32 rea
 }
 
 
-static void SelectInsuranceContractRegionCallBack(MOUSE_REGION* pRegion, INT32 iReason)
+static void SelectInsuranceContractRegionCallBack(MOUSE_REGION* pRegion, UINT32 iReason)
 {
-	if (iReason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		UINT32 uiInsuranceLink = MSYS_GetRegionUserData( pRegion, 0 );
 
@@ -984,7 +983,7 @@ void InsuranceContractPayLifeInsuranceForDeadMerc( UINT8 ubPayoutID )
 	AddTransactionToPlayersBook(INSURANCE_PAYOUT, lip->ubMercID, GetWorldTotalMin(), lip->iPayOutPrice);
 
 	//add to the history log the fact that the we paid the insurance claim
-	AddHistoryToPlayersLog(HISTORY_INSURANCE_CLAIM_PAYOUT, lip->ubMercID, GetWorldTotalMin(), -1, -1);
+	AddHistoryToPlayersLog(HISTORY_INSURANCE_CLAIM_PAYOUT, lip->ubMercID, GetWorldTotalMin(), SGPSector(-1, -1));
 
 	//if there WASNT an investigation
 	if (GetProfile(lip->ubMercID).ubSuspiciousDeath == 0)
@@ -1134,7 +1133,7 @@ void PurchaseOrExtendInsuranceForSoldier( SOLDIERTYPE *pSoldier, UINT32 uiInsura
 			AddTransactionToPlayersBook(	PURCHASED_INSURANCE, pSoldier->ubProfile, GetWorldTotalMin(), -( iAmountOfMoneyTransfer ) );
 
 			//add an entry in the history page for the purchasing of life insurance
-			AddHistoryToPlayersLog(HISTORY_PURCHASED_INSURANCE, pSoldier->ubProfile, GetWorldTotalMin(), -1, -1 );
+			AddHistoryToPlayersLog(HISTORY_PURCHASED_INSURANCE, pSoldier->ubProfile, GetWorldTotalMin(), SGPSector(-1, -1));
 
 			//Set that we have life insurance
 			pSoldier->usLifeInsurance = 1;

@@ -106,7 +106,7 @@ struct SAMPLETAG
 	UINT32 uiBufferSize; // The size of the in-memory buffer
 	ma_format eInMemoryFormat;
 	UINT32 uiInMemoryChannels;
-	
+
 	ma_data_converter* pDataConverter; // pointer to a data converter that decodes the data from pData
 
 	SGPFile* pFile;  // pointer to a SDL_RWops representing the file that we stream from
@@ -280,7 +280,7 @@ UINT32 SoundPlayFromSmackBuff(const char* name, UINT8 channels, UINT8 depth, UIN
 
 UINT32 SoundPlayRandom(const char* pFilename, UINT32 time_min, UINT32 time_max, UINT32 vol_min, UINT32 vol_max, UINT32 pan_min, UINT32 pan_max, UINT32 max_instances)
 {
-	SLOGD("playing random Sound: \"%s\"", pFilename);
+	SLOGD("playing random Sound: \"{}\"", pFilename);
 
 	if (!fSoundSystemInit) return SOUND_ERROR;
 
@@ -360,7 +360,7 @@ BOOLEAN SoundSetVolume(UINT32 uiSoundID, UINT32 uiVolume)
 	SOUNDTAG* const channel = SoundGetChannelByID(uiSoundID);
 	if (channel == NULL) return FALSE;
 
-	channel->uiFadeVolume = __min(uiVolume, MAXVOLUME);
+	channel->uiFadeVolume = std::min(uiVolume, UINT32(MAXVOLUME));
 	return TRUE;
 }
 
@@ -372,7 +372,7 @@ BOOLEAN SoundSetPan(UINT32 uiSoundID, UINT32 uiPan)
 	SOUNDTAG* const channel = SoundGetChannelByID(uiSoundID);
 	if (channel == NULL) return FALSE;
 
-	channel->Pan = __min(uiPan, 127);
+	channel->Pan = std::min(uiPan, 127U);
 	return TRUE;
 }
 
@@ -466,6 +466,12 @@ static BOOLEAN DoesChannelRingBufferNeedService(SOUNDTAG* channel) {
 	return bytesToWrite >= SOUND_RING_BUFFER_SIZE / 2;
 }
 
+void maResultToRuntimeError(ma_result result, const char* functionName) {
+		if (result != MA_SUCCESS) {
+			throw std::runtime_error(ST::format("{}: {}", functionName, ma_result_description(result)).c_str());
+		}
+}
+
 static void FillRingBuffer(SOUNDTAG* channel) {
 	auto sample = channel->pSample;
 
@@ -474,49 +480,44 @@ static void FillRingBuffer(SOUNDTAG* channel) {
 			return;
 		}
 		auto bytesToWrite = ma_pcm_rb_available_write(channel->pRingBuffer);
-		if (bytesToWrite < 0) {
-			throw std::runtime_error("Read pointer is after write pointer, this should not happen");
-		}
 
 		void* pFramesInClientFormat;
-		auto result = ma_pcm_rb_acquire_write(channel->pRingBuffer, &bytesToWrite, &pFramesInClientFormat);
-		if (result != MA_SUCCESS) {
-			throw std::runtime_error(ST::format("ma_pcm_rb_acquire_write: {}", ma_result_description(result)).c_str());
-		}
+		maResultToRuntimeError(ma_pcm_rb_acquire_write(channel->pRingBuffer, &bytesToWrite, &pFramesInClientFormat), "ma_pcm_rb_acquire_write");
 		ma_uint64 framesRead = 0;
 		if (sample->pDecoder != NULL) {
-			auto result = ma_decoder_seek_to_pcm_frame(sample->pDecoder, channel->Pos);
-			if (result != MA_SUCCESS) {
-				throw std::runtime_error(ST::format("ma_decoder_seek_to_pcm_frame: {}", ma_result_description(result)).c_str());
-			}
+			maResultToRuntimeError(ma_decoder_seek_to_pcm_frame(sample->pDecoder, channel->Pos), "ma_decoder_seek_to_pcm_frame");
 			// We stream from file
-			framesRead = ma_decoder_read_pcm_frames(sample->pDecoder, pFramesInClientFormat, bytesToWrite);
+			auto result = ma_decoder_read_pcm_frames(sample->pDecoder, pFramesInClientFormat, bytesToWrite, &framesRead);
+			if (result != MA_SUCCESS && result != MA_AT_END) {
+				throw std::runtime_error(ST::format("ma_decoder_read_pcm_frames: {}", ma_result_description(result)).c_str());
+			}
 		} else if (sample->pDataConverter != NULL) {
 			auto bytesPerFrame = ma_get_bytes_per_frame(sample->eInMemoryFormat, sample->uiInMemoryChannels);
-			auto posInBytes = ma_data_converter_get_required_input_frame_count(sample->pDataConverter, channel->Pos) * bytesPerFrame;
-			auto requiredInputFrameCount = ma_data_converter_get_required_input_frame_count(sample->pDataConverter, bytesToWrite);
+
+			ma_uint64 posInBytes;
+			maResultToRuntimeError(ma_data_converter_get_required_input_frame_count(sample->pDataConverter, channel->Pos, &posInBytes), "ma_data_converter_get_required_input_frame_count");
+			posInBytes *= bytesPerFrame;
+
+			ma_uint64 requiredInputFrameCount;
+			maResultToRuntimeError(ma_data_converter_get_required_input_frame_count(sample->pDataConverter, bytesToWrite, &requiredInputFrameCount), "ma_data_converter_get_required_input_frame_count");
 			// We might not have as many bytes available
-			auto availableFrames = MIN(requiredInputFrameCount * bytesPerFrame, sample->uiBufferSize - posInBytes) / bytesPerFrame;
-			auto expectedOutputFrameCount = ma_data_converter_get_expected_output_frame_count(sample->pDataConverter, availableFrames);
-			
-			auto result = ma_data_converter_process_pcm_frames(
+			auto availableFrames = std::min(requiredInputFrameCount * bytesPerFrame, sample->uiBufferSize - posInBytes) / bytesPerFrame;
+
+			ma_uint64 expectedOutputFrameCount;
+			maResultToRuntimeError(ma_data_converter_get_expected_output_frame_count(sample->pDataConverter, availableFrames, &expectedOutputFrameCount), "ma_data_converter_get_expected_output_frame_count");
+
+			maResultToRuntimeError(ma_data_converter_process_pcm_frames(
 				sample->pDataConverter,
 				sample->pInMemoryBuffer + posInBytes,
 				&availableFrames,
 				pFramesInClientFormat,
 				&expectedOutputFrameCount
-			);
-			if (result != MA_SUCCESS) {
-				throw std::runtime_error(ST::format("ma_data_converter_process_pcm_frames: {}", ma_result_description(result)).c_str());
-			}
+			), "ma_data_converter_process_pcm_frames");
 			framesRead = expectedOutputFrameCount;
 		} else {
 			throw std::runtime_error("Dont know how to process ring buffer");
 		}
-		result = ma_pcm_rb_commit_write(channel->pRingBuffer, framesRead, pFramesInClientFormat);
-		if (result != MA_SUCCESS) {
-			throw std::runtime_error(ST::format("ma_pcm_rb_commit_write: {}", ma_result_description(result)).c_str());
-		}
+		maResultToRuntimeError(ma_pcm_rb_commit_write(channel->pRingBuffer, framesRead), "ma_pcm_rb_commit_write");
 
 		channel->Pos += framesRead;
 		if (framesRead < bytesToWrite) {
@@ -529,11 +530,8 @@ static void FillRingBuffer(SOUNDTAG* channel) {
 			}
 		}
 	} catch (const std::runtime_error& err) {
-		SLOGE(ST::format(
-			"Error processing audio stream for channel {}, sample {}, file \"{}\": {}",
-			channel - pSoundList, sample - pSampleList, sample->pName,
-			err.what()
-		).c_str());
+		SLOGE("Error processing audio stream for channel {}, sample {}, file \"{}\": {}",
+			channel - pSoundList, sample - pSampleList, sample->pName, err.what());
 	}
 }
 
@@ -572,7 +570,7 @@ void SoundServiceStreams(void)
 		SOUNDTAG* Sound = &pSoundList[i];
 		if (Sound->State == CHANNEL_DEAD)
 		{
-			STLOGD("DEAD channel {} file \"{}\" (refcount {})", i, Sound->pSample->pName, Sound->pSample->uiInstances);
+			SLOGD("DEAD channel {} file \"{}\" (refcount {})", i, Sound->pSample->pName, Sound->pSample->uiInstances);
 			if (Sound->EOSCallback != NULL) Sound->EOSCallback(Sound->pCallbackData);
 			assert(Sound->pSample->uiInstances != 0);
 			Sound->pSample->uiInstances--;
@@ -670,10 +668,7 @@ static SAMPLETAG* SoundLoadBuffer(UINT8* inMemoryBuffer, UINT32 uiBufferSize, ma
 			gTargetAudioSpec.freq
 		);
 		ma_data_converter* converter = (ma_data_converter*)ma_malloc(sizeof(ma_data_converter), NULL);
-		auto result = ma_data_converter_init(&config, converter);
-		if (result != MA_SUCCESS) {
-			throw std::runtime_error(ST::format("ma_data_converter_init: {}", ma_result_description(result)).c_str());
-		}
+		maResultToRuntimeError(ma_data_converter_init(&config, NULL, converter), "ma_data_converter_init");
 
 		s->pInMemoryBuffer = inMemoryBuffer;
 		s->uiBufferSize = uiBufferSize;
@@ -691,12 +686,17 @@ static SAMPLETAG* SoundLoadBuffer(UINT8* inMemoryBuffer, UINT32 uiBufferSize, ma
 	}
 }
 
-size_t MiniaudioReadProc(ma_decoder* pDecoder, void* pBufferOut, size_t bytesToRead) {
+ma_result MiniaudioReadProc(ma_decoder* pDecoder, void* pBufferOut, size_t bytesToRead, size_t *bytesRead) {
 	auto rwOps = (SDL_RWops*)pDecoder->pUserData;
-	return SDL_RWread(rwOps, pBufferOut, sizeof(UINT8), bytesToRead);
+
+	*bytesRead = SDL_RWread(rwOps, pBufferOut, sizeof(UINT8), bytesToRead);
+	if (*bytesRead != 0) {
+		return MA_SUCCESS;
+	}
+	return MA_ERROR;
 }
 
-ma_bool32 MiniaudioSeekProc(ma_decoder* pDecoder, int byteOffset, ma_seek_origin origin) {
+ma_result MiniaudioSeekProc(ma_decoder* pDecoder, ma_int64 byteOffset, ma_seek_origin origin) {
 	auto rwOps = (SDL_RWops*)pDecoder->pUserData;
 	auto sdlOrigin = RW_SEEK_SET;
 	if (origin == ma_seek_origin::ma_seek_origin_current) {
@@ -706,7 +706,11 @@ ma_bool32 MiniaudioSeekProc(ma_decoder* pDecoder, int byteOffset, ma_seek_origin
 		sdlOrigin = RW_SEEK_END;
 	}
 
-	return SDL_RWseek(rwOps, byteOffset, sdlOrigin) != -1;
+	if (SDL_RWseek(rwOps, byteOffset, sdlOrigin) != -1) {
+		return MA_SUCCESS;
+	}
+
+	return MA_ERROR;
 }
 
 
@@ -733,7 +737,7 @@ static SAMPLETAG* SoundLoadDisk(const char* pFilename)
 	{
 		auto isStreamed = TRUE;
 		SAMPLETAG* s = SoundGetEmptySample();
-		
+
 		// if we don't have a sample slot
 		if (s == NULL)
 		{
@@ -758,6 +762,7 @@ static SAMPLETAG* SoundLoadDisk(const char* pFilename)
 		// Initialize decoder to convert WAV/MP3/OGG data to raw sample data
 		decoder = (ma_decoder*)ma_malloc(sizeof(ma_decoder), NULL);
 		auto result = ma_decoder_init(MiniaudioReadProc, MiniaudioSeekProc, rwOps, &gTargetDecoderConfig, decoder);
+
 		if (result != MA_SUCCESS) {
 			throw std::runtime_error(ST::format("Error initializing sound decoder for file \"{}\"- {}", pFilename, ma_result_description(result)).c_str());
 		}
@@ -770,15 +775,15 @@ static SAMPLETAG* SoundLoadDisk(const char* pFilename)
 		s->uiFlags |= SAMPLE_ALLOCATED;
 
 		if (isStreamed) {
-			SLOGD("SoundLoadDisk success creating file stream for \"%s\"", pFilename);
+			SLOGD("SoundLoadDisk success creating file stream for \"{}\"", pFilename);
 		} else {
-			SLOGD("SoundLoadDisk success creating in-memory stream for \"%s\"", pFilename);
+			SLOGD("SoundLoadDisk success creating in-memory stream for \"{}\"", pFilename);
 		}
 		return s;
 	}
 	catch (const std::runtime_error& err)
 	{
-		SLOGE("SoundLoadDisk Error for \"%s\": %s", pFilename, err.what());
+		SLOGE("SoundLoadDisk Error for \"{}\": {}", pFilename, err.what());
 		// Clean up possible allocations
 		if (hFile != NULL) {
 			delete hFile;
@@ -820,7 +825,7 @@ static BOOLEAN SoundCleanCache(void)
 
 	if (candidate != NULL)
 	{
-		STLOGD("freeing sample {} \"{}\" with {} hits", candidate - pSampleList, candidate->pName, candidate->uiCacheHits);
+		SLOGD("freeing sample {} \"{}\" with {} hits", candidate - pSampleList, candidate->pName, candidate->uiCacheHits);
 		SoundFreeSample(candidate);
 		return TRUE;
 	}
@@ -855,7 +860,7 @@ static void SoundFreeSample(SAMPLETAG* s)
 {
 	if (!(s->uiFlags & SAMPLE_ALLOCATED)) return;
 
-	SLOGD("SoundFreeSample: Freeing sample %d", s - pSampleList);
+	SLOGD("SoundFreeSample: Freeing sample {}", s - pSampleList);
 
 	assert(s->uiInstances == 0);
 
@@ -864,7 +869,7 @@ static void SoundFreeSample(SAMPLETAG* s)
 		ma_free(s->pDecoder, NULL);
 	}
 	if (s->pDataConverter != NULL) {
-		ma_data_converter_uninit(s->pDataConverter);
+		ma_data_converter_uninit(s->pDataConverter, NULL);
 		ma_free(s->pDataConverter, NULL);
 	}
 	if (s->pRWOps != NULL) {
@@ -897,7 +902,7 @@ static void SoundCallback(void* userdata, Uint8* stream, int len)
 {
 	if (len < 0)
 	{
-		SLOGA("SoundCallback: unexpected negative len %d", len);
+		SLOGA("SoundCallback: unexpected negative len {}", len);
 		return;
 	}
 
@@ -934,7 +939,7 @@ static void SoundCallback(void* userdata, Uint8* stream, int len)
 				const INT16* src;
 				auto rbResult = ma_pcm_rb_acquire_read(Sound->pRingBuffer, &samples, (void**)&src);
 				if (rbResult != MA_SUCCESS) {
-					SLOGE("Could not aquire read pointer for channel %d: %s", Sound - pSoundList, ma_result_description(rbResult));
+					SLOGE("Could not aquire read pointer for channel {}: {}", Sound - pSoundList, ma_result_description(rbResult));
 					continue;
 				}
 
@@ -944,13 +949,13 @@ static void SoundCallback(void* userdata, Uint8* stream, int len)
 					gMixBuffer[2 * i + 1] += src[2 * i + 1] * vol_r >> 7;
 				}
 
-				if (samples < want_samples) {
+				rbResult = ma_pcm_rb_commit_read(Sound->pRingBuffer, samples);
+				if (samples < want_samples || rbResult == MA_AT_END) {
 					Sound->State = CHANNEL_DEAD;
 				}
 
-				rbResult = ma_pcm_rb_commit_read(Sound->pRingBuffer, samples, (void**)src);
-				if (rbResult != MA_SUCCESS) {
-					SLOGE("Could not commit read pointer for channel %d: %s", Sound - pSoundList, ma_result_description(rbResult));
+				if (rbResult != MA_SUCCESS && rbResult != MA_AT_END) {
+					SLOGE("Could not commit read pointer for channel {}: {}", Sound - pSoundList, ma_result_description(rbResult));
 				} else {
 					ringBuffersNeedService |= DoesChannelRingBufferNeedService(Sound);
 				}
@@ -1027,12 +1032,9 @@ static BOOLEAN SoundInitHardware(void)
 
 		SDL_PauseAudio(0);
 		return TRUE;
-		
+
 	} catch (const std::runtime_error& err) {
-		SLOGE(ST::format(
-			"SoundInitHardware: {}",
-			err.what()
-		).c_str());
+		SLOGE("SoundInitHardware: {}", err.what());
 		SoundShutdownHardware();
 		return FALSE;
 	}
@@ -1053,7 +1055,7 @@ static void SoundShutdownHardware(void)
 		int returnValue = 1;
 		SDL_WaitThread(bufferServiceThread, &returnValue);
 		if (returnValue != 0) {
-			SLOGE("SoundManBufferServiceThread exited with code: %d", returnValue);
+			SLOGE("SoundManBufferServiceThread exited with code: {}", returnValue);
 		}
 	}
 	for(auto channel = std::begin(pSoundList); channel != std::end(pSoundList); ++channel) {
@@ -1092,7 +1094,7 @@ static UINT32 SoundGetUniqueID(void);
  * Returns: Unique sound ID if successful, SOUND_ERROR if not. */
 static UINT32 SoundStartSample(SAMPLETAG* sample, SOUNDTAG* channel, UINT32 volume, UINT32 pan, UINT32 loop, void (*end_callback)(void*), void* data)
 {
-	STLOGD("playing channel {} sample {} file \"{}\"", channel - pSoundList, sample - pSampleList, sample->pName);
+	SLOGD("playing channel {} sample {} file \"{}\"", channel - pSoundList, sample - pSampleList, sample->pName);
 
 	if (!fSoundSystemInit) return SOUND_ERROR;
 
@@ -1145,7 +1147,7 @@ static BOOLEAN SoundStopChannel(SOUNDTAG* channel)
 
 	if (channel->pSample == NULL) return FALSE;
 
-	STLOGD("stopping channel channel {}", (channel - pSoundList));
+	SLOGD("stopping channel channel {}", (channel - pSoundList));
 	channel->State = CHANNEL_STOP;
 	return TRUE;
 }

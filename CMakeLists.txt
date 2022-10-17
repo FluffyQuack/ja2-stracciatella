@@ -91,9 +91,13 @@ option(LOCAL_GTEST_LIB "Build with local gtest lib" ON)
 option(WITH_UNITTESTS "Build with unittests" ON)
 option(WITH_FIXMES "Build with fixme messages" OFF)
 option(WITH_MAEMO "Build with right click mapped to F4 (menu button)" OFF)
+option(WITH_MAGICENUM "Build with magic_enum library" ON)
 option(BUILD_LAUNCHER "Build the ja2 launcher application" ON)
 option(WITH_EDITOR_SLF "Include the latest free editor.slf" OFF)
 option(WITH_RUST_BINARIES "Include rust binaries in build" ON)
+# @see LOCAL_LUA_LIB in dependencies/lib-lua/CMakeLists.txt
+# @see LOCAL_SOL_LIB in dependencies/lib-sol2/CMakeLists.txt
+# @see LOCAL_MINIAUDIO_LIB in dependencies/lib-miniaudio/CMakeLists.txt
 set(WITH_CUSTOM_LOCALE "" CACHE STRING "Set a custom locale at the start, leave empty to disable")
 
 if(MSVC)
@@ -173,7 +177,12 @@ else()
     set(RAPIDJSON_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib-rapidjson/rapidjson-1.1.0/include")
 endif()
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (NOT WITH_MAGICENUM)
+    message(STATUS "Compiling without magic_enum. This build will not have enum-gen functionalities")
+    add_compile_definitions(NO_MAGICENUM_LIB)
+endif()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR ENABLE_ASSERTS)
     add_definitions(-DENABLE_ASSERTS)
 endif()
 
@@ -203,6 +212,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib-smacker")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib-stracciatella")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib-string_theory")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib-miniaudio")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib-magic_enum")
 if (MINGW)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib-mingw-std-threads")
 endif()
@@ -210,7 +220,6 @@ endif()
 if(BUILD_LAUNCHER)
     set(LAUNCHER_INCLUDES ${FLTK_INCLUDE_DIR} ${SDL2_INCLUDE_DIR})
     set(LAUNCHER_SOURCES
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/sgp/Logger.cc"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/sgp/FileMan.cc"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/sgp/SGPFile.cc"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/sgp/SGPStrings.cc"
@@ -227,6 +236,7 @@ include_directories(
     ${LUA_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib-smacker/libsmacker
     ${MINIAUDIO_INCLUDE_DIRS}
+    ${MAGICENUM_INCLUDE_DIR}
 )
 
 if(BUILD_LAUNCHER)
@@ -259,7 +269,7 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CFLAGS}")
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-missing-braces -Wno-unused-function")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-missing-braces -Wno-unused-function -Wno-deprecated-declarations -Wtype-limits")
 endif()
 
 set(
@@ -279,10 +289,8 @@ set(
 if (MINGW)
     LIST(APPEND JA2_LIBRARIES mingw_stdthreads)
 endif()
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    LIST(APPEND JA2_LIBRARIES stdc++fs)
-    LIST(APPEND LAUNCHER_LIBRARIES stdc++fs)
+if (ANDROID)
+    LIST(APPEND JA2_LIBRARIES android log)
 endif()
 
 if(ANDROID)
@@ -472,7 +480,7 @@ if(MSVC OR MINGW)
     include(InstallRequiredSystemLibraries)
 
     file(GLOB WIN_DIST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/distr-files-win/*.txt")
-    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib-SDL2-2.0.8-mingw/README-SDL.txt DESTINATION .)
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib-SDL2-2.0.20-mingw/README-SDL.txt DESTINATION .)
     install(FILES ${WIN_DIST_FILES} DESTINATION .)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/logo.ico DESTINATION .)
 endif()

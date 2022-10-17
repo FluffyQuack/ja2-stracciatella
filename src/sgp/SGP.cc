@@ -8,7 +8,6 @@
 #include "Input.h"
 #include "Intro.h"
 #include "JA2_Splash.h"
-#include "MemMan.h"
 #include "Random.h"
 #include "SGP.h"
 #include "SaveLoadGame.h" // XXX should not be used in SGP
@@ -29,8 +28,10 @@
 #include "ModPackContentManager.h"
 #include "policy/GamePolicy.h"
 #include "RustInterface.h"
+#include "EnumCodeGen.h"
 
 #include "Logger.h"
+#include <iostream>
 
 #ifdef WITH_UNITTESTS
 #include "gtest/gtest.h"
@@ -55,26 +56,6 @@
 #include <locale>
 #include <new>
 #include <utility>
-
-#ifdef __ANDROID__
-	static inline ST::string get_temp_filename(void)
-	{
-		return "ja2.log";
-	}
-#else
-	#if defined(__GNUC__) && __GNUC__ < 8
-	#include <experimental/filesystem>
-	namespace fs = std::experimental::filesystem;
-	#else
-	#include <filesystem>
-	namespace fs = std::filesystem;
-	#endif
-
-	static inline ST::string get_temp_filename(void)
-	{
-		return ST::string{fs::temp_directory_path().append("ja2.log")};
-	}
-#endif
 
 extern BOOLEAN gfPauseDueToPlayerGamePause;
 
@@ -184,8 +165,6 @@ static void shutdownGame()
 	ShutdownVideoObjectManager();
 	SLOGD("Shutting Down Video Manager");
 	ShutdownVideoManager();
-	SLOGD("Shutting Down Memory Manager");
-	ShutdownMemoryManager();  // must go last, for MemDebugCounter to work right...
 
 	SLOGD("Shutting Down SDL");
 	SDL_Quit();
@@ -242,11 +221,13 @@ static void MainLoop(int msPerGameCycle)
 				case SDL_MOUSEBUTTONDOWN: MouseButtonDown(&event.button); break;
 				case SDL_MOUSEBUTTONUP:   MouseButtonUp(&event.button);   break;
 
-				case SDL_MOUSEMOTION:
-					SetSafeMousePosition(event.motion.x, event.motion.y);
-					break;
+				case SDL_MOUSEMOTION: MouseMove(&event.motion); break;
 
 				case SDL_MOUSEWHEEL: MouseWheelScroll(&event.wheel); break;
+
+				case SDL_FINGERMOTION: FingerMove(&event.tfinger); break;
+				case SDL_FINGERUP:     FingerUp(&event.tfinger); break;
+				case SDL_FINGERDOWN:   FingerDown(&event.tfinger); break;
 
 				case SDL_QUIT: deinitGameAndExit(); break;
 			}
@@ -368,11 +349,10 @@ int main(int argc, char* argv[])
 		// init locale and logging
 		{
 			std::vector<ST::string> problems = InitGlobalLocale();
-			ST::string const tempFilename{get_temp_filename()};
-			Logger_initialize(tempFilename.c_str());
+			Logger_initialize("ja2.log");
 			for (const ST::string& msg : problems)
 			{
-				SLOGW("%s", msg.c_str());
+				SLOGW("{}", msg);
 			}
 		}
 
@@ -382,7 +362,7 @@ int main(int argc, char* argv[])
 		if (setGlobalJniEnv(jniEnv) == FALSE) {
 			auto rustError = getRustError();
 			if (rustError != NULL) {
-				SLOGE("Failed to set global JNI env for Android: %s", rustError);
+				SLOGE("Failed to set global JNI env for Android: {}", rustError);
 			}
 			return EXIT_FAILURE;
 		}
@@ -391,7 +371,7 @@ int main(int argc, char* argv[])
 		if (configFolderPath.get() == NULL) {
 			auto rustError = getRustError();
 			if (rustError != NULL) {
-				SLOGE("Failed to find home directory: %s", rustError);
+				SLOGE("Failed to find home directory: {}", rustError);
 			}
 			return EXIT_FAILURE;
 		}
@@ -402,6 +382,11 @@ int main(int argc, char* argv[])
 		}
 
 		if (EngineOptions_shouldShowHelp(params.get())) {
+			return EXIT_SUCCESS;
+		}
+
+		if (EngineOptions_shouldRunEnumGen(params.get())) {
+			PrintAllJA2Enums(std::cout);
 			return EXIT_SUCCESS;
 		}
 
@@ -454,10 +439,6 @@ int main(int argc, char* argv[])
 		freopen("CON", "w", stdout);
 		freopen("CON", "w", stderr);
 	#endif
-
-		// this one needs to go ahead of all others (except Debug), for MemDebugCounter to work right...
-		SLOGD("Initializing Memory Manager");
-		InitializeMemoryManager();
 
 		SLOGD("Initializing Game Resources");
 
@@ -531,7 +512,12 @@ int main(int argc, char* argv[])
 
 		return EXIT_SUCCESS;
 	} catch (...) {
-		TerminationHandler();
+		try {
+			TerminationHandler();
+		} catch (...) {
+			// If you ever see return code 27, try to set a breakpoint here
+			return 27;
+		}
 		return EXIT_FAILURE;
 	}
 }
@@ -563,7 +549,7 @@ void TerminationHandler()
 		{
 		}
 	}
-	STLOGE(errorMessage.c_str());
+	SLOGE(errorMessage.c_str());
 	#ifdef __ANDROID__
 	jniEnv->CallVoidMethod(exceptionContainerSingleton, setAndroidExceptionMethodId,
                                    jniEnv->NewStringUTF(errorMessage.c_str()));
@@ -835,19 +821,5 @@ TEST(cpp_language, sizeof_type)
 	EXPECT_EQ(sizeof(char16_t), 2);
 	EXPECT_EQ(sizeof(char32_t), 4);
 }
-
-#ifndef __ANDROID__
-TEST(cpp_language, filesystem)
-{
-	EXPECT_FALSE(fs::temp_directory_path().empty());
-	EXPECT_TRUE(fs::temp_directory_path().is_absolute());
-
-	auto const tmpFilename{fs::temp_directory_path().append("ja2.log")};
-	EXPECT_EQ(tmpFilename, fs::temp_directory_path() / "ja2.log");
-	EXPECT_EQ(tmpFilename.filename(), "ja2.log");
-	EXPECT_EQ(tmpFilename.extension(), ".log");
-	EXPECT_EQ(tmpFilename.stem(), "ja2");
-}
-#endif
 
 #endif // WITH_UNITTESTS

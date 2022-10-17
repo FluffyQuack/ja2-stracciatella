@@ -2,7 +2,6 @@
 #include "HImage.h"
 #include "Local.h"
 #include "Types.h"
-#include "MemMan.h"
 #include "Font.h"
 #include "Debug.h"
 #include "VSurface.h"
@@ -179,7 +178,7 @@ static GlyphIdx GetGlyphIndex(char32_t c)
 	if (result != translationTable->end()) {
 		return result->second;
 	}
-	SLOGE("Invalid character given U+%04X", c);
+	SLOGE("Invalid character given U+{04x}", c);
 	auto questionMark = translationTable->find(L'?')->second;
 	return questionMark;
 }

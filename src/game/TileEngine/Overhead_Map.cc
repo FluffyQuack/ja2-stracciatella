@@ -106,7 +106,7 @@ void InitNewOverheadDB(TileSetID const ubTilesetID)
 		}
 		catch (std::exception &e)
 		{
-			SLOGD(ST::string(e.what()));
+			SLOGD("{}", e.what());
 			// Load one we know about
 			vo = AddVideoObjectFromFile(GCM->getTilesetResourceName(GetDefaultTileset(), ST::string("t/") + "grass.sti").c_str());
 		}
@@ -121,7 +121,7 @@ void InitNewOverheadDB(TileSetID const ubTilesetID)
 		SGPVObject* const vo = gSmTileSurf[i].vo;
 
 		// Get number of regions and check for overflow
-		UINT32 const NumRegions = MIN(vo->SubregionCount(), gNumTilesPerType[i]);
+		UINT32 const NumRegions = std::min(vo->SubregionCount(), gNumTilesPerType[i]);
 
 		UINT32 k = 0;
 		for (; k < NumRegions; ++k)
@@ -277,8 +277,8 @@ void HandleOverheadMap(void)
 	// clear for broken saves before TrashWorld took care of this
 	if (!gfEditMode && gfTacticalPlacementGUIActive)
 	{
-		DecaySmokeEffects(GetWorldTotalSeconds());
-		DecayLightEffects(GetWorldTotalSeconds());
+		DecaySmokeEffects(GetWorldTotalSeconds(), false);
+		DecayLightEffects(GetWorldTotalSeconds(), false);
 	}
 
 	RenderOverheadMap(0, WORLD_COLS / 2, STD_SCREEN_X, STD_SCREEN_Y, STD_SCREEN_X + 640, STD_SCREEN_Y + 320, FALSE);
@@ -363,7 +363,7 @@ void HandleOverheadMap(void)
 
 	RenderButtons();
 	SaveBackgroundRects();
-	RenderButtonsFastHelp();
+	RenderFastHelp();
 	ExecuteBaseDirtyRectQueue();
 	EndFrameBufferRender();
 	fInterfacePanelDirty = DIRTYLEVEL0;
@@ -376,7 +376,8 @@ BOOLEAN InOverheadMap( )
 }
 
 
-static void ClickOverheadRegionCallback(MOUSE_REGION* reg, INT32 reason);
+static void ClickOverheadRegionCallbackPrimary(MOUSE_REGION* reg, UINT32 reason);
+static void ClickOverheadRegionCallbackSecondary(MOUSE_REGION* reg, UINT32 reason);
 
 
 void GoIntoOverheadMap( )
@@ -385,7 +386,7 @@ void GoIntoOverheadMap( )
 
 	MSYS_DefineRegion(&OverheadBackgroundRegion, STD_SCREEN_X, STD_SCREEN_Y, STD_SCREEN_X + 640, STD_SCREEN_Y + 360, MSYS_PRIORITY_HIGH, CURSOR_NORMAL, MSYS_NO_CALLBACK, MSYS_NO_CALLBACK);
 
-	MSYS_DefineRegion(&OverheadRegion, STD_SCREEN_X, STD_SCREEN_Y, STD_SCREEN_X + 640, STD_SCREEN_Y + 320, MSYS_PRIORITY_HIGH, CURSOR_NORMAL, MSYS_NO_CALLBACK, ClickOverheadRegionCallback);
+	MSYS_DefineRegion(&OverheadRegion, STD_SCREEN_X, STD_SCREEN_Y, STD_SCREEN_X + 640, STD_SCREEN_Y + 320, MSYS_PRIORITY_HIGH, CURSOR_NORMAL, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(ClickOverheadRegionCallbackPrimary, ClickOverheadRegionCallbackSecondary));
 
 	// LOAD CLOSE ANIM
 	uiOVERMAP = AddVideoObjectFromFile(INTERFACEDIR "/map_bord.sti");
@@ -425,7 +426,7 @@ void GoIntoOverheadMap( )
 static void HandleOverheadUI(void)
 {
 	InputAtom a;
-	while (DequeueEvent(&a))
+	while (DequeueSpecificEvent(&a, KEYBOARD_EVENTS))
 	{
 		if (a.usEvent == KEY_DOWN)
 		{
@@ -846,7 +847,7 @@ static void RenderOverheadOverlays(void)
 }
 
 
-static void ClickOverheadRegionCallback(MOUSE_REGION* reg, INT32 reason)
+static void ClickOverheadRegionCallbackPrimary(MOUSE_REGION* reg, UINT32 reason)
 {
 	if( gfTacticalPlacementGUIActive )
 	{
@@ -854,22 +855,26 @@ static void ClickOverheadRegionCallback(MOUSE_REGION* reg, INT32 reason)
 		return;
 	}
 
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
-	{
-		// Get new proposed center location.
-		const GridNo pos = GetOverheadMouseGridNo();
-		INT16 cell_x;
-		INT16 cell_y;
-		ConvertGridNoToCenterCellXY(pos, &cell_x, &cell_y);
+	// Get new proposed center location.
+	const GridNo pos = GetOverheadMouseGridNo();
+	INT16 cell_x;
+	INT16 cell_y;
+	ConvertGridNoToCenterCellXY(pos, &cell_x, &cell_y);
 
-		SetRenderCenter(cell_x, cell_y);
+	SetRenderCenter(cell_x, cell_y);
 
-		KillOverheadMap();
-	}
-	else if(reason & MSYS_CALLBACK_REASON_RBUTTON_DWN)
+	KillOverheadMap();
+}
+
+static void ClickOverheadRegionCallbackSecondary(MOUSE_REGION* reg, UINT32 reason)
+{
+	if( gfTacticalPlacementGUIActive )
 	{
-		KillOverheadMap();
+		HandleTacticalPlacementClicksInOverheadMap(reason);
+		return;
 	}
+
+	KillOverheadMap();
 }
 
 
@@ -913,13 +918,13 @@ void CalculateRestrictedMapCoords( INT8 bDirection, INT16 *psX1, INT16 *psY1, IN
 			*psX1 = 0;
 			*psX2 = sEndXS;
 			*psY1 = 0;
-			*psY2 = ( ABS( NORMAL_MAP_SCREEN_TY - gsTopY ) / 5 );
+			*psY2 = std::abs(NORMAL_MAP_SCREEN_TY - gsTopY) / 5;
 			break;
 
 		case WEST:
 
 			*psX1 = 0;
-			*psX2 = ( ABS( -NORMAL_MAP_SCREEN_X - gsLeftX ) / 5 );
+			*psX2 = std::abs(-NORMAL_MAP_SCREEN_X - gsLeftX) / 5;
 			*psY1 = 0;
 			*psY2 = sEndYS;
 			break;
@@ -928,13 +933,13 @@ void CalculateRestrictedMapCoords( INT8 bDirection, INT16 *psX1, INT16 *psY1, IN
 
 			*psX1 = 0;
 			*psX2 = sEndXS;
-			*psY1 = ( NORMAL_MAP_SCREEN_HEIGHT - ABS( NORMAL_MAP_SCREEN_BY - gsBottomY ) ) / 5;
+			*psY1 = (NORMAL_MAP_SCREEN_HEIGHT - std::abs(NORMAL_MAP_SCREEN_BY - gsBottomY)) / 5;
 			*psY2 = sEndYS;
 			break;
 
 		case EAST:
 
-			*psX1 = ( NORMAL_MAP_SCREEN_WIDTH - ABS( NORMAL_MAP_SCREEN_X - gsRightX ) ) / 5;
+			*psX1 = (NORMAL_MAP_SCREEN_WIDTH - std::abs(NORMAL_MAP_SCREEN_X - gsRightX)) / 5;
 			*psX2 = sEndXS;
 			*psY1 = 0;
 			*psY2 = sEndYS;

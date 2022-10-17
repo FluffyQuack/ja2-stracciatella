@@ -173,10 +173,15 @@ static INT16 gsLStartPointY_M;
 static INT16 gsLEndXS;
 static INT16 gsLEndYS;
 
-
+INT16 gsScrollXOffset = 0;
+INT16 gsScrollYOffset = 0;
 INT16 gsScrollXIncrement;
 INT16 gsScrollYIncrement;
 
+BOOLEAN gfScrolledToLeft;
+BOOLEAN gfScrolledToRight;
+BOOLEAN gfScrolledToTop;
+BOOLEAN gfScrolledToBottom;
 
 // Rendering flags (full, partial, etc.)
 static RenderFlags gRenderFlags = RENDER_FLAG_NONE;
@@ -809,7 +814,7 @@ zlevel_objects:
 								uiDirtyFlags = BGND_FLAG_SINGLE | BGND_FLAG_ANIMATED;
 zlevel_shadows:
 								INT16 const world_y = GetMapXYWorldY(iTempPosX_M, iTempPosY_M);
-								sZLevel = __max(((world_y - 80) * Z_SUBLAYERS) + SHADOW_Z_LEVEL, 0);
+								sZLevel = std::max(((world_y - 80) * Z_SUBLAYERS) + SHADOW_Z_LEVEL, 0);
 								break;
 							}
 
@@ -989,7 +994,7 @@ zlevel_topmost:
 								else
 								{
 									ubShadeLevel  = pNode->ubShadeLevel & 0x0f;
-									ubShadeLevel  = __max(ubShadeLevel - 2, DEFAULT_SHADE_LEVEL);
+									ubShadeLevel  = std::max(ubShadeLevel - 2, DEFAULT_SHADE_LEVEL);
 									ubShadeLevel |= pNode->ubShadeLevel & 0x30;
 								}
 								pShadeTable = s.pShades[ubShadeLevel];
@@ -1187,7 +1192,7 @@ zlevel_topmost:
 								sXPos += pTrav.sOffsetX;
 								sYPos += pTrav.sOffsetY;
 
-								INT16 const h = MIN((INT16)uiBrushHeight, gsVIEWPORT_WINDOW_END_Y - sYPos);
+								INT16 const h = std::min((int) uiBrushHeight, gsVIEWPORT_WINDOW_END_Y - sYPos);
 								RegisterBackgroundRect(uiDirtyFlags, sXPos, sYPos, uiBrushWidth, h);
 								if (fSaveZ)
 								{
@@ -1588,7 +1593,7 @@ next_node:
 						 * taskbar. */
 						if (iTempPosY_S < 360)
 						{
-							ColorFillVideoSurfaceArea(FRAME_BUFFER, iTempPosX_S, iTempPosY_S, iTempPosX_S + 40, MIN(iTempPosY_S + 20, 360), Get16BPPColor(FROMRGB(0, 0, 0)));
+							ColorFillVideoSurfaceArea(FRAME_BUFFER, iTempPosX_S, iTempPosY_S, iTempPosX_S + 40, std::min(iTempPosY_S + 20, 360), Get16BPPColor(FROMRGB(0, 0, 0)));
 						}
 					}
 				}
@@ -2115,15 +2120,18 @@ void ScrollWorld(void)
 				RESETCOUNTER(STARTSCROLL);
 			}
 
-			if (gusMouseYPos <  NO_PX_SHOW_EXIT_CURS)                 ScrollFlags |= SCROLL_UP;
-			if (gusMouseYPos >= SCREEN_HEIGHT - NO_PX_SHOW_EXIT_CURS) ScrollFlags |= SCROLL_DOWN;
-			if (gusMouseXPos >= SCREEN_WIDTH  - NO_PX_SHOW_EXIT_CURS) ScrollFlags |= SCROLL_RIGHT;
-			if (gusMouseXPos <  NO_PX_SHOW_EXIT_CURS)                 ScrollFlags |= SCROLL_LEFT;
+			if (!gfIsUsingTouch) {
+				if (gusMouseYPos <  NO_PX_SHOW_EXIT_CURS)                 ScrollFlags |= SCROLL_UP;
+				if (gusMouseYPos >= SCREEN_HEIGHT - NO_PX_SHOW_EXIT_CURS) ScrollFlags |= SCROLL_DOWN;
+				if (gusMouseXPos >= SCREEN_WIDTH  - NO_PX_SHOW_EXIT_CURS) ScrollFlags |= SCROLL_RIGHT;
+				if (gusMouseXPos <  NO_PX_SHOW_EXIT_CURS)                 ScrollFlags |= SCROLL_LEFT;
+			}
 		}
 	}
 	while (FALSE);
 
 
+	BOOLEAN fIsScrollingByOffset = gsScrollXOffset != 0 || gsScrollYOffset != 0;
 	BOOLEAN fAGoodMove   = FALSE;
 	INT16   sScrollXStep = -1;
 	INT16   sScrollYStep = -1;
@@ -2135,12 +2143,33 @@ void ScrollWorld(void)
 		sScrollYStep = speed / 2;
 
 		fAGoodMove = HandleScrollDirections(ScrollFlags, sScrollXStep, sScrollYStep, TRUE);
+	} else if (fIsScrollingByOffset) {
+		if (std::abs(gsScrollXOffset) >= CELL_X_SIZE || std::abs(gsScrollYOffset) >= CELL_Y_SIZE) {
+			sScrollXStep = (gsScrollXOffset / CELL_X_SIZE) * CELL_X_SIZE;
+			sScrollYStep = (gsScrollYOffset / CELL_Y_SIZE) * CELL_Y_SIZE;
+			if (sScrollXStep != 0) {
+				ScrollFlags |= (sScrollXStep > 0) ? SCROLL_LEFT : SCROLL_RIGHT;
+			}
+			if (sScrollYStep != 0) {
+				ScrollFlags |= (sScrollYStep > 0) ? SCROLL_UP : SCROLL_DOWN;
+			}
+			sScrollXStep = std::abs(sScrollXStep);
+			sScrollYStep = std::abs(sScrollYStep);
+
+			fAGoodMove = HandleScrollDirections(ScrollFlags, sScrollXStep, sScrollYStep, TRUE);
+
+			if (fAGoodMove) {
+				SetRenderFlags(RENDER_FLAG_FULL);
+				gsScrollXOffset %= CELL_X_SIZE;
+				gsScrollYOffset %= CELL_Y_SIZE;
+			}
+		}
 	}
 
 	// Has this been an OK scroll?
 	if (fAGoodMove)
 	{
-		if (COUNTERDONE(NEXTSCROLL))
+		if (COUNTERDONE(NEXTSCROLL) || fIsScrollingByOffset)
 		{
 			RESETCOUNTER(NEXTSCROLL);
 
@@ -2238,7 +2267,7 @@ void InitRenderParams(UINT8 ubRestrictionID)
 	gsTopY += ROOF_LEVEL_HEIGHT;
 	gsCY  += ROOF_LEVEL_HEIGHT / 2;
 
-	SLOGD("World Screen Width %d Height %d", gsRightX - gsLeftX, gsBottomY - gsTopY);
+	SLOGD("World Screen Width {} Height {}", gsRightX - gsLeftX, gsBottomY - gsTopY);
 
 	// Determine scale factors
 	// First scale world screen coords for VIEWPORT ratio
@@ -2333,12 +2362,6 @@ static BOOLEAN ApplyScrolling(INT16 sTempRenderCenterX, INT16 sTempRenderCenterY
 	// If in editor, anything goes
 	if (gfEditMode && _KeyDown(SHIFT)) fScrollGood = TRUE;
 
-	// Reset some UI flags
-	gfUIShowExitEast  = FALSE;
-	gfUIShowExitWest  = FALSE;
-	gfUIShowExitNorth = FALSE;
-	gfUIShowExitSouth = FALSE;
-
 	if (!fScrollGood)
 	{
 		if (fForceAdjust)
@@ -2381,13 +2404,6 @@ static BOOLEAN ApplyScrolling(INT16 sTempRenderCenterX, INT16 sTempRenderCenterY
 			sTempRenderCenterY = sTempPosY_W;
 			fScrollGood = TRUE;
 		}
-		else
-		{
-			if (fOutRight  && gusMouseXPos >= SCREEN_WIDTH - NO_PX_SHOW_EXIT_CURS)  gfUIShowExitEast  = TRUE;
-			if (fOutLeft   && gusMouseXPos <  NO_PX_SHOW_EXIT_CURS)                 gfUIShowExitWest  = TRUE;
-			if (fOutTop    && gusMouseYPos <  NO_PX_SHOW_EXIT_CURS)                 gfUIShowExitNorth = TRUE;
-			if (fOutBottom && gusMouseYPos >= SCREEN_HEIGHT - NO_PX_SHOW_EXIT_CURS) gfUIShowExitSouth = TRUE;
-		}
 	}
 
 	if (fScrollGood && !fCheckOnly)
@@ -2401,6 +2417,11 @@ static BOOLEAN ApplyScrolling(INT16 sTempRenderCenterX, INT16 sTempRenderCenterY
 
 		gsBottomRightWorldX = sBottomRightWorldX - gsLeftX;
 		gsBottomRightWorldY = sBottomRightWorldY - gsTopY;
+
+		gfScrolledToLeft   = std::abs(sTopLeftWorldX  - gsLeftX) <= std::abs(SCROLL_LEFT_PADDING);
+		gfScrolledToRight  = std::abs(sBottomRightWorldX  - gsRightX) <= std::abs(SCROLL_RIGHT_PADDING) + CELL_X_SIZE;
+		gfScrolledToTop    = std::abs(sTopLeftWorldY  - gsTopY) <= std::abs(SCROLL_TOP_PADDING);
+		gfScrolledToBottom = std::abs(sBottomRightWorldY  - gsBottomY) <= std::abs(SCROLL_BOTTOM_PADDING) + CELL_Y_SIZE;
 
 		SetPositionSndsVolumeAndPanning();
 	}
@@ -2478,10 +2499,10 @@ static void Blt8BPPDataTo16BPPBufferTransZIncClip(UINT16* pBuffer, UINT32 uiDest
 	}
 
 	// Calculate rows hanging off each side of the screen
-	const INT32 LeftSkip   = __min(ClipX1 -   MIN(ClipX1, iTempX), usWidth);
-	INT32       TopSkip    = __min(ClipY1 - __min(ClipY1, iTempY), usHeight);
-	const INT32 RightSkip  = __min(  MAX(ClipX2, iTempX + usWidth)  - ClipX2, usWidth);
-	const INT32 BottomSkip = __min(__max(ClipY2, iTempY + usHeight) - ClipY2, usHeight);
+	const INT32 LeftSkip   = std::min(ClipX1 - std::min(ClipX1, iTempX), usWidth);
+	INT32       TopSkip    = std::min(ClipY1 - std::min(ClipY1, iTempY), usHeight);
+	const INT32 RightSkip  = std::clamp(iTempX + usWidth - ClipX2, 0, usWidth);
+	const INT32 BottomSkip = std::clamp(iTempY + usHeight - ClipY2, 0, usHeight);
 
 	// calculate the remaining rows and columns to blit
 	const INT32 BlitLength = usWidth  - LeftSkip - RightSkip;
@@ -2741,10 +2762,10 @@ static void Blt8BPPDataTo16BPPBufferTransZIncClipZSameZBurnsThrough(UINT16* pBuf
 	}
 
 	// Calculate rows hanging off each side of the screen
-	const INT32 LeftSkip   = __min(ClipX1 -   MIN(ClipX1, iTempX), usWidth);
-	INT32       TopSkip    = __min(ClipY1 - __min(ClipY1, iTempY), usHeight);
-	const INT32 RightSkip  = __min(  MAX(ClipX2, iTempX + usWidth)  - ClipX2, usWidth);
-	const INT32 BottomSkip = __min(__max(ClipY2, iTempY + usHeight) - ClipY2, usHeight);
+	const INT32 LeftSkip   = std::min(ClipX1 - std::min(ClipX1, iTempX), usWidth);
+	INT32       TopSkip    = std::min(ClipY1 - std::min(ClipY1, iTempY), usHeight);
+	const INT32 RightSkip  = std::clamp(iTempX + usWidth - ClipX2, 0, usWidth);
+	const INT32 BottomSkip = std::clamp(iTempY + usHeight - ClipY2, 0, usHeight);
 
 	// calculate the remaining rows and columns to blit
 	const INT32 BlitLength = usWidth  - LeftSkip - RightSkip;
@@ -3006,10 +3027,10 @@ static void Blt8BPPDataTo16BPPBufferTransZIncObscureClip(UINT16* pBuffer, UINT32
 	}
 
 	// Calculate rows hanging off each side of the screen
-	const INT32 LeftSkip   = __min(ClipX1 -   MIN(ClipX1, iTempX), usWidth);
-	INT32       TopSkip    = __min(ClipY1 - __min(ClipY1, iTempY), usHeight);
-	const INT32 RightSkip  = __min(  MAX(ClipX2, iTempX + usWidth)  - ClipX2, usWidth);
-	const INT32 BottomSkip = __min(__max(ClipY2, iTempY + usHeight) - ClipY2, usHeight);
+	const INT32 LeftSkip   = std::min(ClipX1 - std::min(ClipX1, iTempX), usWidth);
+	INT32       TopSkip    = std::min(ClipY1 - std::min(ClipY1, iTempY), usHeight);
+	const INT32 RightSkip  = std::clamp(iTempX + usWidth - ClipX2, 0, usWidth);
+	const INT32 BottomSkip = std::clamp(iTempY + usHeight - ClipY2, 0, usHeight);
 
 	UINT32 uiLineFlag = iTempY & 1;
 
@@ -3269,10 +3290,10 @@ static void Blt8BPPDataTo16BPPBufferTransZTransShadowIncObscureClip(UINT16* pBuf
 	}
 
 	// Calculate rows hanging off each side of the screen
-	const INT32 LeftSkip   = __min(ClipX1 -   MIN(ClipX1, iTempX), usWidth);
-	INT32       TopSkip    = __min(ClipY1 - __min(ClipY1, iTempY), usHeight);
-	const INT32 RightSkip  = __min(  MAX(ClipX2, iTempX + usWidth)  - ClipX2, usWidth);
-	const INT32 BottomSkip = __min(__max(ClipY2, iTempY + usHeight) - ClipY2, usHeight);
+	const INT32 LeftSkip   = std::min(ClipX1 - std::min(ClipX1, iTempX), usWidth);
+	INT32       TopSkip    = std::min(ClipY1 - std::min(ClipY1, iTempY), usHeight);
+	const INT32 RightSkip  = std::clamp(iTempX + usWidth - ClipX2, 0, usWidth);
+	const INT32 BottomSkip = std::clamp(iTempY + usHeight - ClipY2, 0, usHeight);
 
 	UINT32 uiLineFlag = iTempY & 1;
 
@@ -3537,10 +3558,10 @@ static void Blt8BPPDataTo16BPPBufferTransZTransShadowIncClip(UINT16* pBuffer, UI
 	}
 
 	// Calculate rows hanging off each side of the screen
-	const INT32 LeftSkip   = __min(ClipX1 -   MIN(ClipX1, iTempX), usWidth);
-	INT32       TopSkip    = __min(ClipY1 - __min(ClipY1, iTempY), usHeight);
-	const INT32 RightSkip  = __min(  MAX(ClipX2, iTempX + usWidth)  - ClipX2, usWidth);
-	const INT32 BottomSkip = __min(__max(ClipY2, iTempY + usHeight) - ClipY2, usHeight);
+	const INT32 LeftSkip   = std::min(ClipX1 - std::min(ClipX1, iTempX), usWidth);
+	INT32       TopSkip    = std::min(ClipY1 - std::min(ClipY1, iTempY), usHeight);
+	const INT32 RightSkip  = std::clamp(iTempX + usWidth - ClipX2, 0, usWidth);
+	const INT32 BottomSkip = std::clamp(iTempY + usHeight - ClipY2, 0, usHeight);
 
 	// calculate the remaining rows and columns to blit
 	const INT32 BlitLength = usWidth  - LeftSkip - RightSkip;
@@ -4170,10 +4191,10 @@ static void CalcRenderParameters(INT16 sLeft, INT16 sTop, INT16 sRight, INT16 sB
 	gOldClipRect = gClippingRect;
 
 	// Set new clipped rect
-	gClippingRect.iLeft   = __max(gsVIEWPORT_START_X,        sLeft);
-	gClippingRect.iRight  = __min(gsVIEWPORT_END_X,          sRight);
-	gClippingRect.iTop    = __max(gsVIEWPORT_WINDOW_START_Y, sTop);
-	gClippingRect.iBottom = __min(gsVIEWPORT_WINDOW_END_Y,   sBottom);
+	gClippingRect.iLeft   = std::max((int) gsVIEWPORT_START_X, (int) sLeft);
+	gClippingRect.iRight  = std::min((int) gsVIEWPORT_END_X, (int) sRight);
+	gClippingRect.iTop    = std::max((int) gsVIEWPORT_WINDOW_START_Y, (int) sTop);
+	gClippingRect.iBottom = std::min((int) gsVIEWPORT_WINDOW_END_Y, (int) sBottom);
 
 	gsEndXS = sRight  + VIEWPORT_XOFFSET_S;
 	gsEndYS = sBottom + VIEWPORT_YOFFSET_S;

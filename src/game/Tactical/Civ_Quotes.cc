@@ -130,13 +130,13 @@ try
 	// Build filename....
 	if ( ubCivQuoteID == CIV_QUOTE_HINT )
 	{
-		if ( gbWorldSectorZ > 0 )
+		if (gWorldSector.z > 0)
 		{
 			sprintf(zFileName, NPCDATADIR "/civ%02d.edt", CIV_QUOTE_MINERS_NOT_FOR_PLAYER);
 		}
 		else
 		{
-			sprintf(zFileName, NPCDATADIR "/%c%d.edt", 'a' + (gWorldSectorY - 1) , gWorldSectorX);
+			sprintf(zFileName, NPCDATADIR "/%c%d.edt", 'a' + (gWorldSector.y - 1) , gWorldSector.x);
 		}
 	}
 	else
@@ -230,7 +230,8 @@ INT8 GetCivType(const SOLDIERTYPE* pCiv)
 
 	// ATE: Check if this person is married.....
 	// 1 ) check sector....
-	if ( gWorldSectorX == 10 && gWorldSectorY == 6 && gbWorldSectorZ == 0 )
+	static const SGPSector marriedSector(10, 6);
+	if (gWorldSector == marriedSector)
 	{
 		// 2 ) the only female....
 		if ( pCiv->ubCivilianGroup == 0 && pCiv->bTeam != OUR_TEAM && pCiv->ubBodyType == REGFEMALE )
@@ -293,16 +294,16 @@ static void RenderCivQuoteBoxOverlay(VIDEO_OVERLAY* pBlitter)
 }
 
 
-static void QuoteOverlayClickCallback(MOUSE_REGION* pRegion, INT32 iReason)
+static void QuoteOverlayClickCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 {
 	static BOOLEAN fLButtonDown = FALSE;
 
-	if (iReason & MSYS_CALLBACK_REASON_LBUTTON_DWN )
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_DWN )
 	{
 		fLButtonDown = TRUE;
 	}
 
-	if (iReason & MSYS_CALLBACK_REASON_LBUTTON_UP && fLButtonDown )
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_UP && fLButtonDown )
 	{
 		// Shutdown quote box....
 		ShutDownQuoteBox( FALSE );
@@ -365,7 +366,7 @@ void BeginCivQuote( SOLDIERTYPE *pCiv, UINT8 ubCivQuoteID, UINT8 ubEntryID, INT1
 		}
 
 		// Check for bottom
-		sY = MIN(sY, gsVIEWPORT_WINDOW_END_Y - gusCivQuoteBoxHeight);
+		sY = std::min(int(sY), gsVIEWPORT_WINDOW_END_Y - gusCivQuoteBoxHeight);
 	}
 
 	UINT16 const w = gusCivQuoteBoxWidth;
@@ -393,7 +394,6 @@ static UINT8 DetermineCivQuoteEntry(SOLDIERTYPE* pCiv, UINT8* pubCivHintToUse, B
 	BOOLEAN bCivLowLoyalty = FALSE;
 	BOOLEAN bCivHighLoyalty = FALSE;
 	INT8    bCivHint;
-	INT8    bMineId;
 	BOOLEAN bMiners = FALSE;
 
 	(*pubCivHintToUse) = 0;
@@ -431,7 +431,7 @@ static UINT8 DetermineCivQuoteEntry(SOLDIERTYPE* pCiv, UINT8* pubCivHintToUse, B
 	}
 
 	// Are we in a town sector?
-	UINT8 const bTownId = GetTownIdForSector(SECTOR(gWorldSectorX, gWorldSectorY));
+	UINT8 const bTownId = GetTownIdForSector(gWorldSector);
 
 	// If a married PC...
 	if ( ubCivType == CIV_TYPE_MARRIED_PC )
@@ -501,7 +501,7 @@ static UINT8 DetermineCivQuoteEntry(SOLDIERTYPE* pCiv, UINT8* pubCivHintToUse, B
 	if ( pCiv->ubCivilianGroup == BEGGARS_CIV_GROUP )
 	{
 		// Check if we are in a town...
-		if( bTownId != BLANK_SECTOR && gbWorldSectorZ == 0 )
+		if (bTownId != BLANK_SECTOR && gWorldSector.z == 0)
 		{
 			if ( bTownId == SAN_MONA && ubCivType == CIV_TYPE_ADULT )
 			{
@@ -559,7 +559,7 @@ static UINT8 DetermineCivQuoteEntry(SOLDIERTYPE* pCiv, UINT8* pubCivHintToUse, B
 	}
 
 	// if in a town
-	if( ( bTownId != BLANK_SECTOR ) && ( gbWorldSectorZ == 0 ) && gfTownUsesLoyalty[ bTownId ] )
+	if (bTownId != BLANK_SECTOR && gWorldSector.z == 0 && gfTownUsesLoyalty[bTownId])
 	{
 		// Check loyalty special quotes.....
 		// EXTREMELY LOW TOWN LOYALTY...
@@ -579,7 +579,7 @@ static UINT8 DetermineCivQuoteEntry(SOLDIERTYPE* pCiv, UINT8* pubCivHintToUse, B
 	// ATE: OK, check if we should look for a civ hint....
 	if ( fCanUseHints )
 	{
-		bCivHint = ConsiderCivilianQuotes( gWorldSectorX, gWorldSectorY, gbWorldSectorZ,  FALSE );
+		bCivHint = ConsiderCivilianQuotes(gWorldSector,  FALSE);
 	}
 	else
 	{
@@ -600,7 +600,8 @@ static UINT8 DetermineCivQuoteEntry(SOLDIERTYPE* pCiv, UINT8* pubCivHintToUse, B
 			// Not done yet.
 
 			// Are they working for us?
-			bMineId = GetIdOfMineForSector( gWorldSectorX, gWorldSectorY, gbWorldSectorZ );
+			INT8 const bMineId = GetIdOfMineForSector(gWorldSector);
+			Assert(bMineId >= 0);
 
 			if ( PlayerControlsMine( bMineId ) )
 			{
@@ -633,7 +634,7 @@ static UINT8 DetermineCivQuoteEntry(SOLDIERTYPE* pCiv, UINT8* pubCivHintToUse, B
 			(*pubCivHintToUse) = bCivHint;
 
 			// Set quote as used...
-			ConsiderCivilianQuotes( gWorldSectorX, gWorldSectorY, gbWorldSectorZ, TRUE );
+			ConsiderCivilianQuotes(gWorldSector, TRUE);
 
 			// retrun value....
 			return( CIV_QUOTE_HINT );

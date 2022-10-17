@@ -7,6 +7,7 @@
 #include <sol/sol.hpp>  // this needs to be included first
 #include "STStringHandler.h"
 
+#include "Arms_Dealer_Init.h"
 #include "Campaign_Types.h"
 #include "ContentManager.h"
 #include "FileMan.h"
@@ -17,9 +18,10 @@
 #include "Logger.h"
 #include "Overhead.h"
 #include "Quests.h"
+#include "Soldier_Profile.h"
+#include "Soldier_Profile_Type.h"
 #include "StrategicMap.h"
 #include "Structure.h"
-#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_theory/format>
@@ -53,7 +55,7 @@ static void UnregisterListener(std::string observable, std::string key);
 int StracciatellaLoadFileRequire(lua_State* L)
 {
 	ST::string path = sol::stack::get<std::string>(L);
-	STLOGD("Loading LUA script file: {}", path);
+	SLOGD("Loading LUA script file: {}", path);
 
 	try {
 		AutoSGPFile file(GCM->openGameResForReading(SCRIPTS_DIR "/" + path));
@@ -73,7 +75,7 @@ void RunEntryPoint()
 	auto luaName = ENTRYPOINT_SCRIPT;
 	auto fileName = SCRIPTS_DIR "/" ENTRYPOINT_SCRIPT;
 	
-	STLOGD("Loading LUA script file: {}", luaName);
+	SLOGD("Loading LUA script file: {}", luaName);
 	AutoSGPFile f{GCM->openGameResForReading(fileName)};
 	std::string scriptbody = f->readStringToEnd().to_std_string();
 	auto result = lua.safe_script(scriptbody, ST::format("@{}", luaName).to_std_string());
@@ -123,7 +125,7 @@ void InitScriptingEngine()
 	} 
 	catch (const std::exception &ex)
 	{
-		STLOGE("Lua script engine has failed to initialize:\n {}", ex.what());
+		SLOGE("Lua script engine has failed to initialize:\n {}", ex.what());
 		ST::string err = "The game cannot be started due to an error in the mod scripts. Check the logs for more details.";
 		std::throw_with_nested(std::runtime_error(err.to_std_string()));
 	}
@@ -131,6 +133,12 @@ void InitScriptingEngine()
 
 static void RegisterUserTypes()
 {
+	lua.new_usertype<SGPSector>("SGPSector",
+		"x", &SGPSector::x,
+		"y", &SGPSector::y,
+		"z", &SGPSector::z
+		);
+
 	lua.new_usertype<SECTORINFO>("SECTORINFO",
 		"ubNumAdmins", &SECTORINFO::ubNumAdmins,
 		"ubNumTroops", &SECTORINFO::ubNumTroops,
@@ -185,8 +193,14 @@ static void RegisterUserTypes()
 	lua.new_usertype<SOLDIERTYPE>("SOLDIERTYPE",
 		"ubID", &SOLDIERTYPE::ubID,
 		"ubProfile", &SOLDIERTYPE::ubProfile,
+		"name", &SOLDIERTYPE::name,
+
+		"ubWhatKindOfMercAmI", &SOLDIERTYPE::ubWhatKindOfMercAmI,
+		"bActive", &SOLDIERTYPE::bActive,
+
 		"ubBodyType", &SOLDIERTYPE::ubBodyType,
 		"ubSoldierClass", &SOLDIERTYPE::ubSoldierClass,
+		"uiAnimSubFlags", &SOLDIERTYPE::uiAnimSubFlags,
 		"bTeam", &SOLDIERTYPE::bTeam,
 		"ubCivilianGroup", &SOLDIERTYPE::ubCivilianGroup,
 		"bNeutral", &SOLDIERTYPE::bNeutral,
@@ -195,6 +209,7 @@ static void RegisterUserTypes()
 		"bLife", &SOLDIERTYPE::bLife,
 		"bBreath", &SOLDIERTYPE::bBreath,
 		"bBreathMax", &SOLDIERTYPE::bBreathMax,
+		"sBreathRed", &SOLDIERTYPE::sBreathRed,
 		"bCamo", &SOLDIERTYPE::bCamo,
 
 		"bAgility", &SOLDIERTYPE::bAgility,
@@ -216,7 +231,64 @@ static void RegisterUserTypes()
 		"VestPal", &SOLDIERTYPE::VestPal,
 		"SkinPal", &SOLDIERTYPE::SkinPal,
 
-		"ubBattleSoundID", &SOLDIERTYPE::ubBattleSoundID
+		"ubBattleSoundID", &SOLDIERTYPE::ubBattleSoundID,
+
+		"sSector", &SOLDIERTYPE::sSector,
+		"fBetweenSectors", &SOLDIERTYPE::fBetweenSectors,
+
+		"iTotalContractLength", &SOLDIERTYPE::iTotalContractLength,
+		"iEndofContractTime", &SOLDIERTYPE::iEndofContractTime
+	);
+
+	lua.new_usertype<MERCPROFILESTRUCT>("MERCPROFILESTRUCT",
+		"zNickname", &MERCPROFILESTRUCT::zNickname,
+		"zName", &MERCPROFILESTRUCT::zName,
+
+		"ubBodyType", &MERCPROFILESTRUCT::ubBodyType,
+		"ubFaceIndex", &MERCPROFILESTRUCT::ubFaceIndex,
+		"usEyesX", &MERCPROFILESTRUCT::usEyesX,
+		"usEyesY", &MERCPROFILESTRUCT::usEyesY,
+		"usMouthX", &MERCPROFILESTRUCT::usMouthX,
+		"usMouthY", &MERCPROFILESTRUCT::usMouthY,
+
+		"ubNeedForSleep", &MERCPROFILESTRUCT::ubNeedForSleep,
+
+		"bSkillTrait", &MERCPROFILESTRUCT::bSkillTrait,
+		"bSkillTrait2", &MERCPROFILESTRUCT::bSkillTrait2,
+
+		"bAgility", &MERCPROFILESTRUCT::bAgility,
+		"bDexterity", &MERCPROFILESTRUCT::bDexterity,
+		"bExplosive", &MERCPROFILESTRUCT::bExplosive,
+		"bLeadership", &MERCPROFILESTRUCT::bLeadership,
+		"bMarksmanship", &MERCPROFILESTRUCT::bMarksmanship,
+		"bMechanical", &MERCPROFILESTRUCT::bMechanical,
+		"bMedical", &MERCPROFILESTRUCT::bMedical,
+		"bStrength", &MERCPROFILESTRUCT::bStrength,
+		"bWisdom", &MERCPROFILESTRUCT::bWisdom,
+
+		"bTown", &MERCPROFILESTRUCT::bTown,
+		"sSector", &MERCPROFILESTRUCT::sSector,
+		"sGridNo", &MERCPROFILESTRUCT::sGridNo,
+		"ubLastDateSpokenTo", &MERCPROFILESTRUCT::ubLastDateSpokenTo,
+
+		"iMercMercContractLength", &MERCPROFILESTRUCT::iMercMercContractLength,
+		"sSalary", &MERCPROFILESTRUCT::sSalary,
+		"uiWeeklySalary", &MERCPROFILESTRUCT::uiWeeklySalary,
+		"uiBiWeeklySalary", &MERCPROFILESTRUCT::uiBiWeeklySalary,
+		"bMedicalDeposit", &MERCPROFILESTRUCT::bMedicalDeposit,
+		"sMedicalDepositAmount", &MERCPROFILESTRUCT::sMedicalDepositAmount,
+		"usOptionalGearCost", &MERCPROFILESTRUCT::usOptionalGearCost,
+
+		"iBalance", &MERCPROFILESTRUCT::iBalance
+	);
+
+	lua.new_usertype<DEALER_ITEM_HEADER>("DEALER_ITEM_HEADER",
+		"ubTotalItems", &DEALER_ITEM_HEADER::ubTotalItems,
+		"ubPerfectItems", &DEALER_ITEM_HEADER::ubPerfectItems,
+		"ubStrayAmmo", &DEALER_ITEM_HEADER::ubStrayAmmo,
+		"uiOrderArrivalTime", &DEALER_ITEM_HEADER::uiOrderArrivalTime,
+		"ubQtyOnOrder", &DEALER_ITEM_HEADER::ubQtyOnOrder,
+		"fPreviouslyEligible", &DEALER_ITEM_HEADER::fPreviouslyEligible
 		);
 
 	lua.new_usertype<BOOLEAN_S>("BOOLEAN_S",
@@ -225,6 +297,9 @@ static void RegisterUserTypes()
 	lua.new_usertype<UINT8_S>("UINT8_S",
 		"val", &UINT8_S::val
 		);
+	lua.new_usertype<UINT32_S>("UINT32_S",
+		"val", &UINT32_S::val
+	)	;
 }
 
 static void RegisterGlobals()
@@ -242,8 +317,20 @@ static void RegisterGlobals()
 	lua.set_function("CreateMoney", CreateMoney);
 	lua.set_function("PlaceItem", PlaceItem);
 
+	lua.set_function("DoBasicMessageBox", DoBasicMessageBox);
+	lua.set_function("ExecuteTacticalTextBox", ExecuteTacticalTextBox_);
+
+	lua.set_function("GetMercProfile", GetMercProfile);
+
 	lua.set_function("GetGameStates", GetGameStates);
 	lua.set_function("PutGameStates", PutGameStates);
+
+	lua.set_function("DailyCheckOnItemQuantities", DailyCheckOnItemQuantities);
+	lua.set_function("GuaranteeAtLeastXItemsOfIndex", GuaranteeAtLeastXItemsOfIndex_);
+	lua.set_function("RemoveRandomItemFromDealerInventory", RemoveRandomItemFromDealerInventory);
+	lua.set_function("GetDealerInventory", GetDealerInventory);
+	lua.set_function("StartShopKeeperTalking", StartShopKeeperTalking);
+	lua.set_function("EnterShopKeeperInterfaceScreen", EnterShopKeeperInterfaceScreen);
 
 	lua.set_function("dofile",   []() { throw std::logic_error("dofile is not allowed. Use require instead"); });
 	lua.set_function("loadfile", []() { throw std::logic_error("loadfile is not allowed. Use require instead"); });
@@ -259,7 +346,7 @@ static void LogLuaMessage(LogLevel level, std::string msg) {
 	// Stack position 1 is the calling lua script
 	lua_getstack(lua, 1, &info);
 	lua_getinfo(lua, "S", &info);
-	LogMessage(false, level, info.short_src, msg);
+	Logger_log(level, msg.c_str(), info.short_src);
 }
 
 static void RegisterLogger()
@@ -290,7 +377,7 @@ static void InvokeFunction(ST::string functionName, A... args)
 	if (!func.valid())
 	{
 		SLOGE("Lua script had an error. Scripting engine is now DISABLED. The error was:");
-		STLOGE("Function {} is not defined", functionName);
+		SLOGE("Function {} is not defined", functionName);
 		isLuaDisabled = true;
 		return;
 	}
@@ -328,6 +415,11 @@ static void _RegisterListener(std::string observable, std::string luaFunc, ST::s
 	else if (observable == "OnSoldierCreated")           OnSoldierCreated.addListener(key, wrap<SOLDIERTYPE*>(luaFunc));
 	else if (observable == "BeforeGameSaved")            BeforeGameSaved.addListener(key, wrap<>(luaFunc));
 	else if (observable == "OnGameLoaded")               OnGameLoaded.addListener(key, wrap<>(luaFunc));
+	else if (observable == "OnDealerInventoryUpdated")   OnDealerInventoryUpdated.addListener(key, wrap<>(luaFunc));
+	else if (observable == "OnItemTransacted")           OnItemTransacted.addListener(key, wrap<INT8, UINT16, BOOLEAN>(luaFunc));
+	else if (observable == "OnItemPriced")               OnItemPriced.addListener(key, wrap<INT8, UINT16, BOOLEAN, UINT32_S*>(luaFunc));
+	else if (observable == "OnMercHired")                OnMercHired.addListener(key, wrap<SOLDIERTYPE*>(luaFunc));
+	else if (observable == "OnRPCRecruited")             OnRPCRecruited.addListener(key, wrap<SOLDIERTYPE*>(luaFunc));
 	else {
 		ST::string err = ST::format("There is no observable named '{}'", observable);
 		throw std::logic_error(err.to_std_string());

@@ -208,7 +208,7 @@ static void AdvanceClock(UINT8 ubWarpCode)
 
 	if ( guiGameClock < guiPreviousGameClock )
 	{
-		AssertMsg( FALSE, String( "AdvanceClock: TIME FLOWING BACKWARDS!!! guiPreviousGameClock %d, now %d", guiPreviousGameClock, guiGameClock ) );
+		AssertMsg(FALSE, ST::format("AdvanceClock: TIME FLOWING BACKWARDS!!! guiPreviousGameClock {}, now {}", guiPreviousGameClock, guiGameClock));
 
 		// fix it if assertions are disabled
 		guiGameClock = guiPreviousGameClock;
@@ -474,7 +474,7 @@ static void SetClockResolutionToCompressMode(INT32 iCompressMode)
 	}
 	else
 	{
-		SetClockResolutionPerSecond( (UINT8) MAX( 1, (UINT8)(guiGameSecondsPerRealSecond / 60) ) );
+		SetClockResolutionPerSecond((UINT8) std::max(1U, guiGameSecondsPerRealSecond / 60));
 	}
 
 	// if the compress mode is X0 or X1
@@ -596,7 +596,7 @@ void PauseTimeForInterupt()
 //Valid range is 0 - 60 times per second.
 static void SetClockResolutionPerSecond(UINT8 ubNumTimesPerSecond)
 {
-	ubNumTimesPerSecond = (UINT8)(MAX( 0, MIN( 60, ubNumTimesPerSecond ) ));
+	ubNumTimesPerSecond = (UINT8) std::clamp(int(ubNumTimesPerSecond), 0, 60);
 	gubClockResolution = ubNumTimesPerSecond;
 }
 
@@ -663,7 +663,7 @@ void UpdateClock()
 	//Because we debug so much, breakpoints tend to break the game, and cause unnecessary headaches.
 	//This line ensures that no more than 1 real-second passes between frames.  This otherwise has
 	//no effect on anything else.
-	uiLastSecondTime = MAX( uiNewTime - 1000, uiLastSecondTime );
+	uiLastSecondTime = std::max(uiNewTime - 1000, uiLastSecondTime);
 
 	//1000's of a second difference since last second.
 	uiThousandthsOfThisSecondProcessed = uiNewTime - uiLastSecondTime;
@@ -689,7 +689,7 @@ void UpdateClock()
 			guiTimesThisSecondProcessed = uiThousandthsOfThisSecondProcessed*1000 / uiTimeSlice;
 			uiNewTimeProcessed = guiGameSecondsPerRealSecond * guiTimesThisSecondProcessed / gubClockResolution;
 
-			uiNewTimeProcessed = MAX( uiNewTimeProcessed, uiLastTimeProcessed );
+			uiNewTimeProcessed = std::max(uiNewTimeProcessed, uiLastTimeProcessed);
 
 			#ifdef DEBUG_GAME_CLOCK
 			uiAmountToAdvanceTime = uiNewTimeProcessed - uiLastTimeProcessed;
@@ -784,7 +784,7 @@ void LoadGameClock(HWFILE const hFile)
 }
 
 
-static void PauseOfClockBtnCallback(MOUSE_REGION* pRegion, INT32 iReason);
+static void PauseOfClockBtnCallback(MOUSE_REGION* pRegion, UINT32 iReason);
 
 
 void CreateMouseRegionForPauseOfClock(void)
@@ -819,9 +819,9 @@ void RemoveMouseRegionForPauseOfClock( void )
 }
 
 
-static void PauseOfClockBtnCallback(MOUSE_REGION* pRegion, INT32 iReason)
+static void PauseOfClockBtnCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 {
-	if (iReason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		HandlePlayerPauseUnPauseOfGame(  );
 	}
@@ -866,7 +866,7 @@ void HandlePlayerPauseUnPauseOfGame( void )
 }
 
 
-static void ScreenMaskForGamePauseBtnCallBack(MOUSE_REGION* pRegion, INT32 iReason);
+static void ScreenMaskForGamePauseBtnCallBack(MOUSE_REGION* pRegion, UINT32 iReason);
 
 
 static void CreateDestroyScreenMaskForPauseGame(void)
@@ -909,9 +909,9 @@ static void CreateDestroyScreenMaskForPauseGame(void)
 }
 
 
-static void ScreenMaskForGamePauseBtnCallBack(MOUSE_REGION* pRegion, INT32 iReason)
+static void ScreenMaskForGamePauseBtnCallBack(MOUSE_REGION* pRegion, UINT32 iReason)
 {
-	if (iReason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		// unpause the game
 		HandlePlayerPauseUnPauseOfGame( );

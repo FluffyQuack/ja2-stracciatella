@@ -1,7 +1,6 @@
-#include <stdexcept>
-
 #include "Font.h"
 #include "Local.h"
+#include "Logger.h"
 #include "WorldDef.h"
 #include "RenderWorld.h"
 #include "VSurface.h"
@@ -10,40 +9,32 @@
 #include "Video.h"
 #include "VObject_Blitters.h"
 #include <stdarg.h>
-#include "MemMan.h"
 #include "Debug.h"
 #include "UILayout.h"
 
-#include <vector>
-
-#include "Logger.h"
-
-
-#define BACKGROUND_BUFFERS 500
+#include <forward_list>
+#include <memory>
 
 
 // Struct for backgrounds
 struct BACKGROUND_SAVE
 {
+	std::unique_ptr<UINT16 []> pSaveArea;
+	std::unique_ptr<UINT16 []> pZSaveArea;
 	BOOLEAN         fAllocated;
 	BOOLEAN         fFilled;
-	BOOLEAN         fFreeMemory;
+	BOOLEAN         fPendingDelete;
+	BOOLEAN         fDisabled;
 	BackgroundFlags uiFlags;
-	UINT16*         pSaveArea;
-	UINT16*         pZSaveArea;
 	INT16           sLeft;
 	INT16           sTop;
 	INT16           sRight;
 	INT16           sBottom;
 	INT16           sWidth;
 	INT16           sHeight;
-	BOOLEAN         fPendingDelete;
-	BOOLEAN         fDisabled;
 };
 
-
-static std::vector<BACKGROUND_SAVE*> gBackSaves;
-static UINT32 guiNumBackSaves=0;
+static std::forward_list<BACKGROUND_SAVE> gBackSaves;
 
 static VIDEO_OVERLAY* gVideoOverlays;
 
@@ -56,8 +47,6 @@ static VIDEO_OVERLAY* gVideoOverlays;
 	for (VIDEO_OVERLAY* iter = gVideoOverlays, * iter##__next; iter; iter = iter##__next) \
 		if (iter##__next = iter->next, iter->fDisabled) continue; else
 
-
-SGPRect gDirtyClipRect;
 
 
 static BOOLEAN gfViewportDirty = FALSE;
@@ -101,26 +90,18 @@ void ExecuteBaseDirtyRectQueue(void)
 }
 
 
+// Callers of this function must assume that the returned struct is in a
+// random state and initialise ALL members!
 static BACKGROUND_SAVE* GetFreeBackgroundBuffer(void)
 {
-	for (UINT32 i = 0; i < guiNumBackSaves; ++i)
+	auto before{gBackSaves.before_begin()};
+	for (auto & b : gBackSaves)
 	{
-		BACKGROUND_SAVE* const b = gBackSaves[i];
-		if (!b->fAllocated && !b->fFilled) return b;
+		if (!b.fAllocated && !b.fFilled) return &b;
+		++before;
 	}
 
-	if (guiNumBackSaves == gBackSaves.size())
-	{
-		// out of back saves capacity
-		// let's add some more
-		const int increment = 100;
-		SLOGD("Increasing background slots to %d", gBackSaves.size() + increment);
-		for(int i = 0; i < increment; i++) {
-			gBackSaves.push_back(new BACKGROUND_SAVE());
-		}
-	}
-
-	return gBackSaves[guiNumBackSaves++];
+	return &*gBackSaves.emplace_after(before);
 }
 
 
@@ -138,10 +119,10 @@ BACKGROUND_SAVE* RegisterBackgroundRect(BackgroundFlags const uiFlags, INT16 sLe
 	const INT32 iTempY = sTop;
 
 	// Clip to rect
-	const INT32 uiLeftSkip   = __min(ClipX1 -   MIN(ClipX1, iTempX),                   (INT32)usWidth);
-	const INT32 uiTopSkip    = __min(ClipY1 - __min(ClipY1, iTempY),                   (INT32)usHeight);
-	const INT32 uiRightSkip  = __min(  MAX(ClipX2, iTempX + (INT32)usWidth)  - ClipX2, (INT32)usWidth);
-	const INT32 uiBottomSkip = __min(__max(ClipY2, iTempY + (INT32)usHeight) - ClipY2, (INT32)usHeight);
+	const INT32 uiLeftSkip   = std::min(ClipX1 - std::min(ClipX1, iTempX), (INT32)usWidth);
+	const INT32 uiTopSkip    = std::min(ClipY1 - std::min(ClipY1, iTempY), (INT32)usHeight);
+	const INT32 uiRightSkip  = std::clamp(iTempX + (INT32)usWidth  - ClipX2, 0, (INT32)usWidth);
+	const INT32 uiBottomSkip = std::clamp(iTempY + (INT32)usHeight - ClipY2, 0, (INT32)usHeight);
 
 	// check if whole thing is clipped
 	if (uiLeftSkip >= (INT32)usWidth  || uiRightSkip  >= (INT32)usWidth)  return NO_BGND_RECT;
@@ -153,17 +134,17 @@ BACKGROUND_SAVE* RegisterBackgroundRect(BackgroundFlags const uiFlags, INT16 sLe
 	sTop    += uiTopSkip;
 	sBottom -= uiBottomSkip;
 
-	BACKGROUND_SAVE* const b = GetFreeBackgroundBuffer();
-	*b = BACKGROUND_SAVE{};
-
 	const UINT32 uiBufSize = (sRight - sLeft) * (sBottom - sTop);
 	if (uiBufSize == 0) return NO_BGND_RECT;
 
-	if (uiFlags & BGND_FLAG_SAVERECT) b->pSaveArea  = new UINT16[uiBufSize]{};
-	if (uiFlags & BGND_FLAG_SAVE_Z)   b->pZSaveArea = new UINT16[uiBufSize]{};
+	BACKGROUND_SAVE* const b = GetFreeBackgroundBuffer();
 
-	b->fFreeMemory = TRUE;
+	b->pSaveArea.reset((uiFlags & BGND_FLAG_SAVERECT) ? new UINT16[uiBufSize] : nullptr);
+	b->pZSaveArea.reset((uiFlags & BGND_FLAG_SAVE_Z) ? new UINT16[uiBufSize] : nullptr);
 	b->fAllocated  = TRUE;
+	b->fFilled     = FALSE;
+	b->fPendingDelete = FALSE;
+	b->fDisabled   = FALSE;
 	b->uiFlags     = uiFlags;
 	b->sLeft       = sLeft;
 	b->sTop        = sTop;
@@ -171,7 +152,6 @@ BACKGROUND_SAVE* RegisterBackgroundRect(BackgroundFlags const uiFlags, INT16 sLe
 	b->sBottom     = sBottom;
 	b->sWidth      = sRight  - sLeft;
 	b->sHeight     = sBottom - sTop;
-	b->fFilled     = FALSE;
 
 	return b;
 }
@@ -196,19 +176,19 @@ void RestoreBackgroundRects(void)
 		UINT16* const pDestBuf         = ldst.Buffer<UINT16>();
 		UINT32        uiDestPitchBYTES = ldst.Pitch();
 
-		for (UINT32 i = 0; i < guiNumBackSaves; ++i)
+		for (auto & backsave : gBackSaves)
 		{
-			const BACKGROUND_SAVE* const b = gBackSaves[i];
+			const BACKGROUND_SAVE* const b = &backsave;
 			if (!b->fFilled || b->fDisabled) continue;
 
-			if (b->pSaveArea != NULL)
+			if (b->pSaveArea)
 			{
-				Blt16BPPTo16BPP(pDestBuf, uiDestPitchBYTES, b->pSaveArea, b->sWidth * 2, b->sLeft, b->sTop, 0, 0, b->sWidth, b->sHeight);
+				Blt16BPPTo16BPP(pDestBuf, uiDestPitchBYTES, b->pSaveArea.get(), b->sWidth * 2, b->sLeft, b->sTop, 0, 0, b->sWidth, b->sHeight);
 				AddBaseDirtyRect(b->sLeft, b->sTop, b->sRight, b->sBottom);
 			}
-			else if (b->pZSaveArea != NULL)
+			else if (b->pZSaveArea)
 			{
-				Blt16BPPTo16BPP(gpZBuffer, gZBufferPitch, b->pZSaveArea, b->sWidth * sizeof(*b->pZSaveArea), b->sLeft, b->sTop, 0, 0, b->sWidth, b->sHeight);
+				Blt16BPPTo16BPP(gpZBuffer, gZBufferPitch, b->pZSaveArea.get(), b->sWidth * sizeof(UINT16), b->sLeft, b->sTop, 0, 0, b->sWidth, b->sHeight);
 			}
 			else
 			{
@@ -224,39 +204,27 @@ void RestoreBackgroundRects(void)
 
 void EmptyBackgroundRects(void)
 {
-	for (UINT32 i = 0; i < guiNumBackSaves; ++i)
+	for (auto & backsave : gBackSaves)
 	{
-		BACKGROUND_SAVE* const b = gBackSaves[i];
+		BACKGROUND_SAVE* const b = &backsave;
 		if (b->fFilled)
 		{
-			b->fFilled = FALSE;
-
-			if (!b->fAllocated && b->fFreeMemory)
+			if (!b->fAllocated)
 			{
-				if (b->pSaveArea  != NULL) delete[] b->pSaveArea;
-				if (b->pZSaveArea != NULL) delete[] b->pZSaveArea;
-
-				b->fAllocated  = FALSE;
-				b->fFreeMemory = FALSE;
-				b->fFilled     = FALSE;
-				b->pSaveArea   = NULL;
+				b->pSaveArea.reset();
+				b->pZSaveArea.reset();
 			}
 		}
 
 		if (b->uiFlags & BGND_FLAG_SINGLE || b->fPendingDelete)
 		{
-			if (b->fFreeMemory)
-			{
-				if (b->pSaveArea != NULL)  delete[] b->pSaveArea;
-				if (b->pZSaveArea != NULL) delete[] b->pZSaveArea;
-			}
-
+			b->pSaveArea.reset();
+			b->pZSaveArea.reset();
 			b->fAllocated     = FALSE;
-			b->fFreeMemory    = FALSE;
-			b->fFilled        = FALSE;
-			b->pSaveArea      = NULL;
 			b->fPendingDelete = FALSE;
 		}
+
+		b->fFilled = FALSE;
 	}
 }
 
@@ -267,18 +235,18 @@ void SaveBackgroundRects(void)
 	UINT16* const pSrcBuf          = l.Buffer<UINT16>();
 	UINT32  const uiDestPitchBYTES = l.Pitch();
 
-	for (UINT32 i = 0; i < guiNumBackSaves; ++i)
+	for (auto & backsave : gBackSaves)
 	{
-		BACKGROUND_SAVE* const b = gBackSaves[i];
+		BACKGROUND_SAVE* const b = &backsave;
 		if (!b->fAllocated || b->fDisabled) continue;
 
-		if (b->pSaveArea != NULL)
+		if (b->pSaveArea)
 		{
-			Blt16BPPTo16BPP(b->pSaveArea, b->sWidth * 2, pSrcBuf, uiDestPitchBYTES, 0, 0, b->sLeft, b->sTop, b->sWidth, b->sHeight);
+			Blt16BPPTo16BPP(b->pSaveArea.get(), b->sWidth * 2, pSrcBuf, uiDestPitchBYTES, 0, 0, b->sLeft, b->sTop, b->sWidth, b->sHeight);
 		}
-		else if (b->pZSaveArea != NULL)
+		else if (b->pZSaveArea)
 		{
-			Blt16BPPTo16BPP(b->pZSaveArea, b->sWidth * sizeof(*b->pZSaveArea), gpZBuffer, gZBufferPitch, 0, 0, b->sLeft, b->sTop, b->sWidth, b->sHeight);
+			Blt16BPPTo16BPP(b->pZSaveArea.get(), b->sWidth * sizeof(UINT16), gpZBuffer, gZBufferPitch, 0, 0, b->sLeft, b->sTop, b->sWidth, b->sHeight);
 		}
 		else
 		{
@@ -290,43 +258,39 @@ void SaveBackgroundRects(void)
 }
 
 
-void FreeBackgroundRect(BACKGROUND_SAVE* const b)
+void FreeBackgroundRect(BACKGROUND_SAVE*& b)
 {
 	if (b == NULL) return;
 
 	b->fAllocated = FALSE;
+	b = nullptr;
 }
 
 
-void FreeBackgroundRectPending(BACKGROUND_SAVE* const b)
+void FreeBackgroundRectPending(BACKGROUND_SAVE*& b)
 {
 	if(b)
 	{
 		b->fPendingDelete = TRUE;
+		b = nullptr;
 	}
 }
 
 
 static void FreeBackgroundRectNow(BACKGROUND_SAVE* const b)
 {
-	if (b->fFreeMemory)
-	{
-		if (b->pSaveArea)  delete[] b->pSaveArea;
-		if (b->pZSaveArea) delete[] b->pZSaveArea;
-	}
-
 	b->fAllocated  = FALSE;
-	b->fFreeMemory = FALSE;
 	b->fFilled     = FALSE;
-	b->pSaveArea   = NULL;
+	b->pSaveArea.reset();
+	b->pZSaveArea.reset();
 }
 
 
 void FreeBackgroundRectType(BackgroundFlags const uiFlags)
 {
-	for (UINT32 i = 0; i < guiNumBackSaves; ++i)
+	for (auto & backsave : gBackSaves)
 	{
-		BACKGROUND_SAVE* const b = gBackSaves[i];
+		BACKGROUND_SAVE* const b = &backsave;
 		if (b->uiFlags & uiFlags) FreeBackgroundRectNow(b);
 	}
 }
@@ -334,29 +298,16 @@ void FreeBackgroundRectType(BackgroundFlags const uiFlags)
 
 void InitializeBackgroundRects(void)
 {
-	guiNumBackSaves = 0;
 	gDirtyClipRect.set(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 }
 
 
 void InvalidateBackgroundRects(void)
 {
-	for (UINT32 i = 0; i < guiNumBackSaves; ++i)
+	for (auto & backsave : gBackSaves)
 	{
-		gBackSaves[i]->fFilled = FALSE;
+		backsave.fFilled = FALSE;
 	}
-}
-
-
-void ShutdownBackgroundRects(void)
-{
-	for (auto backgroundSave : gBackSaves)
-	{
-		if (backgroundSave->fAllocated) FreeBackgroundRectNow(backgroundSave);
-		delete backgroundSave;
-	}
-	gBackSaves.clear();
-	guiNumBackSaves = 0;
 }
 
 
@@ -475,9 +426,6 @@ void RemoveVideoOverlay(VIDEO_OVERLAY* const v)
 
 		FreeBackgroundRect(v->background);
 
-		if (v->pSaveArea != NULL) delete v->pSaveArea;
-		v->pSaveArea = NULL;
-
 		VIDEO_OVERLAY* const prev = v->prev;
 		VIDEO_OVERLAY* const next = v->next;
 		*(prev ? &prev->next : &gVideoOverlays) = next;
@@ -528,7 +476,7 @@ static void AllocateVideoOverlayArea(VIDEO_OVERLAY* const v)
 	UINT32                 const buf_size = (bgs->sRight - bgs->sLeft) * (bgs->sBottom - bgs->sTop);
 
 	v->fActivelySaving = TRUE;
-	v->pSaveArea       = new UINT16[buf_size]{};
+	v->pSaveArea.reset(new UINT16[buf_size]{});
 }
 
 
@@ -558,7 +506,7 @@ void SaveVideoOverlaysArea(SGPVSurface* const src)
 
 		// Save data from frame buffer!
 		const BACKGROUND_SAVE* const b = v->background;
-		Blt16BPPTo16BPP(v->pSaveArea, b->sWidth * 2, pSrcBuf, uiSrcPitchBYTES, 0, 0, b->sLeft, b->sTop, b->sWidth, b->sHeight);
+		Blt16BPPTo16BPP(v->pSaveArea.get(), b->sWidth * 2, pSrcBuf, uiSrcPitchBYTES, 0, 0, b->sLeft, b->sTop, b->sWidth, b->sHeight);
 	}
 }
 
@@ -567,8 +515,7 @@ void DeleteVideoOverlaysArea(void)
 {
 	FOR_EACH_VIDEO_OVERLAY_SAFE(v)
 	{
-		if (v->pSaveArea != NULL) delete[] v->pSaveArea;
-		v->pSaveArea       = NULL;
+		v->pSaveArea.reset();
 		v->fActivelySaving = FALSE;
 		if (v->fDeletionPending) RemoveVideoOverlay(v);
 	}
@@ -604,10 +551,10 @@ void RestoreShiftedVideoOverlays(const INT16 sShiftX, const INT16 sShiftY)
 		const INT32 iTempY = sTop  - sShiftY;
 
 		// Clip to rect
-		const INT32 uiLeftSkip   = __min(ClipX1 -   MIN(ClipX1, iTempX),                   (INT32)usWidth);
-		const INT32 uiTopSkip    = __min(ClipY1 - __min(ClipY1, iTempY),                   (INT32)usHeight);
-		const INT32 uiRightSkip  = __min(  MAX(ClipX2, iTempX + (INT32)usWidth)  - ClipX2, (INT32)usWidth);
-		const INT32 uiBottomSkip = __min(__max(ClipY2, iTempY + (INT32)usHeight) - ClipY2, (INT32)usHeight);
+		const INT32 uiLeftSkip   = std::min(ClipX1 - std::min(ClipX1, iTempX), (INT32)usWidth);
+		const INT32 uiTopSkip    = std::min(ClipY1 - std::min(ClipY1, iTempY), (INT32)usHeight);
+		const INT32 uiRightSkip  = std::clamp(iTempX + (INT32)usWidth  - ClipX2, 0, (INT32)usWidth);
+		const INT32 uiBottomSkip = std::clamp(iTempY + (INT32)usHeight - ClipY2, 0, (INT32)usHeight);
 
 		// check if whole thing is clipped
 		if (uiLeftSkip >= (INT32)usWidth  || uiRightSkip  >= (INT32)usWidth)  continue;
@@ -622,7 +569,7 @@ void RestoreShiftedVideoOverlays(const INT16 sShiftX, const INT16 sShiftY)
 		usHeight = sBottom - sTop;
 		usWidth  = sRight -  sLeft;
 
-		Blt16BPPTo16BPP(pDestBuf, uiDestPitchBYTES, v->pSaveArea, b->sWidth * 2, sLeft, sTop, uiLeftSkip, uiTopSkip, usWidth, usHeight);
+		Blt16BPPTo16BPP(pDestBuf, uiDestPitchBYTES, v->pSaveArea.get(), b->sWidth * 2, sLeft, sTop, uiLeftSkip, uiTopSkip, usWidth, usHeight);
 
 		// Once done, check for pending deletion
 		if (v->fDeletionPending) RemoveVideoOverlay(v);

@@ -25,7 +25,6 @@
 #include "Animation_Control.h"
 #include "Soldier_Profile.h"
 #include "Quests.h"
-#include "MemMan.h"
 #include "ScreenIDs.h"
 #include "GameMode.h"
 #include "Logger.h"
@@ -67,7 +66,7 @@ void CopyScheduleToList( SCHEDULENODE *pSchedule, SOLDIERINITNODE *pNode )
 		OptimizeSchedules();
 		if( gubScheduleID > 32 )
 		{
-			SLOGW("too many Schedules posted." );
+			SLOGW("too many Schedules posted.");
 		}
 	}
 }
@@ -166,7 +165,7 @@ void ProcessTacticalSchedule( UINT8 ubScheduleID )
 	pSchedule = GetSchedule( ubScheduleID );
 	if( !pSchedule )
 	{
-		SLOGW("Schedule callback:  Schedule ID of %d not found.", ubScheduleID );
+		SLOGW("Schedule callback:  Schedule ID of {} not found.", ubScheduleID);
 		return;
 	}
 	//Attempt to access the soldier involved
@@ -186,7 +185,7 @@ void ProcessTacticalSchedule( UINT8 ubScheduleID )
 
 	if ( !pSoldier->bActive )
 	{
-		SLOGW("Schedule callback:  Soldier isn't active.  Name is %s.", pSoldier->name.c_str());
+		SLOGW("Schedule callback:  Soldier isn't active.  Name is {}.", pSoldier->name);
 	}
 
 	//Okay, now we have good pointers to the soldier and the schedule.
@@ -466,7 +465,7 @@ void SaveSchedules(HWFILE const f)
 		++n_schedules;
 	}
 
-	UINT8 n_to_save = MIN(n_schedules, 32);
+	UINT8 n_to_save = std::min(n_schedules, 32);
 	f->write(&n_to_save, sizeof(UINT8));
 
 	// Save each schedule
@@ -588,29 +587,17 @@ static void AutoProcessSchedule(SCHEDULENODE* pSchedule, INT32 index)
 
 	if(GameMode::getInstance()->isEditorMode())
 	{
+		ST::string maybeName = "civ";
 		if ( pSoldier->ubProfile != NO_PROFILE )
 		{
-				SLOGD("Autoprocessing schedule action %s for %s (%d) at time %02ld:%02ld (set for %02d:%02d), data1 = %d",
-				gszScheduleActions[ pSchedule->ubAction[ index ] ].c_str(),
-				pSoldier->name.c_str(),
-				pSoldier->ubID,
-				GetWorldHour(),
-				guiMin,
-				pSchedule->usTime[ index ] / 60,
-				pSchedule->usTime[ index ] % 60,
-				pSchedule->usData1[ index ]);
+			maybeName = pSoldier->name;
 		}
-		else
-		{
-			SLOGD("Autoprocessing schedule action %s for civ (%d) at time %02ld:%02ld (set for %02d:%02d), data1 = %d",
-				gszScheduleActions[ pSchedule->ubAction[ index ] ].c_str(),
-				pSoldier->ubID,
-				GetWorldHour(),
-				guiMin,
-				pSchedule->usTime[ index ] / 60,
-				pSchedule->usTime[ index ] % 60,
-				pSchedule->usData1[ index ]);
-		}
+		SLOGD("Autoprocessing schedule action {} for {} ({}) at time {02d}:{02d} (set for {02d}:{02d}), data1 = {}",
+			gszScheduleActions[pSchedule->ubAction[index]],
+			maybeName, pSoldier->ubID,
+			GetWorldHour(), guiMin,
+			pSchedule->usTime[index] / 60, pSchedule->usTime[index] % 60,
+			pSchedule->usData1[index]);
 	}
 
 	// always assume the merc is going to wake, unless the event is a sleep
@@ -673,14 +660,17 @@ static void AutoProcessSchedule(SCHEDULENODE* pSchedule, INT32 index)
 			break;
 		case SCHEDULE_ACTION_LEAVESECTOR:
 		{
-			INT16 sGridNo;
-			sGridNo = FindNearestEdgePoint( pSoldier->sGridNo );
-			BumpAnyExistingMerc( sGridNo );
-			EVENT_SetSoldierPositionNoCenter(pSoldier, sGridNo, SSP_FORCE_DELETE);
-
-			sGridNo = FindNearbyPointOnEdgeOfMap( pSoldier, &bDirection );
-			BumpAnyExistingMerc( sGridNo );
-			EVENT_SetSoldierPositionNoCenter(pSoldier, sGridNo, SSP_FORCE_DELETE);
+			GridNo sGridNo = FindNearestEdgePoint(pSoldier->sGridNo);
+			if (sGridNo != NOWHERE)
+			{
+				BumpAnyExistingMerc(sGridNo);
+				EVENT_SetSoldierPositionNoCenter(pSoldier, sGridNo, SSP_FORCE_DELETE);
+			}
+			else
+			{
+				// Stay in place
+				sGridNo = pSoldier->sGridNo;
+			}
 
 			// ok, that tells us where the civ will return
 			pSoldier->sOffWorldGridNo = sGridNo;
@@ -705,8 +695,9 @@ static void PostSchedule(SOLDIERTYPE* pSoldier)
 	SCHEDULENODE *pSchedule;
 	UINT8	ubTempAction;
 	UINT16	usTemp;
+	static const SGPSector kingpin(5, MAP_ROW_C);
 
-	if ( (pSoldier->ubCivilianGroup == KINGPIN_CIV_GROUP) && ( gTacticalStatus.fCivGroupHostile[ KINGPIN_CIV_GROUP ] || ( (gubQuest[ QUEST_KINGPIN_MONEY ] == QUESTINPROGRESS) && (CheckFact( FACT_KINGPIN_CAN_SEND_ASSASSINS, KINGPIN )) ) ) && (gWorldSectorX == 5 && gWorldSectorY == MAP_ROW_C) && (pSoldier->ubProfile == NO_PROFILE) )
+	if ((pSoldier->ubCivilianGroup == KINGPIN_CIV_GROUP) && (gTacticalStatus.fCivGroupHostile[KINGPIN_CIV_GROUP] || ((gubQuest[QUEST_KINGPIN_MONEY] == QUESTINPROGRESS) && (CheckFact(FACT_KINGPIN_CAN_SEND_ASSASSINS, KINGPIN)))) && (gWorldSector == kingpin) && (pSoldier->ubProfile == NO_PROFILE))
 	{
 		// no schedules for people guarding Tony's!
 		return;
@@ -882,7 +873,7 @@ static void PostDefaultSchedule(SOLDIERTYPE* pSoldier)
 	INT32 i;
 	SCHEDULENODE *curr;
 
-	if( gbWorldSectorZ )
+	if (gWorldSector.z)
 	{ //People in underground sectors don't get schedules.
 		return;
 	}

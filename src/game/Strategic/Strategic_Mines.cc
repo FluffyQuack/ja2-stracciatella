@@ -223,7 +223,7 @@ void HourlyMinesUpdate(void)
 						{
 							// start it now!
 							UINT8 const sector = GCM->getMine(ubMineIndex)->entranceSector;
-							StartQuest(QUEST_CREATURES, SECTORX(sector), SECTORY(sector));
+							StartQuest(QUEST_CREATURES, SGPSector(sector));
 						}
 					}
 
@@ -288,7 +288,7 @@ INT8 GetTownAssociatedWithMine( UINT8 ubMineIndex )
 static void AddMineHistoryEvent(UINT8 const event, UINT const mine_id)
 {
 	auto m = GCM->getMine(mine_id);
-	AddHistoryToPlayersLog(event, m->associatedTownId, GetWorldTotalMin(), SECTORX(m->entranceSector), SECTORY(m->entranceSector));
+	AddHistoryToPlayersLog(event, m->associatedTownId, GetWorldTotalMin(), SGPSector(m->entranceSector));
 }
 
 
@@ -463,12 +463,10 @@ static INT32 GetCurrentWorkRateOfMineForEnemy(UINT8 ubMineIndex)
 
 
 // mine this mine
+// Returns the amount mined if the mine is player controlled, 0 otherwise
 static INT32 MineAMine(UINT8 ubMineIndex)
 {
 	// will extract ore based on available workforce, and increment players income based on amount
-	INT32 iAmtExtracted = 0;
-
-
 	Assert(ubMineIndex < gMineStatus.size());
 
 	// is mine is empty
@@ -483,18 +481,17 @@ static INT32 MineAMine(UINT8 ubMineIndex)
 		return 0;
 	}
 
-
 	// who controls the PRODUCTION in the mine ?  (Queen receives production unless player has spoken to the head miner)
 	if( PlayerControlsMine(ubMineIndex) )
 	{
 		// player controlled
-		iAmtExtracted = ExtractOreFromMine( ubMineIndex , GetCurrentWorkRateOfMineForPlayer( ubMineIndex ) );
+		UINT32 const amtExtracted = ExtractOreFromMine(ubMineIndex, GetCurrentWorkRateOfMineForPlayer(ubMineIndex));
 
 		// SHOW ME THE MONEY!!!!
-		if( iAmtExtracted > 0 )
+		if (amtExtracted > 0)
 		{
 			// debug message
-			STLOGD("{} - Mine income from {} = ${}", WORLDTIMESTR, GCM->getTownName(GetTownAssociatedWithMine(ubMineIndex)), iAmtExtracted);
+			SLOGD("{} - Mine income from {} = ${}", WORLDTIMESTR, GCM->getTownName(GetTownAssociatedWithMine(ubMineIndex)), amtExtracted);
 
 			// if this is the first time this mine has produced income for the player in the game
 			if ( !gMineStatus[ ubMineIndex ].fMineHasProducedForPlayer )
@@ -505,20 +502,19 @@ static INT32 MineAMine(UINT8 ubMineIndex)
 				gMineStatus[ ubMineIndex ].uiTimePlayerProductionStarted = GetWorldTotalMin();
 			}
 		}
+		return static_cast<INT32>(amtExtracted);
 	}
-	else	// queen controlled
+
+	// Queen controlled
+	// we didn't want mines to run out without player ever even going to them, so now the queen doesn't reduce the
+	// amount remaining until the mine has produced for the player first (so she'd have to capture it).
+	if (gMineStatus[ubMineIndex].fMineHasProducedForPlayer)
 	{
-		// we didn't want mines to run out without player ever even going to them, so now the queen doesn't reduce the
-		// amount remaining until the mine has produced for the player first (so she'd have to capture it).
-		if ( gMineStatus[ ubMineIndex ].fMineHasProducedForPlayer )
-		{
-			// don't actually give her money, just take production away
-			iAmtExtracted = ExtractOreFromMine( ubMineIndex , GetCurrentWorkRateOfMineForEnemy( ubMineIndex ) );
-		}
+		// don't actually give her money, just take production away
+		ExtractOreFromMine(ubMineIndex, GetCurrentWorkRateOfMineForEnemy(ubMineIndex));
 	}
 
-
-	return iAmtExtracted;
+	return 0;
 }
 
 
@@ -593,7 +589,7 @@ INT32 CalcMaxPlayerIncomeFromMines()
 
 INT8 GetMineIndexForSector(UINT8 const sector)
 {
-	return GetIdOfMineForSector(SECTORX(sector), SECTORY(sector), 0);
+	return GetIdOfMineForSector(SGPSector(sector));
 }
 
 
@@ -610,7 +606,7 @@ INT16 GetMineSectorForTown(INT8 const town_id)
 	for (auto m : GCM->getMines())
 	{
 		if (m->associatedTownId != town_id) continue;
-		return SECTOR_INFO_TO_STRATEGIC_INDEX(m->entranceSector);
+		return SGPSector(m->entranceSector).AsStrategicIndex();
 	}
 	return -1;
 }
@@ -620,7 +616,7 @@ bool PlayerControlsMine(INT8 const mine_id)
 {
 	auto mine = GCM->getMine(mine_id);
 	return
-		!StrategicMap[SECTOR_INFO_TO_STRATEGIC_INDEX(mine->entranceSector)].fEnemyControlled &&
+		!StrategicMap[SGPSector(mine->entranceSector).AsStrategicIndex()].fEnemyControlled &&
 		/* Player only controls the actual mine after he has made arrangements to do
 		 * so with the head miner there. */
 		gMineStatus[mine_id].fSpokeToHeadMiner;
@@ -773,7 +769,7 @@ void IssueHeadMinerQuote(UINT8 const mine_idx, HeadMinerQuote const quote_type)
 	MERCPROFILESTRUCT const& p = GetProfile(miner_data.usProfileId);
 	if (p.bLife < OKLIFE)
 	{
-		SLOGD("Head Miner #%s can't talk (quote #%d)", p.zNickname.c_str(), quote_type);
+		SLOGD("Head Miner #{} can't talk (quote #{})", p.zNickname, quote_type);
 		return;
 	}
 
@@ -806,6 +802,8 @@ void IssueHeadMinerQuote(UINT8 const mine_idx, HeadMinerQuote const quote_type)
 
 UINT8 GetHeadMinersMineIndex( UINT8 ubMinerProfileId)
 {
+	Assert(ubMinerProfileId < NUM_PROFILES);
+
 	// find which mine this guy represents
 	for (auto mine : GCM->getMines())
 	{
@@ -816,7 +814,7 @@ UINT8 GetHeadMinersMineIndex( UINT8 ubMinerProfileId)
 	}
 
 	// not found!
-	SLOGA("Illegal profile id receieved or something is very wrong");
+	SLOGE("Illegal profile id receieved or something is very wrong");
 	return 0;
 }
 
@@ -991,9 +989,9 @@ BOOLEAN HasHisMineBeenProducingForPlayerForSomeTime( UINT8 ubMinerProfileId )
 }
 
 
-INT8 GetIdOfMineForSector(INT16 const x, INT16 const y, INT8 const z)
+INT8 GetIdOfMineForSector(const SGPSector& sector)
 {
-	auto mine = GCM->getMineForSector(x, y, z);
+	auto mine = GCM->getMineForSector(sector);
 	if (mine != NULL)
 	{
 		return mine->mineId;

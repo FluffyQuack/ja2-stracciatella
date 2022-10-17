@@ -14,7 +14,6 @@
 #include "Environment.h"
 #include "TileDef.h"
 #include "WorldMan.h"
-#include "MemMan.h"
 #include "FileMan.h"
 
 #include "Message.h"
@@ -871,7 +870,7 @@ UINT16 ChooseMapEdgepoint( UINT8 ubStrategicInsertionCode )
 
 void ChooseMapEdgepoints(MAPEDGEPOINTINFO* const pMapEdgepointInfo, const UINT8 ubStrategicInsertionCode, UINT8 ubNumDesiredPoints)
 {
-	AssertMsg(ubNumDesiredPoints > 0 && ubNumDesiredPoints <= 32, String("ChooseMapEdgepoints:  Desired points = %d, valid range is 1-32", ubNumDesiredPoints));
+	AssertMsg(ubNumDesiredPoints > 0 && ubNumDesiredPoints <= 32, ST::format("ChooseMapEdgepoints:  Desired points = {}, valid range is 1-32", ubNumDesiredPoints));
 
 	/* First validate and get access to the correct array based on strategic
 	 * direction.  We will use the selected array to choose insertion gridno's. */
@@ -998,19 +997,19 @@ INT16 SearchForClosestPrimaryMapEdgepoint( INT16 sGridNo, UINT8 ubInsertionCode 
 	{
 		case INSERTION_CODE_NORTH:
 			pEdgepoints = &gps1stNorthEdgepointArray;
-			AssertMsg(pEdgepoints->size() != 0, String("Sector %c%d level %d doesn't have any north mapedgepoints. LC:1", gWorldSectorY + 'A' - 1, gWorldSectorX, gbWorldSectorZ));
+			AssertMsg(pEdgepoints->size() != 0, ST::format("Sector {} doesn't have any north mapedgepoints. LC:1", gWorldSector));
 			break;
 		case INSERTION_CODE_EAST:
 			pEdgepoints = &gps1stEastEdgepointArray;
-			AssertMsg(pEdgepoints->size() != 0, String("Sector %c%d level %d doesn't have any east mapedgepoints. LC:1", gWorldSectorY + 'A' - 1, gWorldSectorX, gbWorldSectorZ));
+			AssertMsg(pEdgepoints->size() != 0, ST::format("Sector {} doesn't have any east mapedgepoints. LC:1", gWorldSector));
 			break;
 		case INSERTION_CODE_SOUTH:
 			pEdgepoints = &gps1stSouthEdgepointArray;
-			AssertMsg(pEdgepoints->size() != 0, String("Sector %c%d level %d doesn't have any south mapedgepoints. LC:1", gWorldSectorY + 'A' - 1, gWorldSectorX, gbWorldSectorZ));
+			AssertMsg(pEdgepoints->size() != 0, ST::format("Sector {} doesn't have any south mapedgepoints. LC:1", gWorldSector));
 			break;
 		case INSERTION_CODE_WEST:
 			pEdgepoints = &gps1stWestEdgepointArray;
-			AssertMsg(pEdgepoints->size() != 0, String("Sector %c%d level %d doesn't have any west mapedgepoints. LC:1", gWorldSectorY + 'A' - 1, gWorldSectorX, gbWorldSectorZ));
+			AssertMsg(pEdgepoints->size() != 0, ST::format("Sector {} doesn't have any west mapedgepoints. LC:1", gWorldSector));
 			break;
 	}
 	if (!pEdgepoints || pEdgepoints->size() == 0)
@@ -1050,7 +1049,7 @@ INT16 SearchForClosestPrimaryMapEdgepoint( INT16 sGridNo, UINT8 ubInsertionCode 
 	sRadius = 1;
 	sDirection = WORLD_COLS;
 	sOriginalGridNo = sGridNo;
-	while( sRadius < (INT16)(gbWorldSectorZ ? 30 : 10) )
+	while (sRadius < (INT16)(gWorldSector.z ? 30 : 10))
 	{
 		sGridNo = sOriginalGridNo + (-1 - WORLD_COLS)*sRadius; //start at the TOP-LEFT gridno
 		for( iDirectionLoop = 0; iDirectionLoop < 4; iDirectionLoop++ )
@@ -1112,19 +1111,19 @@ INT16 SearchForClosestSecondaryMapEdgepoint( INT16 sGridNo, UINT8 ubInsertionCod
 	{
 		case INSERTION_CODE_NORTH:
 			pEdgepoints = &gps2ndNorthEdgepointArray;
-			AssertMsg(pEdgepoints->size() != 0, String("Sector %c%d level %d doesn't have any isolated north mapedgepoints. KM:1", gWorldSectorY + 'A' - 1, gWorldSectorX, gbWorldSectorZ));
+			AssertMsg(pEdgepoints->size() != 0, ST::format("Sector {} doesn't have any isolated north mapedgepoints. KM:1", gWorldSector));
 			break;
 		case INSERTION_CODE_EAST:
 			pEdgepoints = &gps2ndEastEdgepointArray;
-			AssertMsg(pEdgepoints->size() != 0, String("Sector %c%d level %d doesn't have any isolated east mapedgepoints. KM:1", gWorldSectorY + 'A' - 1, gWorldSectorX, gbWorldSectorZ));
+			AssertMsg(pEdgepoints->size() != 0, ST::format("Sector {} doesn't have any isolated east mapedgepoints. KM:1", gWorldSector));
 			break;
 		case INSERTION_CODE_SOUTH:
 			pEdgepoints = &gps2ndSouthEdgepointArray;
-			AssertMsg(pEdgepoints->size() != 0, String("Sector %c%d level %d doesn't have any isolated south mapedgepoints. KM:1", gWorldSectorY + 'A' - 1, gWorldSectorX, gbWorldSectorZ));
+			AssertMsg(pEdgepoints->size() != 0, ST::format("Sector {} doesn't have any isolated south mapedgepoints. KM:1", gWorldSector));
 			break;
 		case INSERTION_CODE_WEST:
 			pEdgepoints = &gps2ndWestEdgepointArray;
-			AssertMsg(pEdgepoints->size() != 0, String("Sector %c%d level %d doesn't have any isolated west mapedgepoints. KM:1", gWorldSectorY + 'A' - 1, gWorldSectorX, gbWorldSectorZ));
+			AssertMsg(pEdgepoints->size() != 0, ST::format("Sector {} doesn't have any isolated west mapedgepoints. KM:1", gWorldSector));
 			break;
 	}
 	if (!pEdgepoints || pEdgepoints->size() == 0)
@@ -1164,7 +1163,7 @@ INT16 SearchForClosestSecondaryMapEdgepoint( INT16 sGridNo, UINT8 ubInsertionCod
 	sRadius = 1;
 	sDirection = WORLD_COLS;
 	sOriginalGridNo = sGridNo;
-	while( sRadius < (INT16)(gbWorldSectorZ ? 30 : 10) )
+	while( sRadius < (INT16)(gWorldSector.z ? 30 : 10) )
 	{
 		sGridNo = sOriginalGridNo + (-1 - WORLD_COLS)*sRadius; //start at the TOP-LEFT gridno
 		for( iDirectionLoop = 0; iDirectionLoop < 4; iDirectionLoop++ )
@@ -1227,12 +1226,12 @@ static BOOLEAN VerifyEdgepoint(SOLDIERTYPE* pSoldier, INT16 sEdgepoint)
 	iSearchRange = EDGE_OF_MAP_SEARCH;
 
 	// determine maximum horizontal limits
-	sMaxLeft  = MIN( iSearchRange, (pSoldier->sGridNo % MAXCOL));
-	sMaxRight = MIN( iSearchRange, MAXCOL - ((pSoldier->sGridNo % MAXCOL) + 1));
+	sMaxLeft  = std::min(iSearchRange, (pSoldier->sGridNo % MAXCOL));
+	sMaxRight = std::min(iSearchRange, MAXCOL - ((pSoldier->sGridNo % MAXCOL) + 1));
 
 	// determine maximum vertical limits
-	sMaxUp   = MIN( iSearchRange, (pSoldier->sGridNo / MAXROW));
-	sMaxDown = MIN( iSearchRange, MAXROW - ((pSoldier->sGridNo / MAXROW) + 1));
+	sMaxUp   = std::min(iSearchRange, (pSoldier->sGridNo / MAXROW));
+	sMaxDown = std::min(iSearchRange, MAXROW - ((pSoldier->sGridNo / MAXROW) + 1));
 
 	// Call FindBestPath to set flags in all locations that we can
 	// walk into within range.  We have to set some things up first...
@@ -1290,7 +1289,7 @@ static BOOLEAN EdgepointsClose(SOLDIERTYPE* pSoldier, INT16 sEdgepoint1, INT16 s
 
 	pSoldier->sGridNo = sEdgepoint1;
 
-	if( gWorldSectorX == 14 && gWorldSectorY == 9 && !gbWorldSectorZ )
+	if( gWorldSector.x == 14 && gWorldSector.y == 9 && !gWorldSector.z )
 	{ //BRUTAL CODE  -- special case map.
 		iSearchRange = 250;
 	}
@@ -1300,12 +1299,12 @@ static BOOLEAN EdgepointsClose(SOLDIERTYPE* pSoldier, INT16 sEdgepoint1, INT16 s
 	}
 
 	// determine maximum horizontal limits
-	sMaxLeft  = MIN( iSearchRange, (pSoldier->sGridNo % MAXCOL));
-	sMaxRight = MIN( iSearchRange, MAXCOL - ((pSoldier->sGridNo % MAXCOL) + 1));
+	sMaxLeft  = std::min(iSearchRange, (pSoldier->sGridNo % MAXCOL));
+	sMaxRight = std::min(iSearchRange, MAXCOL - ((pSoldier->sGridNo % MAXCOL) + 1));
 
 	// determine maximum vertical limits
-	sMaxUp   = MIN( iSearchRange, (pSoldier->sGridNo / MAXROW));
-	sMaxDown = MIN( iSearchRange, MAXROW - ((pSoldier->sGridNo / MAXROW) + 1));
+	sMaxUp   = std::min(iSearchRange, (pSoldier->sGridNo / MAXROW));
+	sMaxDown = std::min(iSearchRange, MAXROW - ((pSoldier->sGridNo / MAXROW) + 1));
 
 	// Call FindBestPath to set flags in all locations that we can
 	// walk into within range.  We have to set some things up first...
@@ -1458,9 +1457,9 @@ void ShowMapEdgepoints()
 	}
 	else
 	{
-		SLOGD("Showing display of map edgepoints (%d illegal primary, %d illegal secondary)", n_illegal1, n_illegal2);
+		SLOGD("Showing display of map edgepoints ({} illegal primary, {} illegal secondary)", n_illegal1, n_illegal2);
 	}
-	SLOGD("N:%d:%d E:%d:%d S:%d:%d W:%d:%d",
+	SLOGD("N:{}:{} E:{}:{} S:{}:{} W:{}:{}",
 		static_cast<int>(gps1stNorthEdgepointArray.size()), static_cast<int>(gps2ndNorthEdgepointArray.size()),
 		static_cast<int>(gps1stEastEdgepointArray.size()),  static_cast<int>(gps2ndEastEdgepointArray.size()),
 		static_cast<int>(gps1stSouthEdgepointArray.size()), static_cast<int>(gps2ndSouthEdgepointArray.size()),

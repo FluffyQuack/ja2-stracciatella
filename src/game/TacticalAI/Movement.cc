@@ -12,6 +12,8 @@
 #include "Soldier_Macros.h"
 #include "Render_Fun.h"
 #include "Debug.h"
+#include <algorithm>
+#include <array>
 
 //
 // CJC's DG->JA2 conversion notes
@@ -104,7 +106,7 @@ int TryToResumeMovement(SOLDIERTYPE *pSoldier, INT16 sGridno)
 	// have occupied the destination gridno in the meantime!)
 	if (LegalNPCDestination(pSoldier,sGridno,ENSURE_PATH,WATEROK,0))
 	{
-		SLOGD("%d continues movement to gridno %d...",
+		SLOGD("{} continues movement to gridno {}...",
 			pSoldier->ubID, sGridno);
 
 		pSoldier->bPathStored = TRUE;	// optimization - Ian
@@ -290,8 +292,7 @@ INT8 RandomPointPatrolAI(SOLDIERTYPE *pSoldier)
 
 
 	// passed all tests - start moving towards next patrol point
-	SLOGD("%s - POINT PATROL to grid %d",
-		pSoldier->name.c_str(), pSoldier->usActionData);
+	SLOGD("{} - POINT PATROL to grid {}", pSoldier->name, pSoldier->usActionData);
 	return(TRUE);
 }
 
@@ -303,7 +304,6 @@ INT16 InternalGoAsFarAsPossibleTowards(SOLDIERTYPE *pSoldier, INT16 sDesGrid, IN
 	INT16 sTempDest,sGoToGrid;
 	INT16 sOrigin;
 	UINT16 usMaxDist;
-	UINT8 ubDirection,ubDirsLeft,ubDirChecked[8],fFound = FALSE;
 	INT8 fPathFlags;
 
 	INT8 bAPsLeft = -1; // XXX HACK000E
@@ -391,32 +391,18 @@ INT16 InternalGoAsFarAsPossibleTowards(SOLDIERTYPE *pSoldier, INT16 sDesGrid, IN
 		else
 		{
 			// else look at the 8 nearest gridnos to sDesGrid for a valid destination
-
-			// clear ubDirChecked flag for all 8 directions
-			for (ubDirection = 0; ubDirection < 8; ubDirection++)
-				ubDirChecked[ubDirection] = FALSE;
-
-			ubDirsLeft = 8;
+			bool fFound = false;
 
 			// examine all 8 spots around 'sDesGrid'
 			// keep looking while directions remain and a satisfactory one not found
-			for (ubDirsLeft = 8; ubDirsLeft != 0; ubDirsLeft--)
+			// randomly select a direction which hasn't been 'checked' yet
+			std::array<UINT8, 8> directions{ 0, 1, 2, 3, 4, 5, 6, 7 };
+			std::shuffle(directions.begin(), directions.end(), gRandomEngine);
+
+			for (UINT8 const ubDirection : directions)
 			{
-				if (fFound)
-				{
-					break;
-				}
-				// randomly select a direction which hasn't been 'checked' yet
-				do
-				{
-					ubDirection = (UINT8) Random(8);
-				}
-				while (ubDirChecked[ubDirection]);
-
-				ubDirChecked[ubDirection] = TRUE;
-
 				// determine the gridno 1 tile away from current friend in this direction
-				sTempDest = NewGridNo(sDesGrid,DirectionInc( ubDirection + 1 ));
+				sTempDest = NewGridNo(sDesGrid, DirectionInc(ubDirection));
 
 				// if that's out of bounds, ignore it & check next direction
 				if (sTempDest == sDesGrid)
@@ -424,7 +410,7 @@ INT16 InternalGoAsFarAsPossibleTowards(SOLDIERTYPE *pSoldier, INT16 sDesGrid, IN
 
 				if (LegalNPCDestination(pSoldier,sTempDest,ENSURE_PATH,NOWATER,0))
 				{
-					fFound = TRUE;            // found a spot
+					fFound = true;           // found a spot
 					break;                   // stop checking in other directions
 				}
 			}
@@ -566,7 +552,7 @@ INT16 InternalGoAsFarAsPossibleTowards(SOLDIERTYPE *pSoldier, INT16 sDesGrid, IN
 			pSoldier->ubPathDataSize = sLoop + 1;
 		}
 
-		SLOGD("%d to %d with %d APs left", pSoldier->ubID,
+		SLOGD("{} to {} with {} APs left", pSoldier->ubID,
 					sGoToGrid, pSoldier->bActionPoints );
 		return( sGoToGrid );
 	}
@@ -623,7 +609,7 @@ void SoldierTriesToContinueAlongPath(SOLDIERTYPE *pSoldier)
 	else
 	{
 		CancelAIAction(pSoldier);
-		SLOGD("Soldier (%d) HAS NOT ENOUGH AP to continue along path",pSoldier->ubID);
+		SLOGD("Soldier ({}) HAS NOT ENOUGH AP to continue along path", pSoldier->ubID);
 	}
 
 	usNewGridNo = NewGridNo( (UINT16)pSoldier->sGridNo, DirectionInc( pSoldier->ubPathingData[ pSoldier->ubPathIndex ] ) );
@@ -637,12 +623,12 @@ void SoldierTriesToContinueAlongPath(SOLDIERTYPE *pSoldier)
 		NewDest(pSoldier,usNewGridNo);
 		// maybe we didn't actually start the action last turn...
 		pSoldier->bActionInProgress = TRUE;
-		SLOGD("Soldier (%d) continues along path",pSoldier->ubID);
+		SLOGD("Soldier ({}) continues along path", pSoldier->ubID);
 	}
 	else
 	{
 		CancelAIAction(pSoldier);
-		SLOGD("Soldier (%d) HAS NOT ENOUGH AP to continue along path",pSoldier->ubID);
+		SLOGD("Soldier ({}) HAS NOT ENOUGH AP to continue along path", pSoldier->ubID);
 	}
 }
 
@@ -656,12 +642,12 @@ void HaltMoveForSoldierOutOfPoints(SOLDIERTYPE& s)
 	AdjustNoAPToFinishMove(&s, TRUE);
 
 	// We'll keep his action intact though
-	SLOGD("NO AP TO FINISH MOVE for %d (%d APs left)", s.ubID, s.bActionPoints);
+	SLOGD("NO AP TO FINISH MOVE for {} ({} APs left)", s.ubID, s.bActionPoints);
 
 	// If this dude is under AI right now, then pass the baton to someone else
 	if (s.uiStatusFlags & SOLDIER_UNDERAICONTROL)
 	{
-		SLOGD("Ending turn for %d because out of APs for movement", s.ubID);
+		SLOGD("Ending turn for {} because out of APs for movement", s.ubID);
 		EndAIGuysTurn(s);
 	}
 }
@@ -717,7 +703,7 @@ INT16 TrackScent( SOLDIERTYPE * pSoldier )
 			for (iXDiff = -RADIUS; iXDiff < (RADIUS + 1); iXDiff += iXIncr)
 			{
 				iGridNo = iStart + iXDiff + iYDiff * WORLD_ROWS;
-				if (ABS( iGridNo % WORLD_ROWS - iXStart ) > RADIUS)
+				if (std::abs(iGridNo % WORLD_ROWS - iXStart) > RADIUS)
 				{
 					// wrapped across map!
 					continue;
@@ -735,7 +721,7 @@ INT16 TrackScent( SOLDIERTYPE * pSoldier )
 							ubBestStrength = ubStrength;
 							bDir = atan8( (INT16) iXStart, (INT16) iYStart, (INT16) (iXStart + iXDiff), (INT16) (iYStart + iYDiff) );
 							// now convert it into a difference in degree between it and our current dir
-							ubBestDirDiff = ABS( pSoldier->bDirection - bDir );
+							ubBestDirDiff = std::abs(pSoldier->bDirection - bDir);
 							if (ubBestDirDiff > 4 ) // dir 0 compared with dir 6, for instance
 							{
 								ubBestDirDiff = 8 - ubBestDirDiff;
@@ -755,7 +741,7 @@ INT16 TrackScent( SOLDIERTYPE * pSoldier )
 								// start by calculating direction to the new gridno
 								bDir = atan8( (INT16) iXStart, (INT16) iYStart, (INT16) (iXStart + iXDiff), (INT16) (iYStart + iYDiff) );
 								// now convert it into a difference in degree between it and our current dir
-								ubDirDiff = ABS( pSoldier->bDirection - bDir );
+								ubDirDiff = std::abs(pSoldier->bDirection - bDir);
 								if (ubDirDiff > 4 ) // dir 0 compared with dir 6, for instance
 								{
 									ubDirDiff = 8 - ubDirDiff;

@@ -16,7 +16,6 @@
 #include "Campaign_Types.h"
 #include "StrategicMap.h"
 #include "VSurface.h"
-#include "MemMan.h"
 #include "Button_System.h"
 #include "Font_Control.h"
 #include "FileMan.h"
@@ -36,7 +35,7 @@
 struct FinanceUnit
 {
 	UINT8 ubCode; // the code index in the finance code table
-	UINT8 ubSecondCode; // secondary code
+	UINT8 ubSecondCode; // secondary code: Profile ID or sector ID
 	UINT32 uiDate; // time in the world in global time
 	INT32 iAmount; // the amount of the transaction
 	INT32 iBalanceToDate;
@@ -146,7 +145,7 @@ static BUTTON_PICS* giFinanceButtonImage[4];
 static MOUSE_REGION g_scroll_region;
 
 // internal functions
-static void ProcessAndEnterAFinacialRecord(UINT8 ubCode, UINT32 uiDate, INT32 iAmount, UINT8 ubSecondCode, INT32 iBalanceToDate);
+static void ProcessAndEnterAFinancialRecord(UINT8 ubCode, UINT32 uiDate, INT32 iAmount, UINT8 ubSecondCode, INT32 iBalanceToDate);
 static void LoadFinances(void);
 static void RemoveFinances(void);
 static void ClearFinanceList(void);
@@ -195,7 +194,7 @@ void AddTransactionToPlayersBook(UINT8 ubCode, UINT8 ubSecondCode, UINT32 uiDate
 	// update balance
 	LaptopSaveInfo.iCurrentBalance += iAmount;
 
-	ProcessAndEnterAFinacialRecord(ubCode, uiDate, iAmount, ubSecondCode, LaptopSaveInfo.iCurrentBalance);
+	ProcessAndEnterAFinancialRecord(ubCode, uiDate, iAmount, ubSecondCode, LaptopSaveInfo.iCurrentBalance);
 
 	// write balance to disk
 	WriteBalanceToDisk( );
@@ -705,7 +704,7 @@ static void ClearFinanceList(void)
 }
 
 
-static void ProcessAndEnterAFinacialRecord(const UINT8 ubCode, const UINT32 uiDate, const INT32 iAmount, const UINT8 ubSecondCode, const INT32 iBalanceToDate)
+static void ProcessAndEnterAFinancialRecord(const UINT8 ubCode, const UINT32 uiDate, const INT32 iAmount, const UINT8 ubSecondCode, const INT32 iBalanceToDate)
 {
 	FinanceUnit* const fu = new FinanceUnit{};
 	fu->Next           = NULL;
@@ -726,7 +725,7 @@ static void LoadPreviousPage(void);
 static void LoadNextPage(void);
 
 
-static void ScrollRegionCallback(MOUSE_REGION* const, INT32 const reason)
+static void ScrollRegionCallback(MOUSE_REGION* const, UINT32 const reason)
 {
 	if (reason & MSYS_CALLBACK_REASON_WHEEL_UP)
 	{
@@ -739,36 +738,36 @@ static void ScrollRegionCallback(MOUSE_REGION* const, INT32 const reason)
 }
 
 
-static void BtnFinanceDisplayPrevPageCallBack(GUI_BUTTON* const, INT32 const reason)
+static void BtnFinanceDisplayPrevPageCallBack(GUI_BUTTON* const, UINT32 const reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		LoadPreviousPage();
 	}
 }
 
 
-static void BtnFinanceDisplayNextPageCallBack(GUI_BUTTON* const, INT32 const reason)
+static void BtnFinanceDisplayNextPageCallBack(GUI_BUTTON* const, UINT32 const reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		LoadNextPage();
 	}
 }
 
 
-static void BtnFinanceFirstPageCallBack(GUI_BUTTON* const, INT32 const reason)
+static void BtnFinanceFirstPageCallBack(GUI_BUTTON* const, UINT32 const reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		LoadInRecords(0);
 	}
 }
 
 
-static void BtnFinanceLastPageCallBack(GUI_BUTTON* const, INT32 const reason)
+static void BtnFinanceLastPageCallBack(GUI_BUTTON* const, UINT32 const reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		LoadInRecords(guiLastPageInRecordsList + 1);
 	}
@@ -852,9 +851,7 @@ static ST::string ProcessTransactionString(const FinanceUnit* f)
 
 		case TRAIN_TOWN_MILITIA:
 		{
-			const UINT8 ubSectorX = SECTORX(f->ubSecondCode);
-			const UINT8 ubSectorY = SECTORY(f->ubSecondCode);
-			return st_format_printf(pTransactionText[TRAIN_TOWN_MILITIA], GetSectorIDString(ubSectorX, ubSectorY, 0, TRUE));
+			return st_format_printf(pTransactionText[TRAIN_TOWN_MILITIA], GetSectorIDString(f->ubSecondCode, TRUE));
 		}
 
 		default:
@@ -880,7 +877,7 @@ static void WriteBalanceToDisk(void)
 
 
 // will grab the current blanace from disk
-// this procedure will open and read in data to the finance list	
+// this procedure will open and read in data to the finance list
 static void GetBalanceFromDisk(void)
 {
 	if (!GCM->tempFiles()->exists(FINANCES_DATA_FILE)) {
@@ -985,7 +982,7 @@ static void LoadInRecords(UINT32 const page)
 		EXTR_I32(d, balance_to_date);
 		Assert(d.getConsumed() == lengthof(data));
 
-		ProcessAndEnterAFinacialRecord(code, date, amount, second_code, balance_to_date);
+		ProcessAndEnterAFinancialRecord(code, date, amount, second_code, balance_to_date);
 	}
 }
 

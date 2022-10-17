@@ -43,7 +43,6 @@
 #include "SmokeEffects.h"
 #include "Auto_Resolve.h"
 #include "SoundMan.h"
-#include "MemMan.h"
 #include "Debug.h"
 
 #include "CalibreModel.h"
@@ -62,9 +61,9 @@
 #define MIN_TANK_RANGE		120 // range at which tank starts really having trouble aiming
 
 // percent reduction in sight range per point of aiming
-#define SNIPERSCOPE_AIM_BONUS	20
+#define SNIPERSCOPE_AIM_BONUS	gamepolicy(aim_bonus_sniperscope)
 // bonus to hit with working laser scope
-#define LASERSCOPE_BONUS	20
+#define LASERSCOPE_BONUS	gamepolicy(aim_bonus_laserscope)
 
 #define CRITICAL_HIT_THRESHOLD	30
 
@@ -178,11 +177,16 @@ UINT16 GunRange(OBJECTTYPE const& o)
 	// return a minimal value of 1 tile
 	if (!(GCM->getItem(o.usItem)->isWeapon())) return CELL_X_SIZE;
 
-	INT8   const attach_pos = FindAttachment(&o, GUN_BARREL_EXTENDER);
-	UINT16       range      = GCM->getWeapon(o.usItem)->usRange;
+	UINT16 range = GCM->getWeapon(o.usItem)->usRange;
+	INT8 attach_pos = FindAttachment(&o, GUN_BARREL_EXTENDER);
 	if (attach_pos != ITEM_NOT_FOUND)
 	{
 		range += GUN_BARREL_RANGE_BONUS * WEAPON_STATUS_MOD(o.bAttachStatus[attach_pos]) / 100;
+	}
+	attach_pos = FindAttachment(&o, SILENCER);
+	if (attach_pos != ITEM_NOT_FOUND)
+	{
+		range -= SILENCER_RANGE_PENALTY;
 	}
 	return range;
 }
@@ -284,7 +288,7 @@ INT8 ArmourVersusExplosivesPercent( SOLDIERTYPE * pSoldier )
 	{
 		iVest = ExplosiveEffectiveArmour( &(pSoldier->inv[VESTPOS]) );
 		// convert to % of best; ignoring bug-treated stuff
-		iVest = __min( 65, 65 * iVest / ( Armour[ GCM->getItem(SPECTRA_VEST_18)->getClassIndex() ].ubProtection + Armour[ GCM->getItem(CERAMIC_PLATES)->getClassIndex() ].ubProtection) );
+		iVest = std::min(65, 65 * iVest / ( Armour[ GCM->getItem(SPECTRA_VEST_18)->getClassIndex() ].ubProtection + Armour[ GCM->getItem(CERAMIC_PLATES)->getClassIndex() ].ubProtection));
 	}
 	else
 	{
@@ -295,7 +299,7 @@ INT8 ArmourVersusExplosivesPercent( SOLDIERTYPE * pSoldier )
 	{
 		iHelmet = ExplosiveEffectiveArmour( &(pSoldier->inv[HELMETPOS]) );
 		// convert to % of best; ignoring bug-treated stuff
-		iHelmet = __min( 15, 15 * iHelmet / Armour[ GCM->getItem(SPECTRA_HELMET_18)->getClassIndex() ].ubProtection );
+		iHelmet = std::min(15, 15 * iHelmet / Armour[ GCM->getItem(SPECTRA_HELMET_18)->getClassIndex() ].ubProtection);
 	}
 	else
 	{
@@ -306,7 +310,7 @@ INT8 ArmourVersusExplosivesPercent( SOLDIERTYPE * pSoldier )
 	{
 		iLeg = ExplosiveEffectiveArmour( &(pSoldier->inv[LEGPOS]) );
 		// convert to % of best; ignoring bug-treated stuff
-		iLeg = __min( 25, 25 * iLeg / Armour[ GCM->getItem(SPECTRA_LEGGINGS_18)->getClassIndex() ].ubProtection );
+		iLeg = std::min(25, 25 * iLeg / Armour[ GCM->getItem(SPECTRA_LEGGINGS_18)->getClassIndex() ].ubProtection);
 	}
 	else
 	{
@@ -767,7 +771,7 @@ static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 				if (!weapon->silencedSound.empty()) {
 					PlayLocationJA2Sample(pSoldier->sGridNo, weapon->silencedSound, HIGHVOLUME, 1);
 				}
-				
+
 			}
 			else
 			{
@@ -838,7 +842,7 @@ static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 					{
 						// gain extra exp for aiming, up to the amount from
 						// the difficulty of the shot
-						usExpGain += __min( pSoldier->bAimTime, usExpGain );
+						usExpGain += std::min(int(pSoldier->bAimTime), int(usExpGain));
 					}
 
 					// base pts extra for hitting
@@ -898,7 +902,7 @@ static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 				{
 					// gain extra exp for aiming, up to the amount from
 					// the difficulty of the throw
-					usExpGain += ( 2 * __min( pSoldier->bAimTime, usExpGain ) );
+					usExpGain += 2 * std::min(int(pSoldier->bAimTime), int(usExpGain));
 				}
 
 				// base pts extra for hitting
@@ -928,8 +932,7 @@ static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 
 			// Reduce again for attack end 'cause it has been incremented for a normal attack
 			//
-			SLOGD(
-				"Freeing up attacker - ATTACK ANIMATION %s ENDED BY BAD EXPLOSIVE CHECK, Now %d",
+			SLOGD("Freeing up attacker - ATTACK ANIMATION {} ENDED BY BAD EXPLOSIVE CHECK, Now {}",
 				gAnimControl[pSoldier->usAnimState].zAnimStr, gTacticalStatus.ubAttackBusyCount);
 			ReduceAttackBusyCount(pSoldier, FALSE);
 
@@ -976,8 +979,7 @@ static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 			{
 				// Increment attack counter...
 				gTacticalStatus.ubAttackBusyCount++;
-				SLOGD(ST::format("Incrementing Attack: Exhaust from LAW ({})",
-					gTacticalStatus.ubAttackBusyCount));
+				SLOGD("Incrementing Attack: Exhaust from LAW ({})", gTacticalStatus.ubAttackBusyCount);
 				EVENT_SoldierGotHit(tgt, MINI_GRENADE, 10, 200, pSoldier->bDirection, 0, pSoldier, 0, ANIM_CROUCH, sNewGridNo);
 			}
 		}
@@ -1038,7 +1040,7 @@ static void UseBlade(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo)
 	INT32          iImpact, iImpactForCrits;
 	BOOLEAN        fGonnaHit = FALSE;
 	UINT16         usExpGain = 0;
-	INT8           bMaxDrop;
+	int            bMaxDrop;
 	BOOLEAN        fSurpriseAttack;
 
 	// Deduct points!
@@ -1101,12 +1103,11 @@ static void UseBlade(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo)
 			if ( pSoldier->inv[ pSoldier->ubAttackingHand ].bStatus[ 0 ] > USABLE )
 			{
 				bMaxDrop = (iImpact / 20);
+				int adjStatus = pSoldier->inv[pSoldier->ubAttackingHand].bStatus[0] / 10;
 
 				// the duller they get, the slower they get any worse...
-				bMaxDrop = __min( bMaxDrop, pSoldier->inv[ pSoldier->ubAttackingHand ].bStatus[ 0 ] / 10 );
-
 				// as long as its still > USABLE, it drops another point 1/2 the time
-				bMaxDrop = __max( bMaxDrop, 2 );
+				bMaxDrop = adjStatus > 2 ? std::clamp(bMaxDrop, 2, adjStatus) : 2;
 
 				pSoldier->inv[ pSoldier->ubAttackingHand ].bStatus[ 0 ] -= (INT8) Random( bMaxDrop );     // 0 to (maxDrop - 1)
 			}
@@ -1144,7 +1145,7 @@ static void UseBlade(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo)
 				{
 					// gain extra exp for aiming, up to the amount from
 					// the difficulty of the attack
-					usExpGain += ( 2 * __min( pSoldier->bAimTime, usExpGain ) );
+					usExpGain += 2 * std::min(int(pSoldier->bAimTime), int(usExpGain));
 				}
 
 				// base pts extra for hitting
@@ -1247,7 +1248,7 @@ void UseHandToHand(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo, BOOLE
 				if ( iDiceRoll <= iHitChance )
 				{
 					// Was a good steal!
-					ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(g_langRes->Message[ STR_STOLE_SOMETHING ], pSoldier->name, ShortItemNames[ pTargetSoldier->inv[HANDPOS].usItem ]) );
+					ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(g_langRes->Message[ STR_STOLE_SOMETHING ], pSoldier->name, GCM->getItem(pTargetSoldier->inv[HANDPOS].usItem)->getShortName()) );
 
 					usOldItem = pTargetSoldier->inv[HANDPOS].usItem;
 
@@ -1303,7 +1304,7 @@ void UseHandToHand(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo, BOOLE
 				{
 					ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE,
 						st_format_printf(g_langRes->Message[ STR_FAILED_TO_STEAL_SOMETHING ],
-						pSoldier->name, ShortItemNames[ pTargetSoldier->inv[HANDPOS].usItem ]) );
+						pSoldier->name, pSoldier->name, GCM->getItem(pTargetSoldier->inv[HANDPOS].usItem)->getShortName()) );
 					if ( pSoldier->bTeam == OUR_TEAM )
 					{
 						DoMercBattleSound( pSoldier, BATTLE_SOUND_CURSE1 );
@@ -1516,8 +1517,7 @@ static BOOLEAN UseLauncher(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 		IgniteExplosion(pSoldier, 0, pSoldier->sGridNo, Launchable.usItem, pSoldier->bLevel);
 
 		// Reduce again for attack end 'cause it has been incremented for a normal attack
-		SLOGD(
-			"Freeing up attacker - ATTACK ANIMATION %s ENDED BY BAD EXPLOSIVE CHECK, Now %d",
+		SLOGD("Freeing up attacker - ATTACK ANIMATION {} ENDED BY BAD EXPLOSIVE CHECK, Now {}",
 			gAnimControl[pSoldier->usAnimState].zAnimStr, gTacticalStatus.ubAttackBusyCount);
 		ReduceAttackBusyCount(pSoldier, FALSE);
 
@@ -1612,14 +1612,14 @@ static BOOLEAN DoSpecialEffectAmmoMiss(SOLDIERTYPE* const attacker, const INT16 
 	else if (ubAmmoType == AMMO_MONSTER)
 	{
 		UINT16 gas = GCM->getWeapon(usItem)->usSmokeEffect;
-		if (gas == NONE) 
+		if (gas == NONE)
 		{
 			return FALSE;
 		}
 
 		// Increment attack busy...
 		// gTacticalStatus.ubAttackBusyCount++;
-		// SLOGD("Incrementing Attack: Explosion gone off, COunt now %d", gTacticalStatus.ubAttackBusyCount);
+		// SLOGD("Incrementing Attack: Explosion gone off, COunt now {}", gTacticalStatus.ubAttackBusyCount);
 
 		PlayLocationJA2Sample(sGridNo, CREATURE_GAS_NOISE, HIGHVOLUME, 1);
 
@@ -1663,17 +1663,20 @@ void WeaponHit(SOLDIERTYPE* const pTargetSoldier, const UINT16 usWeaponIndex, co
 	{
 		// Buddy had died from additional dammage - free up attacker here...
 		ReduceAttackBusyCount(pTargetSoldier->attacker, FALSE);
-		SLOGD("Special effect killed before bullet impact, attack count now %d",
+		SLOGD("Special effect killed before bullet impact, attack count now {}",
 			gTacticalStatus.ubAttackBusyCount);
 	}
 }
 
 
-void StructureHit(BULLET* const pBullet, const INT16 sXPos, const INT16 sYPos, const INT16 sZPos, const UINT16 usStructureID, const INT32 iImpact, const BOOLEAN fStopped)
+void StructureHit(BULLET* const pBullet, const UINT16 usStructureID, const INT32 iImpact, const BOOLEAN fStopped)
 {
+	const INT16 sXPos = FIXEDPT_TO_INT32(pBullet->qCurrX);
+	const INT16 sYPos = FIXEDPT_TO_INT32(pBullet->qCurrY);
+	const INT16 sZPos = CONVERT_HEIGHTUNITS_TO_PIXELS(FIXEDPT_TO_INT32(pBullet->qCurrZ));
+
 	BOOLEAN        fDoMissForGun = FALSE;
 	ANITILE        *pNode;
-	INT16          sGridNo;
 	ANITILE_PARAMS AniParams;
 	UINT32         uiMissVolume = MIDVOLUME;
 
@@ -1690,7 +1693,7 @@ void StructureHit(BULLET* const pBullet, const INT16 sXPos, const INT16 sYPos, c
 
 	const BOOLEAN fHitSameStructureAsBefore = (usStructureID == pBullet->usLastStructureHit);
 
-	sGridNo = MAPROWCOLTOPOS( (sYPos/CELL_Y_SIZE), (sXPos/CELL_X_SIZE) );
+	const GridNo sGridNo = pBullet->sGridNo;
 	if ( !fHitSameStructureAsBefore )
 	{
 		const INT8 level = (sZPos > WALL_HEIGHT ? 1 : 0);
@@ -2098,7 +2101,7 @@ UINT32 CalcChanceToHitGun(SOLDIERTYPE *pSoldier, UINT16 sGridNo, UINT8 ubAimTime
 			pSoldier2 = GetRobotController( pSoldier );
 			if ( pSoldier2 )
 			{
-				iMarksmanship = __max( iMarksmanship, EffectiveMarksmanship( pSoldier2 ) );
+				iMarksmanship = std::max(iMarksmanship, int(EffectiveMarksmanship(pSoldier2)));
 			}
 		}
 	}
@@ -2257,7 +2260,7 @@ UINT32 CalcChanceToHitGun(SOLDIERTYPE *pSoldier, UINT16 sGridNo, UINT8 ubAimTime
 			// max with 0 to prevent this being a bonus, for JA2 it's just a penalty to make early enemies easy
 			// CJC note: IDIOT!  This should have been a min.  It's kind of too late now...
 			// CJC 2002-05-17: changed the max to a min to make this work.
-			iChance += __min( 0, gbDiff[ DIFF_ENEMY_TO_HIT_MOD ][ SoldierDifficultyLevel( pSoldier ) ] );
+			iChance += std::min(INT8(0), gbDiff[DIFF_ENEMY_TO_HIT_MOD][SoldierDifficultyLevel(pSoldier)]);
 		}
 	}
 
@@ -2339,11 +2342,7 @@ UINT32 CalcChanceToHitGun(SOLDIERTYPE *pSoldier, UINT16 sGridNo, UINT8 ubAimTime
 			iScopeBonus = (iScopeBonus * WEAPON_STATUS_MOD(pInHand->bAttachStatus[bAttachPos])) / 100;
 
 			// reduce effective range by the bonus obtained from the scope
-			iSightRange -= iScopeBonus;
-			if (iSightRange < 1)
-			{
-				iSightRange = 1;
-			}
+			iSightRange = std::max(iSightRange - iScopeBonus, 1);
 		}
 
 		bAttachPos = FindAttachment( pInHand, LASERSCOPE );
@@ -2499,7 +2498,7 @@ UINT32 CalcChanceToHitGun(SOLDIERTYPE *pSoldier, UINT16 sGridNo, UINT8 ubAimTime
 					{
 						// reduce chance to hit with distance to the prone/immersed target
 						iPenalty = 3 * ((iRange - POINT_BLANK_RANGE) / CELL_X_SIZE); // penalty -3%/tile
-						iPenalty = __min( iPenalty, AIM_PENALTY_TARGET_PRONE );
+						iPenalty = std::min(iPenalty, AIM_PENALTY_TARGET_PRONE);
 
 						iChance -= iPenalty;
 					}
@@ -2529,7 +2528,7 @@ UINT32 CalcChanceToHitGun(SOLDIERTYPE *pSoldier, UINT16 sGridNo, UINT8 ubAimTime
 		}
 
 		// penalty for amount that enemy has moved
-		iPenalty = __min( ((pTarget->bTilesMoved * 3) / 2), 30 );
+		iPenalty = std::min(((pTarget->bTilesMoved * 3) / 2), 30);
 		iChance -= iPenalty;
 
 		// if target sees us, he may have a chance to dodge before the gun goes off
@@ -3634,7 +3633,7 @@ INT32 CalcMaxTossRange(const SOLDIERTYPE* pSoldier, UINT16 usItem, BOOLEAN fArme
 		{
 			// start with the range based on the soldier's strength and the item's weight
 			INT32 iThrowingStrength = ( EffectiveStrength( pSoldier ) * 2 + 100 ) / 3;
-			iRange = 2 + ( iThrowingStrength / __min( ( 3 + (GCM->getItem(usItem)->getWeight()) / 3 ), 4 ) );
+			iRange = 2 + ( iThrowingStrength / std::min(( 3 + (GCM->getItem(usItem)->getWeight()) / 3 ), 4 ));
 		}
 		else
 		{	// not as aerodynamic!
@@ -3812,7 +3811,7 @@ UINT32 CalcThrownChanceToHit(SOLDIERTYPE *pSoldier, INT16 sGridNo, UINT8 ubAimTi
 }
 
 
-static BOOLEAN HasLauncher(const SOLDIERTYPE* const s)
+bool HasLauncher(const SOLDIERTYPE* const s)
 {
 	OBJECTTYPE const& o = s->inv[HANDPOS];
 	return FindAttachment(&o, UNDER_GLAUNCHER) != ITEM_NOT_FOUND &&
@@ -3820,37 +3819,46 @@ static BOOLEAN HasLauncher(const SOLDIERTYPE* const s)
 }
 
 
+// Ensure the main hand item is in sync with the soldier's weapon mode.
+void EnsureConsistentWeaponMode(SOLDIERTYPE* const s)
+{
+	if (s->bWeaponMode == WM_BURST)
+	{
+		if (!IsGunBurstCapable(s, HANDPOS))
+		{
+			s->bWeaponMode = WM_NORMAL;
+		}
+	}
+	else if (s->bWeaponMode == WM_ATTACHED)
+	{
+		if (!HasLauncher(s))
+		{
+			s->bWeaponMode = WM_NORMAL;
+		}
+	}
+
+	s->bDoBurst = s->bWeaponMode == WM_BURST;
+}
+
+
+// Change the soldier's weapon mode to the next possible in
+// the cycle NORMAL ➔ BURST ➔ ATTACHED
 void ChangeWeaponMode(SOLDIERTYPE* const s)
 {
 	// ATE: Don't do this if in a fire amimation.....
 	if (gAnimControl[s->usAnimState].uiFlags & ANIM_FIRE) return;
 
-	INT8 mode = s->bWeaponMode;
-	switch (mode)
+	WeaponModes& mode = s->bWeaponMode;
+	WeaponModes previousMode = mode;
+	mode = mode == WM_ATTACHED ? WM_NORMAL : static_cast<WeaponModes>(mode + 1);
+
+	EnsureConsistentWeaponMode(s);
+
+	if (previousMode == mode)
 	{
-		case WM_NORMAL:
-			if (IsGunBurstCapable(s, HANDPOS))
-			{
-				mode = WM_BURST;
-			}
-			else if (HasLauncher(s))
-			{
-				mode = WM_ATTACHED;
-			}
-			else
-			{
-				ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_UI_FEEDBACK, st_format_printf(g_langRes->Message[STR_NOT_BURST_CAPABLE], s->name));
-			}
-			break;
-
-		case WM_BURST: mode = (HasLauncher(s) ? WM_ATTACHED : WM_NORMAL); break;
-
-		default:
-		case WM_ATTACHED: mode = WM_NORMAL; break;
+		ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_UI_FEEDBACK, st_format_printf(g_langRes->Message[STR_NOT_BURST_CAPABLE], s->name));
 	}
 
-	s->bWeaponMode = mode;
-	s->bDoBurst    = (mode == WM_BURST);
 	DirtyMercPanelInterface(s, DIRTYLEVEL2);
 	gfUIForceReExamineCursorData = TRUE;
 }

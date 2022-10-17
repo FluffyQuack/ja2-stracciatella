@@ -63,7 +63,6 @@
 #include "Map_Screen_Interface_Map_Inventory.h"
 #include "ScreenIDs.h"
 #include "VSurface.h"
-#include "MemMan.h"
 #include "Debug.h"
 #include "UILayout.h"
 
@@ -509,7 +508,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 	if (item->getItemClass() == IC_MEDKIT)
 	{
 		// ATE: AI CANNOT GO THROUGH HERE!
-		const INT16 usMapPos = (gTacticalStatus.fAutoBandageMode ? usGridNo : GetMouseMapPos());
+		const INT16 usMapPos = (gTacticalStatus.fAutoBandageMode ? usGridNo : guiCurrentCursorGridNo);
 
 		// See if we can get there to stab
 		BOOLEAN	fHadToUseCursorPos = FALSE;
@@ -864,9 +863,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 	if (item->getItemClass() == IC_TENTACLES)
 	{
 		gTacticalStatus.ubAttackBusyCount++;
-		SLOGD(
-			"Starting swipe attack, incrementing a.b.c in HandleItems to %d",
-			gTacticalStatus.ubAttackBusyCount);
+		SLOGD("Starting swipe attack, incrementing a.b.c in HandleItems to {}", gTacticalStatus.ubAttackBusyCount);
 		const INT16 sAPCost = CalcTotalAPsToAttack(s, sGridNo, FALSE, s->bAimTime);
 		DeductPoints(s, sAPCost, 0);
 		EVENT_InitNewSoldierAnim(s, QUEEN_SWIPE, 0, FALSE);
@@ -945,7 +942,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 	if (item->getCursor() == INVALIDCURS)
 	{
 		// Found detonator...
-		OBJECTTYPE& obj = s->inv[usHandItem];
+		OBJECTTYPE& obj = s->inv[HANDPOS];
 		if (FindAttachment(&obj, DETONATOR) != ITEM_NOT_FOUND || FindAttachment(&obj, REMDETONATOR))
 		{
 			StartBombMessageBox(s, usGridNo);
@@ -971,8 +968,8 @@ void HandleSoldierDropBomb(SOLDIERTYPE* const s, INT16 const sGridNo)
 		// EXPLOSIVES GAIN (25):  Place a bomb, or buried and armed a mine
 		StatChange(*s, EXPLODEAMT, 25, FROM_SUCCESS);
 
-		INT8 const trap_lvl = EffectiveExplosive(s) / 20 + EffectiveExpLevel(s) / 3;
-		o.bTrap       = __min(trap_lvl, 10);
+		int trap_lvl = EffectiveExplosive(s) / 20 + EffectiveExpLevel(s) / 3;
+		o.bTrap       = std::min(trap_lvl, 10);
 		o.ubBombOwner = s->ubID + 2;
 
 		// we now know there is something nasty here
@@ -1476,8 +1473,7 @@ INT32 InternalAddItemToPool(INT16* const psGridNo, OBJECTTYPE* const pObject, Vi
 	if (*psGridNo == NOWHERE)
 	{
 		// Display warning.....
-		SLOGE(
-			"Item %d was given invalid grid location %d for item pool. Please Report.",
+		SLOGE("Item {} was given invalid grid location {} for item pool. Please Report.",
 			pObject->usItem, *psGridNo);
 		*psGridNo = gMapInformation.sCenterGridNo;
 		//return -1;
@@ -2066,7 +2062,7 @@ void DrawItemPoolList(const ITEM_POOL* const pItemPool, const INT8 bZLevel, cons
 		}
 
 		WORLDITEM const& wi  = GetWorldItem(i->iItemIndex);
-		ST::string txt = ShortItemNames[wi.o.usItem];
+		ST::string txt = GCM->getItem(wi.o.usItem)->getShortName();
 		ST::string buf;
 		if (wi.o.ubNumberOfObjects > 1)
 		{
@@ -2116,7 +2112,7 @@ void DrawItemPoolList(const ITEM_POOL* const pItemPool, const INT8 bZLevel, cons
 		}
 
 		WORLDITEM const&       wi  = GetWorldItem(i->iItemIndex);
-		ST::string txt = ShortItemNames[wi.o.usItem];
+		ST::string txt = GCM->getItem(wi.o.usItem)->getShortName();
 		if (wi.o.ubNumberOfObjects > 1)
 		{
 			GDirtyPrint(x, y, ST::format("{} ({})", txt, wi.o.ubNumberOfObjects));
@@ -2315,7 +2311,7 @@ SOLDIERTYPE* VerifyGiveItem(SOLDIERTYPE* const pSoldier)
 			AddItemToPool(pSoldier->sGridNo, pSoldier->pTempObject, VISIBLE, pSoldier->bLevel, 0 , -1);
 
 			// Place it on the ground!
-			ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(TacticalStr[ ITEM_HAS_BEEN_PLACED_ON_GROUND_STR ], ShortItemNames[ pSoldier->pTempObject->usItem ]) );
+			ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(TacticalStr[ ITEM_HAS_BEEN_PLACED_ON_GROUND_STR ], GCM->getItem(pSoldier->pTempObject->usItem)->getShortName()) );
 
 			// OK, disengage buddy
 			pSoldier->uiStatusFlags &= (~SOLDIER_ENGAGEDINACTION );
@@ -2471,7 +2467,7 @@ void SoldierGiveItemFromAnimation( SOLDIERTYPE *pSoldier )
 
 				// We could not place it!
 				// Drop it on the ground?
-				ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(TacticalStr[ ITEM_HAS_BEEN_PLACED_ON_GROUND_STR ], ShortItemNames[ usItemNum ]) );
+				ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(TacticalStr[ ITEM_HAS_BEEN_PLACED_ON_GROUND_STR ], GCM->getItem(usItemNum)->getShortName()) );
 
 				// OK, disengage buddy
 				pSoldier->uiStatusFlags &= (~SOLDIER_ENGAGEDINACTION );
@@ -2487,7 +2483,7 @@ void SoldierGiveItemFromAnimation( SOLDIERTYPE *pSoldier )
 				}
 
 				// OK, it's given, display message!
-				ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(TacticalStr[ ITEM_HAS_BEEN_GIVEN_TO_STR ], ShortItemNames[ usItemNum ], pTSoldier->name) );
+				ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(TacticalStr[ ITEM_HAS_BEEN_GIVEN_TO_STR ], GCM->getItem(usItemNum)->getShortName(), pTSoldier->name) );
 				if (usItemNum == MONEY)
 				{
 					// are we giving money to an NPC, to whom we owe money?
@@ -2523,12 +2519,12 @@ void SoldierGiveItemFromAnimation( SOLDIERTYPE *pSoldier )
 			// Now intiate conv
 			InitiateConversationFull(pTSoldier, pSoldier, APPROACH_GIVINGITEM, 0, &TempObject);
 		}
+
+		pTSoldier->uiStatusFlags &= (~SOLDIER_ENGAGEDINACTION );
 	}
 
 	// OK, disengage buddy
 	pSoldier->uiStatusFlags &= (~SOLDIER_ENGAGEDINACTION );
-	pTSoldier->uiStatusFlags &= (~SOLDIER_ENGAGEDINACTION );
-
 }
 
 
@@ -2575,10 +2571,8 @@ static void StartBombMessageBox(SOLDIERTYPE* const s, INT16 const gridno)
 		PlayJA2Sample(USE_STATUE_REMOTE, HIGHVOLUME, 1, MIDDLEPAN);
 
 		// Check what sector we are in....
-		if (gWorldSectorX == 3 &&
-			gWorldSectorY == MAP_ROW_O &&
-			gbWorldSectorZ == 0 &&
-			GetRoom(s->sGridNo) == 4)
+		const SGPSector sectorO3(3, MAP_ROW_O);
+		if (gWorldSector == sectorO3 && GetRoom(s->sGridNo) == 4)
 		{
 			ChangeO3SectorStatue(FALSE); // Open statue
 			DoMercBattleSound(s, BATTLE_SOUND_OK1);
@@ -2658,7 +2652,7 @@ static void BombMessageBoxCallBack(MessageBoxReturnValue const ubExitValue)
 
 			if (ArmBomb(&gpTempSoldier->inv[HANDPOS], timer))
 			{
-				gpTempSoldier->inv[ HANDPOS ].bTrap = __min( 10, ( EffectiveExplosive( gpTempSoldier ) / 20) + (EffectiveExpLevel( gpTempSoldier ) / 3) );
+				gpTempSoldier->inv[ HANDPOS ].bTrap = std::min(10, ( EffectiveExplosive( gpTempSoldier ) / 20) + (EffectiveExpLevel( gpTempSoldier ) / 3));
 				// HACK IMMINENT!
 				// value of 1 is stored in maps for SIDE of bomb owner... when we want to use IDs!
 				// so we add 2 to all owner IDs passed through here and subtract 2 later

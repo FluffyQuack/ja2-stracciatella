@@ -25,17 +25,17 @@ BOOLEAN IsTownFound(INT8 const bTownID)
 	auto town = GCM->getTown(bTownID);
 	if (!town)
 	{
-		STLOGW("Town #{} not found", bTownID);
+		SLOGW("Town #{} not found", bTownID);
 		return FALSE;
 	}
 
-	if (isSecretFound.find(town->getBaseSector()) == isSecretFound.end())
+	if (isSecretFound.find(town->getBaseSector().AsByte()) == isSecretFound.end())
 	{
 		// town is always known to the player
 		return TRUE;
 	}
 
-	return IsSecretFoundAt(town->getBaseSector());
+	return IsSecretFoundAt(town->getBaseSector().AsByte());
 }
 
 BOOLEAN IsSecretFoundAt(UINT8 const sectorID)
@@ -45,7 +45,7 @@ BOOLEAN IsSecretFoundAt(UINT8 const sectorID)
 		// The game always try to find secrets at J9 and K4, but they
 		// may not be present in a modded set up. So we will just
 		// return TRUE and continue.
-		STLOGW("No secret defined at sector {}", sectorID);
+		SLOGW("No secret defined at sector {}", sectorID);
 		return TRUE;
 	}
 	return isSecretFound[sectorID];
@@ -59,11 +59,11 @@ void SetTownAsFound(INT8 const bTownID, BOOLEAN const fFound)
 		// The game has hard-coded references to TIXA and
 		// ORTA, but they may not be present in a modded
 		// set up.
-		STLOGW("Town #{} is not defined", bTownID);
+		SLOGW("Town #{} is not defined", bTownID);
 		return;
 	}
 
-	SetSectorSecretAsFound(town->getBaseSector(), fFound);
+	SetSectorSecretAsFound(town->getBaseSector().AsByte(), fFound);
 }
 
 void SetSAMSiteAsFound( UINT8 uiSamIndex )
@@ -141,7 +141,7 @@ BOOLEAN GetMapSecretStateForSave(unsigned int const index)
 			return IsSecretFoundAt(s->sectorID);
 		}
 	}
-	STLOGW("There is no secret at slot #{}", index);
+	SLOGW("There is no secret at slot #{}", index);
 	return FALSE;  // write something to maintain save compatibility
 }
 
@@ -164,5 +164,5 @@ void SetMapSecretStateFromSave(unsigned int const index, BOOLEAN const fFound)
 			return;
 		}
 	}
-	STLOGW("There is no secret at slot #{}", index);
+	SLOGW("There is no secret at slot #{}", index);
 }

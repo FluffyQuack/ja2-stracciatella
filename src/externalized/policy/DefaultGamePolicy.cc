@@ -41,6 +41,7 @@ DefaultGamePolicy::DefaultGamePolicy(rapidjson::Document *json)
 
 	gui_extras = gp.getOptionalBool("gui_extras", true);
 	extra_attachments = gp.getOptionalBool("extra_attachments");
+	skip_sleep_explanation = gp.getOptionalBool("skip_sleep_explanation");
 
 	pablo_wont_steal = gp.getOptionalBool("pablo_wont_steal");
 
@@ -48,6 +49,12 @@ DefaultGamePolicy::DefaultGamePolicy(rapidjson::Document *json)
 	critical_damage_legs_multiplier = gp.getOptionalDouble("tactical_legs_damage_multiplier", 0.5);
 	chance_to_hit_maximum = gp.getOptionalInt("chance_to_hit_maximum", 99);
 	chance_to_hit_minimum = gp.getOptionalInt("chance_to_hit_minimum", 1);
+
+	aim_bonus_per_std_ap = gp.getOptionalInt("aim_bonus_per_std_ap", 10);
+	aim_bonus_sniperscope = gp.getOptionalInt("aim_bonus_sniperscope", 20);
+	aim_bonus_laserscope = gp.getOptionalInt("aim_bonus_laserscope", 20);
+	range_penalty_silencer = gp.getOptionalInt("range_penalty_silencer", 0);
+	range_bonus_barrel_extender = gp.getOptionalInt("range_bonus_barrel_extender", 100);
 
 	always_show_cursor_in_tactical = gp.getOptionalBool("always_show_cursor_in_tactical", true); //Fluffy (ForeverMouseCursor) (false is supposed to be default, but I set true as personal default)
 	show_hit_chance = gp.getOptionalBool("show_hit_chance", true); //Fluffy (ShowChanceToHit) (false is supposed to be default, but I set true as personal default)
@@ -84,7 +91,7 @@ DefaultGamePolicy::DefaultGamePolicy(rapidjson::Document *json)
 
 	JsonObjectReader campaign = JsonObjectReader(gp.GetValue("campaign"));
 	const char* sector_string = campaign.getOptionalString("start_sector");
-	start_sector = SECTOR_FROM_SECTOR_SHORT_STRING(sector_string != NULL ? sector_string : "A9");
+	start_sector = SGPSector::FromShortString(sector_string != nullptr ? sector_string : "A9").AsByte();
 	reveal_start_sector = campaign.getOptionalBool("start_sector_revealed", false);
 }
 

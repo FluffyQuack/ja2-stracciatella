@@ -26,7 +26,6 @@
 #include "Options_Screen.h"
 #include "Debug.h"
 #include "Video.h"
-#include "MemMan.h"
 #include "Button_System.h"
 #include "Font_Control.h"
 #include "UILayout.h"
@@ -62,8 +61,8 @@ void InitializeGame(void)
 
 	InitTacticalSave();
 
-	SLOGI("Version Label: %s", g_version_label);
-	SLOGI("Version #:     %s", g_version_number);
+	SLOGI("Version Label: {}", g_version_label);
+	SLOGI("Version #:     {}", g_version_number);
 
 	// Initialize Game Screens.
 	for (uiIndex = 0; uiIndex < MAX_SCREENS; uiIndex++)
@@ -120,12 +119,17 @@ try
 	SGPPoint MousePos;
 	GetMousePos(&MousePos);
 	// Hook into mouse stuff for MOVEMENT MESSAGES
-	MouseSystemHook(MOUSE_POS, MousePos.iX, MousePos.iY);
+	MouseSystemHook(MOUSE_POS, 0, MousePos.iX, MousePos.iY);
 	MusicPoll();
 
+	HandleSingleClicksAndButtonRepeats();
 	while (DequeueSpecificEvent(&InputEvent, MOUSE_EVENTS))
 	{
-		MouseSystemHook(InputEvent.usEvent, MousePos.iX, MousePos.iY);
+		MouseSystemHook(InputEvent.usEvent, InputEvent.usParam, MousePos.iX, MousePos.iY);
+	}
+	while (DequeueSpecificEvent(&InputEvent, TOUCH_EVENTS))
+	{
+		MouseSystemHook(InputEvent.usEvent, InputEvent.usParam, MousePos.iX, MousePos.iY);
 	}
 
 
@@ -222,8 +226,8 @@ catch (std::exception const& e)
 {
 	guiPreviousOptionScreen = guiCurrentScreen;
 	char const* what;
-	char const* success = "failed";
-	char const* attach  = "";
+	ST::string success = "failed";
+	char const* attach = "";
 
 	if (gfEditMode && GameMode::getInstance()->isEditorMode())
 	{
@@ -240,7 +244,7 @@ catch (std::exception const& e)
 		auto saveName = GetErrorSaveName();
 		if (SaveGame(saveName, "error savegame"))
 		{
-			success = ST::format("succeeded ({}.sav)", saveName).c_str();
+			success = ST::format("succeeded ({}.sav)", saveName);
 			attach  = " Do not forget to attach the savegame.";
 		}
 	}
@@ -249,7 +253,7 @@ catch (std::exception const& e)
 		"%s\n"
 		"Creating an emergency %s %s.\n"
 		"Please report this error with a description of the circumstances.%s",
-		e.what(), what, success, attach
+		e.what(), what, success.c_str(), attach
 	);
 	throw std::runtime_error(msg);
 }

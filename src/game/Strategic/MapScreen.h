@@ -53,7 +53,7 @@ void ReBuildCharactersList( void );
 void HandlePreloadOfMapGraphics(void);
 void HandleRemovalOfPreLoadedMapGraphics( void );
 
-void ChangeSelectedMapSector( INT16 sMapX, INT16 sMapY, INT8 bMapZ );
+void ChangeSelectedMapSector(const SGPSector& sector);
 
 BOOLEAN CanExtendContractForSoldier(const SOLDIERTYPE* s);
 
@@ -91,7 +91,6 @@ void RebuildContractBoxForMerc(const SOLDIERTYPE* s);
 
 void    InternalMAPBeginItemPointer(SOLDIERTYPE* pSoldier);
 BOOLEAN ContinueDialogue(SOLDIERTYPE* pSoldier, BOOLEAN fDone);
-BOOLEAN GetMouseMapXY(INT16* psMapWorldX, INT16* psMapWorldY);
 void    EndConfirmMapMoveMode(void);
 BOOLEAN CanDrawSectorCursor(void);
 void    RememberPreviousPathForAllSelectedChars(void);
@@ -108,6 +107,7 @@ extern BOOLEAN      fShowDescriptionFlag;
 extern GUIButtonRef giMapContractButton;
 extern GUIButtonRef giCharInfoButton[2];
 extern BOOLEAN      fDrawCharacterList;
+extern SGPSector    gsHighlightSector;
 
 // create/destroy inventory button as needed
 void CreateDestroyMapInvButton(void);

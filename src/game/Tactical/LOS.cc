@@ -1,4 +1,5 @@
-#include <math.h>
+#include <cmath>
+
 #include "Font_Control.h"
 #include "Handle_Items.h"
 #include "Structure.h"
@@ -206,14 +207,13 @@ static FLOAT FixedToFloat(FIXEDPT qN)
 
 static FLOAT Distance3D(FLOAT dDeltaX, FLOAT dDeltaY, FLOAT dDeltaZ)
 {
-	return ((FLOAT) sqrt( (DOUBLE)(dDeltaX * dDeltaX) +
-			(DOUBLE)(dDeltaY * dDeltaY) + (DOUBLE)(dDeltaZ * dDeltaZ)));
+	return (FLOAT) std::hypot(dDeltaX, dDeltaY, dDeltaZ);
 }
 
 
 static FLOAT Distance2D(FLOAT dDeltaX, FLOAT dDeltaY)
 {
-	return( (FLOAT) sqrt( (DOUBLE)(dDeltaX * dDeltaX) + (DOUBLE)(dDeltaY * dDeltaY) ));
+	return (FLOAT) std::hypot(dDeltaX, dDeltaY);
 }
 
 enum LocationCode
@@ -919,7 +919,7 @@ static INT32 LineOfSightTest(GridNo start_pos, FLOAT dStartZ, GridNo end_pos, FL
 					iStepsToTravelY = 1000000;
 				}
 
-				iStepsToTravel = __min( iStepsToTravelX, iStepsToTravelY ) + 1;
+				iStepsToTravel = std::min( iStepsToTravelX, iStepsToTravelY ) + 1;
 
 				/*
 				if (qIncrX > 0)
@@ -955,7 +955,7 @@ static INT32 LineOfSightTest(GridNo start_pos, FLOAT dStartZ, GridNo end_pos, FL
 				}
 
 				// add 1 to the # of steps to travel to go INTO the next tile
-				iStepsToTravel = __min( iStepsToTravelX, iStepsToTravelY ) + 1;
+				iStepsToTravel = std::min( iStepsToTravelX, iStepsToTravelY ) + 1;
 				//iStepsToTravel = 1;*/
 
 				qCurrX += qIncrX * iStepsToTravel;
@@ -1496,7 +1496,7 @@ INT32 SoldierToSoldierLineOfSightTest(const SOLDIERTYPE* const pStartSoldier, co
 	FLOAT dStartZPos, dEndZPos;
 	BOOLEAN fOk;
 	BOOLEAN fSmell;
-	INT8 bEffectiveCamo;
+	int bEffectiveCamo;
 	UINT8 ubTreeReduction;
 
 	// TO ADD: if target is camouflaged and in cover, reduce sight distance by 30%
@@ -1506,7 +1506,7 @@ INT32 SoldierToSoldierLineOfSightTest(const SOLDIERTYPE* const pStartSoldier, co
 	fOk = CalculateSoldierZPos( pStartSoldier, LOS_POS, &dStartZPos );
 	CHECKF( fOk );
 
-	if ( gWorldSectorX == 5 && gWorldSectorY == MAP_ROW_N )
+	if (gWorldSector.x == 5 && gWorldSector.y == MAP_ROW_N)
 	{
 		// in the bloodcat arena sector, skip sight between army & bloodcats
 		if ( pStartSoldier->bTeam == ENEMY_TEAM && pEndSoldier->bTeam == CREATURE_TEAM )
@@ -1573,7 +1573,7 @@ INT32 SoldierToSoldierLineOfSightTest(const SOLDIERTYPE* const pStartSoldier, co
 		{
 			bEffectiveCamo = pEndSoldier->bCamo * (100 - pEndSoldier->bTilesMoved * 5) / 100;
 		}
-		bEffectiveCamo = __max( bEffectiveCamo, 0 );
+		bEffectiveCamo = std::max(bEffectiveCamo, 0);
 
 		if ( gAnimControl[ pEndSoldier->usAnimState ].ubEndHeight < ANIM_STAND )
 		{
@@ -1775,7 +1775,7 @@ INT32 BulletImpactReducedByRange( INT32 iImpact, INT32 iDistanceTravelled, INT32
 	return( iImpact );
 
 	// only start reducing impact at distances greater than one range
-	//return( __max( 1, iImpact * ( 100 - ( PERCENT_BULLET_SLOWED_BY_RANGE * iDistanceTravelled ) / iRange ) / 100 ) );
+	//return( std::max(1, iImpact * ( 100 - ( PERCENT_BULLET_SLOWED_BY_RANGE * iDistanceTravelled ) / iRange ) / 100 ));
 
 }*/
 
@@ -2113,7 +2113,7 @@ static BOOLEAN BulletHitMerc(BULLET* pBullet, STRUCTURE* pStructure, BOOLEAN fIn
 		{
 			iImpact = iDamage;
 		}
-		uiChanceThrough = (UINT8) __max( 0, ( iImpact - 20 ) );
+		uiChanceThrough = (UINT8) std::max(0, ( iImpact - 20 ));
 		if (PreRandom( 100 ) < uiChanceThrough )
 		{
 			// bullet MAY go through
@@ -2180,18 +2180,6 @@ static BOOLEAN BulletHitMerc(BULLET* pBullet, STRUCTURE* pStructure, BOOLEAN fIn
 	// handle hit!
 	WeaponHit(&tgt, pFirer->usAttackingWeapon, iDamage, breath_loss, hit_direction, tgt.dXPos, tgt.dYPos, 20, sRange, pFirer, ubSpecial, ubHitLocation);
 	return( fStopped );
-}
-
-
-static void BulletHitStructure(BULLET* pBullet, UINT16 usStructureID, INT32 iImpact, BOOLEAN fStopped)
-{
-	const FIXEDPT qCurrX = pBullet->qCurrX;
-	const FIXEDPT qCurrY = pBullet->qCurrY;
-	const FIXEDPT qCurrZ = pBullet->qCurrZ;
-	INT16 sXPos = FIXEDPT_TO_INT32(qCurrX + FloatToFixed(0.5f)); // + 0.5);
-	INT16 sYPos = FIXEDPT_TO_INT32(qCurrY + FloatToFixed(0.5f)); // (dCurrY + 0.5);
-	INT16 sZPos = CONVERT_HEIGHTUNITS_TO_PIXELS((INT16)FIXEDPT_TO_INT32(qCurrZ + FloatToFixed(0.5f)));// dCurrZ + 0.5) );
-	StructureHit(pBullet, sXPos, sYPos, sZPos, usStructureID, iImpact, fStopped);
 }
 
 
@@ -2300,17 +2288,9 @@ static INT32 HandleBulletStructureInteraction(BULLET* pBullet, STRUCTURE* pStruc
 
 				ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, TacticalStr[ LOCK_HAS_BEEN_HIT ] );
 
-				pDoor->bLockDamage+= sLockDamage;
-
 				// Check if it has been shot!
-				if ( pDoor->bLockDamage > LockTable[ pDoor->ubLockID ].ubSmashDifficulty )
+				if (pDoor->damageLock(sLockDamage))
 				{
-					// Display message!
-					ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, TacticalStr[ LOCK_HAS_BEEN_DESTROYED ] );
-
-					// succeeded! door can never be locked again, so remove from door list...
-					RemoveDoorInfoFromTable( pDoor->sGridNo );
-
 					// MARKSMANSHIP GAIN (marksPts): Opened/Damaged a door
 					StatChange(*pBullet->pFirer, MARKAMT, 10, FROM_SUCCESS);
 				}
@@ -2471,7 +2451,7 @@ static UINT8 CalcChanceToGetThrough(BULLET* pBullet)
 		// check a particular tile
 		// retrieve values from world for this particular tile
 		iGridNo = pBullet->iCurrTileX + pBullet->iCurrTileY * WORLD_COLS;
-		STLOGD("CTGT now at {}", iGridNo);
+		SLOGD("CTGT now at {}", iGridNo);
 		pMapElement = &(gpWorldLevelData[ iGridNo ] );
 		qLandHeight = INT32_TO_FIXEDPT( CONVERT_PIXELS_TO_HEIGHTUNITS( pMapElement->sHeight ) );
 		qWallHeight = gqStandardWallHeight + qLandHeight;
@@ -2692,7 +2672,7 @@ static UINT8 CalcChanceToGetThrough(BULLET* pBullet)
 				}
 
 				// add 1 to the # of steps to travel to go INTO the next tile
-				iStepsToTravel = __min( iStepsToTravelX, iStepsToTravelY ) + 1;
+				iStepsToTravel = std::min( iStepsToTravelX, iStepsToTravelY ) + 1;
 
 				pBullet->qCurrX += pBullet->qIncrX * iStepsToTravel;
 				pBullet->qCurrY += pBullet->qIncrY * iStepsToTravel;
@@ -2713,8 +2693,7 @@ static UINT8 CalcChanceToGetThrough(BULLET* pBullet)
 				pBullet->bLOSIndexX = FIXEDPT_TO_LOS_INDEX( pBullet->qCurrX );
 				pBullet->bLOSIndexY = FIXEDPT_TO_LOS_INDEX( pBullet->qCurrY );
 
-				SLOGD(ST::format("CTGT at {} {} after traversing empty tile",
-					pBullet->bLOSIndexX, pBullet->bLOSIndexY));
+				SLOGD("CTGT at {} {} after traversing empty tile", pBullet->bLOSIndexX, pBullet->bLOSIndexY);
 			}
 			else
 			{
@@ -2827,9 +2806,9 @@ static UINT8 CalcChanceToGetThrough(BULLET* pBullet)
 				}
 				while( (pBullet->bLOSIndexX == bOldLOSIndexX) && (pBullet->bLOSIndexY == bOldLOSIndexY) && (pBullet->iCurrCubesZ == iOldCubesZ));
 
-				SLOGD(ST::format("CTGT at {} {} {} after moving in nonempty tile from {} {} {}",
+				SLOGD("CTGT at {} {} {} after moving in nonempty tile from {} {} {}",
 					pBullet->bLOSIndexX, pBullet->bLOSIndexY, pBullet->iCurrCubesZ,
-					bOldLOSIndexX, bOldLOSIndexY, iOldCubesZ));
+					bOldLOSIndexX, bOldLOSIndexY, iOldCubesZ);
 				pBullet->iCurrTileX = FIXEDPT_TO_INT32( pBullet->qCurrX ) / CELL_X_SIZE;
 				pBullet->iCurrTileY = FIXEDPT_TO_INT32( pBullet->qCurrY ) / CELL_Y_SIZE;
 			}
@@ -2861,7 +2840,7 @@ static UINT8 CalcChanceToGetThrough(BULLET* pBullet)
 					iTotalStructureImpact = CTGTHandleBulletStructureInteraction( pBullet, gpLocalStructure[iStructureLoop] ) * gubLocalStructureNumTimesHit[iStructureLoop];
 
 					// reduce the impact reduction of a structure tile to that of the bullet, since it can't do MORE than stop it.
-					iTotalStructureImpact = __min( iTotalStructureImpact, pBullet->iImpact );
+					iTotalStructureImpact = std::min(iTotalStructureImpact, pBullet->iImpact);
 
 					// add to "impact reduction" based on strength of structure weighted by probability of hitting it
 					pBullet->iImpactReduction += (iTotalStructureImpact * guiLocalStructureCTH[iStructureLoop]) / 100;
@@ -3698,7 +3677,7 @@ void MoveBullet(BULLET* const pBullet)
 					{
 						// hit a roof
 						StopBullet(pBullet);
-						BulletHitStructure(pBullet, 0, 0, TRUE);
+						StructureHit(pBullet, INVALID_STRUCTURE_ID, 0, TRUE);
 						return;
 					}
 
@@ -3903,7 +3882,7 @@ void MoveBullet(BULLET* const pBullet)
 			{
 				// ground is in the way!
 				StopBullet(pBullet);
-				BulletHitStructure(pBullet, INVALID_STRUCTURE_ID, 0, TRUE);
+				StructureHit(pBullet, INVALID_STRUCTURE_ID, 0, TRUE);
 				return;
 			}
 			// check for the existence of structures
@@ -3950,19 +3929,19 @@ void MoveBullet(BULLET* const pBullet)
 				}
 
 				// add 1 to the # of steps to travel to go INTO the next tile
-				iStepsToTravel = __min( iStepsToTravelX, iStepsToTravelY ) + 1;
+				iStepsToTravel = std::min( iStepsToTravelX, iStepsToTravelY ) + 1;
 
 				// special coding (compared with other versions above) to deal with
 				// bullets hitting the ground
 				if (pBullet->qCurrZ + pBullet->qIncrZ * iStepsToTravel < qLandHeight)
 				{
-					iStepsToTravel = __min( iStepsToTravel, ABS( (pBullet->qCurrZ - qLandHeight) / pBullet->qIncrZ ) );
+					iStepsToTravel = std::min(iStepsToTravel, INT32(std::abs((pBullet->qCurrZ - qLandHeight) / pBullet->qIncrZ)));
 					pBullet->qCurrX += pBullet->qIncrX * iStepsToTravel;
 					pBullet->qCurrY += pBullet->qIncrY * iStepsToTravel;
 					pBullet->qCurrZ += pBullet->qIncrZ * iStepsToTravel;
 
 					StopBullet(pBullet);
-					BulletHitStructure(pBullet, INVALID_STRUCTURE_ID, 0, TRUE);
+					StructureHit(pBullet, INVALID_STRUCTURE_ID, 0, TRUE);
 					return;
 				}
 
@@ -4121,7 +4100,7 @@ void MoveBullet(BULLET* const pBullet)
 
 												// bullet must end here!
 												StopBullet(pBullet);
-												BulletHitStructure(pBullet, pStructure->usStructureID, 1, TRUE);
+												StructureHit(pBullet, pStructure->usStructureID, 1, TRUE);
 												return;
 											}
 										}
@@ -4180,13 +4159,13 @@ void MoveBullet(BULLET* const pBullet)
 											else if ( iRemainingImpact <= 0 )
 											{
 												StopBullet(pBullet);
-												BulletHitStructure(pBullet, pStructure->usStructureID, 1, TRUE);
+												StructureHit(pBullet, pStructure->usStructureID, 1, TRUE);
 												return;
 											}
 											else if (fHitStructure && (gubLocalStructureNumTimesHit[iStructureLoop] == 0) )
 											{
 												// play animation to indicate structure being hit
-												BulletHitStructure(pBullet, pStructure->usStructureID, 1, FALSE);
+												StructureHit(pBullet, pStructure->usStructureID, 1, FALSE);
 												gubLocalStructureNumTimesHit[iStructureLoop] = 1;
 											}
 										}
@@ -4217,7 +4196,7 @@ void MoveBullet(BULLET* const pBullet)
 							if ( 1 /*HandleBulletStructureInteraction( pBullet, pRoofStructure, &fHitStructure ) <= 0 */)
 							{
 								StopBullet(pBullet);
-								BulletHitStructure(pBullet, 0, 0, TRUE);
+								StructureHit(pBullet, INVALID_STRUCTURE_ID, 0, TRUE);
 								return;
 							}
 							/*
@@ -4315,12 +4294,8 @@ INT32 CheckForCollision(FLOAT dX, FLOAT dY, FLOAT dZ, FLOAT dDeltaX, FLOAT dDelt
 	STRUCTURE * pStructure, *pTempStructure;
 
 	SOLDIERTYPE * pTarget;
-	//FLOAT dTargetX;
-	//FLOAT dTargetY;
 	FLOAT dTargetZMin;
 	FLOAT dTargetZMax;
-
-	//INT8 iImpactReduction;
 
 	INT16 sX, sY;
 
@@ -4332,15 +4307,10 @@ INT32 CheckForCollision(FLOAT dX, FLOAT dY, FLOAT dZ, FLOAT dDeltaX, FLOAT dDelt
 	sX = (INT16)( dX / CELL_X_SIZE );
 	sY = (INT16)( dY / CELL_Y_SIZE );
 
-	// Check if gridno is in bounds....
-	if ( !GridNoOnVisibleWorldTile( (INT16) (sX + sY * WORLD_COLS) ) )
+	if (sX < 0 || sX >= WORLD_COLS || sY < 0 || sY >= WORLD_ROWS)
 	{
-		//return( COLLISION_NONE );
-	}
-
-	if ( sX < 0 || sX > WORLD_COLS || sY < 0 || sY > WORLD_COLS )
-	{
-		//return( COLLISION_NONE );
+		SLOGW("CheckForCollision coordinates out of bounds");
+		return COLLISION_NONE;
 	}
 
 	// check a particular tile

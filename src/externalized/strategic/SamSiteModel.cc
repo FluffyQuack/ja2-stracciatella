@@ -17,10 +17,9 @@ SamSiteModel::SamSiteModel(uint8_t sectorId_, std::array<GridNo, 2> gridNos_)
 	graphicIndex = (gridNos[0] - gridNos[1] == WORLD_COLS) ? SAM_GRAPHIC_INDEX_NE_SW : SAM_GRAPHIC_INDEX_NW_SE;
 }
 
-const bool SamSiteModel::doesSamExistHere(INT16 const x, INT16 const y, GridNo const gridNo) const
+const bool SamSiteModel::doesSamExistHere(const SGPSector& sector, GridNo const gridNo) const
 {
-	return x == SECTORX(sectorId) 
-		&& y == SECTORY(sectorId) 
+	return sector == SGPSector(sectorId)
 		&& std::find(gridNos.begin(), gridNos.end(), gridNo) != gridNos.end()
 	;
 }
@@ -57,7 +56,7 @@ void SamSiteModel::validateData(const std::vector<const SamSiteModel*>& models)
 	if (models.size() != NUMBER_OF_SAMS)
 	{
 		// Game saves, Skyrider and Meanwhile dialogues all assume 4 SAM sites
-		STLOGE("There must be exactly {} SAM sites defined", NUMBER_OF_SAMS);
+		SLOGE("There must be exactly {} SAM sites defined", NUMBER_OF_SAMS);
 		throw std::runtime_error("Unexpected number of SAM sites");
 	}
 }

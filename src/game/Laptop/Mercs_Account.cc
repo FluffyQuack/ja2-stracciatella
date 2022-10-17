@@ -93,8 +93,8 @@ static GUIButtonRef MakeButton(const ST::string& text, INT16 x, GUI_CALLBACK cli
 }
 
 
-static void BtnMercAuthorizeButtonCallback(GUI_BUTTON* btn, INT32 reason);
-static void BtnMercBackButtonCallback(GUI_BUTTON* btn, INT32 reason);
+static void BtnMercAuthorizeButtonCallback(GUI_BUTTON* btn, UINT32 reason);
+static void BtnMercBackButtonCallback(GUI_BUTTON* btn, UINT32 reason);
 
 
 void EnterMercsAccount()
@@ -186,9 +186,9 @@ void RenderMercsAccount()
 static void MercAuthorizePaymentMessageBoxCallBack(MessageBoxReturnValue);
 
 
-static void BtnMercAuthorizeButtonCallback(GUI_BUTTON *btn, INT32 reason)
+static void BtnMercAuthorizeButtonCallback(GUI_BUTTON *btn, UINT32 reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		ST::string wzAuthorizeString;
 		ST::string wzDollarAmount;
@@ -203,9 +203,9 @@ static void BtnMercAuthorizeButtonCallback(GUI_BUTTON *btn, INT32 reason)
 }
 
 
-static void BtnMercBackButtonCallback(GUI_BUTTON *btn, INT32 reason)
+static void BtnMercBackButtonCallback(GUI_BUTTON *btn, UINT32 reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		guiCurrentLaptopMode = LAPTOP_MODE_MERC;
 		gubArrivedFromMercSubSite = MERC_CAME_FROM_ACCOUNTS_PAGE;
@@ -305,7 +305,7 @@ static void SettleMercAccounts(void)
 
 	// add the transaction to the finance page
 	AddTransactionToPlayersBook( PAY_SPECK_FOR_MERC, GetProfileIDFromMERCListingIndex( gubCurMercIndex ), GetWorldTotalMin(), -iPartialPayment );
-	AddHistoryToPlayersLog( HISTORY_SETTLED_ACCOUNTS_AT_MERC, GetProfileIDFromMERCListingIndex( gubCurMercIndex ), GetWorldTotalMin(), -1, -1 );
+	AddHistoryToPlayersLog(HISTORY_SETTLED_ACCOUNTS_AT_MERC, GetProfileIDFromMERCListingIndex( gubCurMercIndex ), GetWorldTotalMin(), SGPSector(-1, -1));
 
 	//Increment the amount of money paid to speck
 	LaptopSaveInfo.uiTotalMoneyPaidToSpeck += iPartialPayment;
@@ -371,7 +371,7 @@ static void SettleMercAccounts(void)
 		{
 			// add the transaction to the finance page
 			AddTransactionToPlayersBook( PAY_SPECK_FOR_MERC, GetMercIDFromMERCArray( gubCurMercIndex ), GetWorldTotalMin(), -iPartialPayment );
-			AddHistoryToPlayersLog( HISTORY_SETTLED_ACCOUNTS_AT_MERC, GetMercIDFromMERCArray( gubCurMercIndex ), GetWorldTotalMin(), -1, -1 );
+			AddHistoryToPlayersLog(HISTORY_SETTLED_ACCOUNTS_AT_MERC, GetMercIDFromMERCArray( gubCurMercIndex ), GetWorldTotalMin(), SGPSector(-1, -1));
 		}
 
 
@@ -387,7 +387,7 @@ static void SettleMercAccounts(void)
 
 	// add the transaction to the finance page
 	AddTransactionToPlayersBook( PAY_SPECK_FOR_MERC, GetMercIDFromMERCArray( gubCurMercIndex ), GetWorldTotalMin(), -giMercTotalContractCharge);
-	AddHistoryToPlayersLog( HISTORY_SETTLED_ACCOUNTS_AT_MERC, GetMercIDFromMERCArray( gubCurMercIndex ), GetWorldTotalMin(), -1, -1 );
+	AddHistoryToPlayersLog(HISTORY_SETTLED_ACCOUNTS_AT_MERC, GetMercIDFromMERCArray( gubCurMercIndex ), GetWorldTotalMin(), SGPSector(-1, -1));
 
 	//reset all the mercs time
 	for(i=0; i<NUMBER_OF_MERCS; i++)

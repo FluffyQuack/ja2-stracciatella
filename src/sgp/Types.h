@@ -10,11 +10,11 @@
 #include "Logger.h"
 
 #define UNIMPLEMENTED \
-	SLOGA("===> %s:%d: %s() is not implemented", __FILE__, __LINE__, __func__);
+	SLOGA("===> {}:{}: {}() is not implemented", __FILE__, __LINE__, __func__);
 
 #ifdef WITH_FIXMES
 	#define FIXME \
-		SLOGE("===> %s:%d: %s() FIXME", __FILE__, __LINE__, __func__);
+		SLOGE("===> {}:{}: {}() FIXME", __FILE__, __LINE__, __func__);
 #else
 	#define FIXME (void)0;
 #endif
@@ -22,11 +22,6 @@
 
 #define lengthof(a) (sizeof(a) / sizeof(a[0]))
 #define endof(a) ((a) + lengthof(a))
-
-
-#define ABS(a) (UINT16)abs(int(a))
-#define MAX(a, b) __max(a, b)
-#define MIN(a, b) __min(a, b)
 
 #define FOR_EACHX(type, iter, array, x) for (type* iter = (array); iter != endof((array)); (x), ++iter)
 #define FOR_EACH(type, iter, array)     FOR_EACHX(type, iter, (array), (void)0)
@@ -77,10 +72,6 @@ typedef CHAR8 SGPFILENAME[SGPFILENAME_LEN];
 
 #define PI 3.1415926
 
-#ifndef NULL
-#define NULL 0
-#endif
-
 struct SGPBox
 {
 	UINT16 x;
@@ -125,6 +116,39 @@ struct SGPPoint
 	}
 };
 
+class SGPSector
+{
+public:
+	INT16 x = 0;
+	INT16 y = 0;
+	INT8 z = 0;
+
+	SGPSector() noexcept = default;
+	SGPSector(INT16 a, INT16 b, INT8 c = 0) noexcept : x(a), y(b), z(c) {};
+	SGPSector(const SGPSector&) noexcept = default;
+	SGPSector(UINT32 s) noexcept; // normal FromSectorID
+	static SGPSector FromStrategicIndex(UINT16 idx);
+	static SGPSector FromShortString(const ST::string coordinates, INT8 h = 0);
+	static SGPSector FromSectorID(UINT32 s, INT8 h);
+
+	bool operator==(const SGPSector&) const noexcept;
+	bool operator!=(const SGPSector&) const noexcept;
+	bool operator<(const SGPSector&) const noexcept;
+	SGPSector operator+(const SGPSector&) const noexcept;
+	SGPSector operator-(const SGPSector&) const noexcept;
+	SGPSector& operator+=(const SGPSector&) noexcept;
+	SGPSector& operator-=(const SGPSector&) noexcept;
+
+	bool IsValid() const noexcept;
+	bool IsValid(ST::string shortString) const noexcept;
+	UINT8 AsByte() const;
+	UINT16 AsStrategicIndex() const;
+	ST::string AsShortString() const;
+	ST::string AsLongString(bool file = false) const;
+};
+
+// String formatting for SGP sector
+void format_type(const ST::format_spec &format, ST::format_writer &output, const SGPSector &value);
 
 struct SDL_Color;
 typedef SDL_Color SGPPaletteEntry;
@@ -183,5 +207,6 @@ namespace _Types
 
 typedef _Types::BoxedValue<BOOLEAN> BOOLEAN_S;
 typedef _Types::BoxedValue<UINT8>   UINT8_S;
+typedef _Types::BoxedValue<UINT32>  UINT32_S;
 
 #endif

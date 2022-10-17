@@ -47,7 +47,7 @@ void InitSquads()
 		std::fill_n(Squad[iCounter].begin(), gamepolicy(squad_size), nullptr);
 
 		// create mvt groups
-		GROUP* const g = CreateNewPlayerGroupDepartingFromSector(1, 1);
+		GROUP* const g = CreateNewPlayerGroupDepartingFromSector(SGPSector(1, 1));
 		g->fPersistant = TRUE;
 		SquadMovementGroups[iCounter] = g->ubGroupID;
 
@@ -116,11 +116,8 @@ BOOLEAN AddCharacterToSquad(SOLDIERTYPE* const s, INT8 const bSquadValue)
 		// free slot, add here
 
 		// check if squad empty, if not check sector x,y,z are the same as this guys
-		INT16 sX;
-		INT16 sY;
-		INT8  bZ;
-		if (SectorSquadIsIn(bSquadValue, &sX, &sY, &bZ) &&
-			(s->sSectorX != sX || s->sSectorY != sY || s->bSectorZ != bZ))
+		SGPSector sMap;
+		if (SectorSquadIsIn(bSquadValue, sMap) && sMap != s->sSector)
 		{
 			return FALSE;
 		}
@@ -149,7 +146,7 @@ BOOLEAN AddCharacterToSquad(SOLDIERTYPE* const s, INT8 const bSquadValue)
 		if (s->bAssignment != VEHICLE || s->iVehicleId == -1)
 		{
 			AddPlayerToGroup(g, *s);
-			SetGroupSectorValue(s->sSectorX, s->sSectorY, s->bSectorZ, g);
+			SetGroupSectorValue(s->sSector, g);
 		}
 		else if (InHelicopter(*s))
 		{
@@ -159,7 +156,7 @@ BOOLEAN AddCharacterToSquad(SOLDIERTYPE* const s, INT8 const bSquadValue)
 			RemoveSoldierFromHelicopter(s);
 
 			AddPlayerToGroup(g, *s);
-			SetGroupSectorValue(s->sSectorX, s->sSectorY, s->bSectorZ, g);
+			SetGroupSectorValue(s->sSector, g);
 
 			// if we've just started a new squad
 			if (fNewSquad)
@@ -170,7 +167,7 @@ BOOLEAN AddCharacterToSquad(SOLDIERTYPE* const s, INT8 const bSquadValue)
 				if (pGroup)
 				{
 					// set where it is and where it's going, then make it arrive there.  Don't check for battle
-					PlaceGroupInSector(g, pGroup->ubPrevX, pGroup->ubPrevY, pGroup->ubSectorX, pGroup->ubSectorY, pGroup->ubSectorZ, false); // XXX TODO001D
+					PlaceGroupInSector(g, pGroup->ubPrev, pGroup->ubSector, false); // XXX TODO001D
 				}
 			}
 		}
@@ -182,7 +179,7 @@ BOOLEAN AddCharacterToSquad(SOLDIERTYPE* const s, INT8 const bSquadValue)
 			fExitingVehicleToSquad = FALSE;
 
 			AddPlayerToGroup(g, *s);
-			SetGroupSectorValue(s->sSectorX, s->sSectorY, s->bSectorZ, g);
+			SetGroupSectorValue(s->sSector, g);
 		}
 
 		*i = s;
@@ -197,7 +194,8 @@ BOOLEAN AddCharacterToSquad(SOLDIERTYPE* const s, INT8 const bSquadValue)
 		// set squad value
 		ChangeSoldiersAssignment(s, bSquadValue);
 
-		if (SquadIsEmpty(iCurrentTacticalSquad)) SetCurrentSquad(bSquadValue, TRUE);
+		// update selected squad if the old one is emptied
+		if (iCurrentTacticalSquad == NO_CURRENT_SQUAD || SquadIsEmpty(iCurrentTacticalSquad)) SetCurrentSquad(bSquadValue, TRUE);
 
 		if (bSquadValue == iCurrentTacticalSquad) CheckForAndAddMercToTeamPanel(s);
 
@@ -265,8 +263,13 @@ INT8 AddCharacterToUniqueSquad(SOLDIERTYPE* const s)
 }
 
 
-BOOLEAN SquadIsEmpty( INT8 bSquadValue )
+BOOLEAN SquadIsEmpty(INT8 bSquadValue)
 {
+	if (bSquadValue < 0 || bSquadValue >= NUMBER_OF_SQUADS)
+	{
+		throw std::logic_error("invalid squad number");
+	}
+
 	// run through this squad's slots and find if they ALL are empty
 	FOR_EACH_IN_SQUAD(i, bSquadValue)
 	{
@@ -301,7 +304,7 @@ BOOLEAN RemoveCharacterFromSquads(SOLDIERTYPE* const s)
 
 			if (s->fBetweenSectors && s->uiStatusFlags & SOLDIER_VEHICLE)
 			{
-				GROUP& g = *CreateNewPlayerGroupDepartingFromSector(s->sSectorX, s->sSectorY);
+				GROUP& g = *CreateNewPlayerGroupDepartingFromSector(s->sSector);
 				AddPlayerToGroup(g, *s);
 			}
 
@@ -384,7 +387,7 @@ BOOLEAN IsRobotControllerInSquad( INT8 bSquadValue )
 }
 
 
-BOOLEAN SectorSquadIsIn(const INT8 bSquadValue, INT16* const sMapX, INT16* const sMapY, INT8* const sMapZ)
+BOOLEAN SectorSquadIsIn(const INT8 bSquadValue, SGPSector& sMap)
 {
 	// returns if there is anyone on the squad and what sector ( strategic ) they are in
 	Assert( bSquadValue < ON_DUTY );
@@ -393,9 +396,7 @@ BOOLEAN SectorSquadIsIn(const INT8 bSquadValue, INT16* const sMapX, INT16* const
 	{
 		SOLDIERTYPE const* const s = *i;
 		// if valid soldier, get current sector and return
-		*sMapX = s->sSectorX;
-		*sMapY = s->sSectorY;
-		*sMapZ = s->bSectorZ;
+		sMap = s->sSector;
 		return TRUE;
 	}
 
@@ -584,11 +585,7 @@ BOOLEAN IsSquadOnCurrentTacticalMap( INT32 iCurrentSquad )
 	FOR_EACH_IN_SQUAD(i, iCurrentSquad)
 	{
 		SOLDIERTYPE const* const s = *i;
-		// ATE; Added more checks here for being in sector ( fBetweenSectors and SectorZ )
-		if (s->sSectorX == gWorldSectorX  &&
-				s->sSectorY == gWorldSectorY  &&
-				s->bSectorZ == gbWorldSectorZ &&
-				!s->fBetweenSectors)
+		if (s->sSector == gWorldSector && !s->fBetweenSectors)
 		{
 			return( TRUE );
 		}
@@ -914,7 +911,7 @@ void CheckSquadMovementGroups()
 		if (GetGroup(*i)) continue;
 
 		// recreate group
-		GROUP* const g = CreateNewPlayerGroupDepartingFromSector(1, 1);
+		GROUP* const g = CreateNewPlayerGroupDepartingFromSector(SGPSector(1, 1));
 		g->fPersistant = TRUE;
 		*i = g->ubGroupID;
 	}

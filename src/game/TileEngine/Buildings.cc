@@ -186,12 +186,12 @@ static BUILDING* GenerateBuilding(INT16 sDesiredSpot)
 			gsCoverValue[sCurrGridNo]++;
 		}
 
-		SLOGD("Roof code visits %d", sCurrGridNo);
+		SLOGD("Roof code visits {}", sCurrGridNo);
 #endif
 		if (sCurrGridNo == sPrevGridNo)
 		{
 			// not progressing, we are just repeating the same gridNo
-			STLOGW("Dead loop detected in GenerateBuilding. This may indicate a problem with the current map. Probably reached edge of map. (starting GridNo:{})", sStartGridNo);
+			SLOGW("Dead loop detected in GenerateBuilding. This may indicate a problem with the current map. Probably reached edge of map. (starting GridNo:{})", sStartGridNo);
 			break;
 		}
 
@@ -384,7 +384,7 @@ void GenerateBuildings( void )
 	std::fill_n(gBuildings, MAX_BUILDINGS, BUILDING{});
 	gubNumberOfBuildings = 0;
 
-	if ( (gbWorldSectorZ > 0) || gfEditMode)
+	if (gWorldSector.z > 0 || gfEditMode)
 	{
 		return;
 	}
@@ -401,11 +401,11 @@ void GenerateBuildings( void )
 	// search through world
 	// for each location in a room try to find building info
 
-	for (UINT32 uiLoop = 0; uiLoop < WORLD_MAX; ++uiLoop)
+	for (GridNo loop = 0; loop < WORLD_MAX; ++loop)
 	{
-		if ( (gubWorldRoomInfo[ uiLoop ] != NO_ROOM) && (gubBuildingInfo[ uiLoop ] == NO_BUILDING) && (FindStructure( (INT16) uiLoop, STRUCTURE_NORMAL_ROOF ) != NULL) )
+		if ( (gubWorldRoomInfo[ loop ] != NO_ROOM) && (gubBuildingInfo[ loop ] == NO_BUILDING) && (FindStructure( loop, STRUCTURE_NORMAL_ROOF ) != NULL) )
 		{
-			GenerateBuilding( (INT16) uiLoop );
+			GenerateBuilding( loop );
 		}
 	}
 }

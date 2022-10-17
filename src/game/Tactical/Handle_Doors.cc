@@ -43,7 +43,7 @@ void HandleDoorChangeFromGridNo(SOLDIERTYPE* const s, INT16 const grid_no, BOOLE
 	STRUCTURE* const structure = FindStructure(grid_no, STRUCTURE_ANYDOOR);
 	if (!structure)
 	{
-		SLOGE("Told to handle door that does not exist at %d.", grid_no);
+		SLOGE("Told to handle door that does not exist at {}.", grid_no);
 		return;
 	}
 
@@ -57,7 +57,7 @@ void HandleDoorChangeFromGridNo(SOLDIERTYPE* const s, INT16 const grid_no, BOOLE
 	DOOR_STATUS* const door_status = GetDoorStatus(grid_no);
 	if (!door_status)
 	{
-		SLOGE("Told to set door busy but can't get door status at %d!", grid_no);
+		SLOGE("Told to set door busy but can't get door status at {}!", grid_no);
 		return;
 	}
 
@@ -263,11 +263,10 @@ void InteractWithOpenableStruct(SOLDIERTYPE& s, STRUCTURE& structure, UINT8 cons
 static void ProcessImplicationsOfPCMessingWithDoor(SOLDIERTYPE* pSoldier)
 {
 	// if player is hacking at a door in the brothel and a kingpin guy can see him
+	const SGPSector brothel(5, MAP_ROW_D);
 	UINT8 const room = GetRoom(pSoldier->sGridNo);
 	if (IN_BROTHEL(room) ||
-		(gWorldSectorX == 5 &&
-		gWorldSectorY == MAP_ROW_D &&
-		gbWorldSectorZ == 0 &&
+		(gWorldSector == brothel &&
 		(pSoldier->sGridNo == 11010 ||
 		pSoldier->sGridNo == 11177 ||
 		pSoldier->sGridNo == 11176)))
@@ -289,7 +288,8 @@ static void ProcessImplicationsOfPCMessingWithDoor(SOLDIERTYPE* pSoldier)
 		}
 	}
 
-	if ( gWorldSectorX == TIXA_SECTOR_X && gWorldSectorY == TIXA_SECTOR_Y )
+	const SGPSector tixa(TIXA_SECTOR_X, TIXA_SECTOR_Y);
+	if (gWorldSector == tixa)
 	{
 		SOLDIERTYPE* const pGoon = FindSoldierByProfileID(WARDEN);
 		if ( pGoon && pGoon->bAlertStatus < STATUS_RED && PythSpacesAway( pSoldier->sGridNo, pGoon->sGridNo ) <= 5 )
@@ -845,7 +845,7 @@ try
 		//ModifyDoorStatus( INT16 sGridNo, BOOLEAN fOpen, BOOLEAN fPercievedOpen )
 		ModifyDoorStatus(sGridNo, TRUE, DONTSETDOORSTATUS);
 
-		if ( gWorldSectorX == 13 && gWorldSectorY == MAP_ROW_I )
+		if (gWorldSector.x == 13 && gWorldSector.y == MAP_ROW_I)
 		{
 			DoPOWPathChecks();
 		}

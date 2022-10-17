@@ -23,7 +23,6 @@
 #include "SelectWin.h"
 #include "Simple_Render_Utils.h"
 #include "Debug.h"
-#include "MemMan.h"
 #include "TileDat.h"
 #include "Video.h"
 #include "UILayout.h"
@@ -502,9 +501,9 @@ static GUIButtonRef iDoorButton[NUM_DOOR_BUTTONS];
 static MOUSE_REGION DoorRegion;
 
 
-static void DoorCancelCallback(GUI_BUTTON* btn, INT32 reason);
-static void DoorOkayCallback(GUI_BUTTON* btn, INT32 reason);
-static void DoorToggleLockedCallback(GUI_BUTTON* btn, INT32 reason);
+static void DoorCancelCallback(GUI_BUTTON* btn, UINT32 reason);
+static void DoorOkayCallback(GUI_BUTTON* btn, UINT32 reason);
+static void DoorToggleLockedCallback(GUI_BUTTON* btn, UINT32 reason);
 
 
 void InitDoorEditing(INT32 const map_idx)
@@ -547,19 +546,19 @@ void ExtractAndUpdateDoorInfo()
 
 	door.sGridNo = (INT16)iDoorMapIndex;
 
-	num = MIN( GetNumericStrictValueFromField( 0 ), NUM_LOCKS-1 );
+	num = std::min(GetNumericStrictValueFromField( 0 ), NUM_LOCKS-1);
 	door.ubLockID = (UINT8)num;
 	SetInputFieldStringWithNumericStrictValue( 0, num );
 	if( num >= 0 )
 		fCursor = TRUE;
 
-	num = MIN( MAX( GetNumericStrictValueFromField( 1 ), 0 ), 10 );
+	num = std::clamp(GetNumericStrictValueFromField(1), 0, 10);
 	door.ubTrapID = (UINT8)num;
 	SetInputFieldStringWithNumericStrictValue( 1, num );
 	if( num )
 		fCursor = TRUE;
 
-	num = MIN( MAX( GetNumericStrictValueFromField( 2 ), 0 ), 20 );
+	num = std::clamp(GetNumericStrictValueFromField(2), 0, 20);
 	if( door.ubTrapID && !num )
 		num = 1;  //Can't have a trap without a traplevel!
 	door.ubTrapLevel = (UINT8)num;
@@ -646,9 +645,9 @@ void KillDoorEditing()
 }
 
 
-static void DoorOkayCallback(GUI_BUTTON* btn, INT32 reason)
+static void DoorOkayCallback(GUI_BUTTON* btn, UINT32 reason)
 {
-	if( reason & MSYS_CALLBACK_REASON_LBUTTON_UP )
+	if( reason & MSYS_CALLBACK_REASON_POINTER_UP )
 	{
 		ExtractAndUpdateDoorInfo();
 		KillDoorEditing();
@@ -656,16 +655,16 @@ static void DoorOkayCallback(GUI_BUTTON* btn, INT32 reason)
 }
 
 
-static void DoorCancelCallback(GUI_BUTTON* btn, INT32 reason)
+static void DoorCancelCallback(GUI_BUTTON* btn, UINT32 reason)
 {
-	if( reason & MSYS_CALLBACK_REASON_LBUTTON_UP )
+	if( reason & MSYS_CALLBACK_REASON_POINTER_UP )
 	{
 		KillDoorEditing();
 	}
 }
 
 
-static void DoorToggleLockedCallback(GUI_BUTTON* btn, INT32 reason)
+static void DoorToggleLockedCallback(GUI_BUTTON* btn, UINT32 reason)
 {
 	//handled in ExtractAndUpdateDoorInfo();
 }
@@ -709,7 +708,7 @@ void ExtractAndUpdateBuildingInfo()
 	ST::string str;
 	INT32 temp;
 	//extract light1 colors
-	temp = MIN( GetNumericStrictValueFromField( 1 ), 255 );
+	temp = std::min(GetNumericStrictValueFromField( 1 ), 255);
 	if( temp != -1 )
 	{
 		gubCurrRoomNumber = (UINT8)temp;

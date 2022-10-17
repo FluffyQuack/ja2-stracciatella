@@ -7,7 +7,6 @@
 #include "WCheck.h"
 #include "Debug.h"
 #include "FileMan.h"
-#include "MemMan.h"
 #include "Structure.h"
 #include "TileDef.h"
 #include "WorldDef.h"
@@ -302,10 +301,10 @@ void NormalizeStructureTiles(DB_STRUCTURE_TILE** pTiles, UINT8 ubNumTiles)
 {
 	/**
 	 * In #1107, it was discovered that some of the Copter structures do not
-	 * have a base tile. RemoveStruct will not work without a base tile, as 
+	 * have a base tile. RemoveStruct will not work without a base tile, as
 	 * it tries to find a non-existent base structure.
 	 *
-	 * This function attempts to correct such issues with JSD data, by 
+	 * This function attempts to correct such issues with JSD data, by
 	 * ensuring there is a tile with (0, 0) position relative to base.
 	 */
 	int minDistFromBase = INT_MAX;
@@ -324,7 +323,7 @@ void NormalizeStructureTiles(DB_STRUCTURE_TILE** pTiles, UINT8 ubNumTiles)
 		return;
 	}
 
-	STLOGD("Adjusting tiles relative positions by {}", -minDistFromBase);
+	SLOGD("Adjusting tiles relative positions by {}", -minDistFromBase);
 	int xDist = minDistFromBase % WORLD_COLS;
 	int yDist = minDistFromBase / WORLD_COLS;
 	for (UINT8 i = 0; i < ubNumTiles; i++)
@@ -417,7 +416,7 @@ static STRUCTURE* CreateStructureFromDB(DB_STRUCTURE_REF const* const pDBStructu
 	pStructure->pDBStructureRef = pDBStructureRef;
 	if (pTile->sPosRelToBase != 0 && ubTileNum == 0)
 	{
-		STLOGW("Possible bad structure {}", pDBStructureRef->pDBStructure->usStructureNumber);
+		SLOGW("Possible bad structure {}", pDBStructureRef->pDBStructure->usStructureNumber);
 	}
 	if (pTile->sPosRelToBase == 0)
 	{	// base tile
@@ -444,7 +443,7 @@ static BOOLEAN OkayToAddStructureToTile(INT16 const sBaseGridNo, INT16 const sCu
 { // Verifies whether a structure is blocked from being added to the map at a particular point
 	DB_STRUCTURE_TILE const* const* const ppTile = pDBStructureRef->ppTile;
 	INT16 const sGridNo = sBaseGridNo + ppTile[ubTileIndex]->sPosRelToBase;
-	if (sGridNo < 0 || WORLD_MAX < sGridNo) return FALSE;
+	if (sGridNo < 0 || WORLD_MAX <= sGridNo) return FALSE;
 
 	if (gpWorldLevelData[sBaseGridNo].sHeight != gpWorldLevelData[sGridNo].sHeight)
 	{
@@ -1207,11 +1206,7 @@ BOOLEAN StructureDensity( STRUCTURE * pStructure, UINT8 * pubLevel0, UINT8 * pub
 
 StructureDamageResult DamageStructure(STRUCTURE* const s, UINT8 damage, StructureDamageReason const reason, GridNo const grid_no, INT16 const x, INT16 const y, SOLDIERTYPE* const owner)
 {	// Do damage to a structure; returns TRUE if the structure should be removed
-	if (!s)
-	{
-		SLOGW("Structure is not defined");
-		return STRUCTURE_NOT_DAMAGED;
-	}
+	Assert(s);
 
 	if (s->fFlags & (STRUCTURE_PERSON | STRUCTURE_CORPSE))
 	{ // Don't hurt this structure, it's used for hit detection only
@@ -1289,7 +1284,7 @@ void DebugStructurePage1()
 		"Outside right"
 	};
 
-	GridNo const grid_no = GetMouseMapPos();
+	GridNo const grid_no = guiCurrentCursorGridNo;
 	if (grid_no == NOWHERE) {
 		MPageHeader("DEBUG STRUCTURES PAGE ONE");
 		return;

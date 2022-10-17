@@ -72,8 +72,8 @@ static const FacePosInfo g_face_info[] =
 };
 
 
-static void BtnIMPConfirmNo(GUI_BUTTON *btn, INT32 reason);
-static void BtnIMPConfirmYes(GUI_BUTTON *btn, INT32 reason);
+static void BtnIMPConfirmNo(GUI_BUTTON *btn, UINT32 reason);
+static void BtnIMPConfirmYes(GUI_BUTTON *btn, UINT32 reason);
 
 
 static void CreateConfirmButtons(void);
@@ -174,8 +174,7 @@ static BOOLEAN AddCharacterToPlayersTeam(void)
 
 	HireMercStruct.bWhatKindOfMerc = MERC_TYPE__PLAYER_CHARACTER;
 
-	HireMercStruct.sSectorX = SECTORX(g_merc_arrive_sector);
-	HireMercStruct.sSectorY = SECTORY(g_merc_arrive_sector);
+	HireMercStruct.sSector = g_merc_arrive_sector;
 	HireMercStruct.fUseLandingZoneForArrival = TRUE;
 
 	HireMercStruct.fCopyProfileItemsOver = TRUE;
@@ -200,9 +199,9 @@ static BOOLEAN AddCharacterToPlayersTeam(void)
 	}
 }
 
-static void BtnIMPConfirmYes(GUI_BUTTON *btn, INT32 reason)
+static void BtnIMPConfirmYes(GUI_BUTTON *btn, UINT32 reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		if (LaptopSaveInfo.fIMPCompletedFlag)
 		{
@@ -234,7 +233,7 @@ static void BtnIMPConfirmYes(GUI_BUTTON *btn, INT32 reason)
 
 		// charge the player
 		AddTransactionToPlayersBook(IMP_PROFILE, (UINT8)(PLAYER_GENERATED_CHARACTER_ID + LaptopSaveInfo.iVoiceId), GetWorldTotalMin(), -COST_OF_PROFILE);
-		AddHistoryToPlayersLog(HISTORY_CHARACTER_GENERATED, 0, GetWorldTotalMin(), -1, -1);
+		AddHistoryToPlayersLog(HISTORY_CHARACTER_GENERATED, 0, GetWorldTotalMin(), SGPSector(-1, -1));
 
 		fButtonPendingFlag = TRUE;
 		iCurrentImpPage = IMP_HOME_PAGE;
@@ -256,9 +255,9 @@ static void BtnIMPConfirmYes(GUI_BUTTON *btn, INT32 reason)
 
 
 // fixed? by CJC Nov 28 2002
-static void BtnIMPConfirmNo(GUI_BUTTON *btn, INT32 reason)
+static void BtnIMPConfirmNo(GUI_BUTTON *btn, UINT32 reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		iCurrentImpPage = IMP_FINISH;
 

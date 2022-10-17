@@ -843,6 +843,7 @@ static void HandleRenderFaceAdjustments(FACETYPE& f, BOOLEAN const fDisplayBuffe
 		INT16   sPtsAvailable = 0;
 		UINT16  usMaximumPts  = 0;
 		BOOLEAN fShowNumber   = FALSE;
+		static const SGPSector gunRange(GUN_RANGE_X, GUN_RANGE_Y, GUN_RANGE_Z);
 		switch (s->bAssignment)
 		{
 			case DOCTOR:
@@ -870,8 +871,7 @@ static void HandleRenderFaceAdjustments(FACETYPE& f, BOOLEAN const fDisplayBuffe
 			case TRAIN_BY_OTHER:
 			{
 				// there could be bonus pts for training at gun range
-				const BOOLEAN fAtGunRange = s->sSectorX == 13 &&
-								s->sSectorY == MAP_ROW_H && s->bSectorZ == 0;
+				const BOOLEAN fAtGunRange = s->sSector == gunRange;
 
 				switch (s->bAssignment)
 				{
@@ -1048,7 +1048,7 @@ static void NewEye(FACETYPE& f)
 			break;
 
 		default:
-			SLOGW("unexpected eye frame (%d)", f.sEyeFrame);
+			SLOGW("unexpected eye frame ({})", f.sEyeFrame);
 			f.sEyeFrame = 0;
 			break;
 	}

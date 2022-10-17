@@ -210,11 +210,11 @@ void EnvironmentController( BOOLEAN fCheckForLights )
 					// Thunder showers.. make darker
 					if ( guiEnvWeather & ( WEATHER_FORECAST_THUNDERSHOWERS ) )
 					{
-						ubLightAdjustFromWeather = (UINT8)(__min( gubEnvLightValue+2, NORMAL_LIGHTLEVEL_NIGHT ));
+						ubLightAdjustFromWeather = (UINT8)(std::min( gubEnvLightValue+2, NORMAL_LIGHTLEVEL_NIGHT ));
 					}
 					else
 					{
-						ubLightAdjustFromWeather = (UINT8)(__min( gubEnvLightValue+1, NORMAL_LIGHTLEVEL_NIGHT ));
+						ubLightAdjustFromWeather = (UINT8)(std::min( gubEnvLightValue+1, NORMAL_LIGHTLEVEL_NIGHT ));
 					}
 				}
 #endif
@@ -380,7 +380,7 @@ void ForecastDayEvents( )
 
 UINT8 GetTimeOfDayAmbientLightLevel()
 {
-	if ( SectorTemperature( GetWorldMinutesInDay(), gWorldSectorX, gWorldSectorY, gbWorldSectorZ ) == HOT )
+	if (SectorTemperature(GetWorldMinutesInDay(), gWorldSector) == HOT)
 	{
 		return( HOT_DAY_LIGHTLEVEL );
 	}
@@ -500,14 +500,14 @@ void UpdateTemperature( UINT8 ubTemperatureCode )
 	gfDoLighting = TRUE;
 }
 
-INT8 SectorTemperature( UINT32 uiTime, INT16 sSectorX, INT16 sSectorY, INT8 bSectorZ )
+INT8 SectorTemperature(UINT32 uiTime, const SGPSector& sector)
 {
-	if (bSectorZ > 0)
+	if (sector.z > 0)
 	{
 		// cool underground
 		return( 0 );
 	}
-	else if ( IsSectorDesert( sSectorX, sSectorY ) ) // is desert
+	else if (IsSectorDesert(sector))
 	{
 		return( gubDesertTemperature );
 	}

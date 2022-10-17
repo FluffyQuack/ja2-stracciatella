@@ -594,8 +594,8 @@ static const ST::string s_ger_pDirectionStr[pDirectionStr_SIZE] =
 
 static const ST::string s_ger_gpStrategicString[gpStrategicString_SIZE] =
 {
-	"%s wurden entdeckt in Sektor %c%d und ein weiterer Trupp wird gleich ankommen.",	//STR_DETECTED_SINGULAR
-	"%s wurden entdeckt in Sektor %c%d und weitere Trupps werden gleich ankommen.",	//STR_DETECTED_PLURAL
+	"%s wurden entdeckt in Sektor %s und ein weiterer Trupp wird gleich ankommen.",	//STR_DETECTED_SINGULAR
+	"%s wurden entdeckt in Sektor %s und weitere Trupps werden gleich ankommen.",	//STR_DETECTED_PLURAL
 	"Gleichzeitige Ankunft koordinieren?",													//STR_COORDINATE
 
 	//Dialog strings for enemies.
@@ -710,11 +710,11 @@ static const ST::string s_ger_gpStrategicString[gpStrategicString_SIZE] =
 
 	//various popup messages for battle conditions.
 
-	//%c%d is the sector -- ex: A9
-	"Feinde attackieren Ihre Miliz im Sektor %c%d.",
-	//%c%d is the sector -- ex: A9
-	"Monster attackieren Ihre Miliz im Sektor %c%d.",
-	//1st %d refers to the number of civilians eaten by monsters, %c%d is the sector -- ex: A9
+	//%s -- ex: A9
+	"Feinde attackieren Ihre Miliz im Sektor %s.",
+	//%s -- ex: A9
+	"Monster attackieren Ihre Miliz im Sektor %s.",
+	//1st %d refers to the number of civilians eaten by monsters, %s -- ex: A9
 	//Note: the minimum number of civilians eaten will be two.
 	"Monster attackieren und töten %d Zivilisten im Sektor %s.",
 	//%s is the sector -- ex: A9
@@ -1433,7 +1433,7 @@ static const ST::string s_ger_pMoralStrings[pMoralStrings_SIZE] =
 };
 
 // Mercs equipment has now arrived and is now available in Omerta or Drassen.
-static const ST::string s_ger_str_left_equipment   = "%ss Ausrüstung ist in %s (%c%d) angekommen.";
+static const ST::string s_ger_str_left_equipment   = "%ss Ausrüstung ist in %s (%s) angekommen.";
 
 // Status that appears on the Map Screen
 static const ST::string s_ger_pMapScreenStatusStrings[pMapScreenStatusStrings_SIZE] =
@@ -3065,7 +3065,7 @@ static const ST::string s_ger_gzLateLocalizedString[gzLateLocalizedString_SIZE] 
 	"Sie können den Zeitraffer jetzt nicht benutzen. Warten Sie das Feuerwerk ab!",
 	"%s will sich nicht bewegen.",
 	"%s hat nicht genug Energie, um die Position zu ändern.",
-	"%s hat kein Benzin mehr und steckt in %c%d fest.",
+	"{} hat kein Benzin mehr und steckt in {} fest.",
 
 	//6-10
 

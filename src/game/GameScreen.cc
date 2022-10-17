@@ -149,7 +149,6 @@ void MainGameScreenShutdown(void)
 	ShutdownZBuffer(gpZBuffer);
 	RemoveVideoOverlay(g_fps_overlay);
 	RemoveVideoOverlay(g_counter_period_overlay);
-	ShutdownBackgroundRects();
 }
 
 
@@ -585,7 +584,7 @@ ScreenID MainGameScreenHandle(void)
 	//Don't render if we have a scroll pending!
 	if (!gfScrollPending && !g_scroll_inertia && !gfRenderFullThisFrame)
 	{
-		RenderButtonsFastHelp( );
+		RenderFastHelp( );
 	}
 
 	// Display Framerate
@@ -758,7 +757,7 @@ static void HandleModalTactical(void)
 	RenderButtons();
 
 	SaveBackgroundRects( );
-	RenderButtonsFastHelp( );
+	RenderFastHelp();
 	RenderPausedGameBox( );
 
 	ExecuteBaseDirtyRectQueue( );

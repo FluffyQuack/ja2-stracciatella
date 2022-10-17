@@ -194,16 +194,16 @@ static std::map<UINT8, UINT32> gNumberOfTimesQuoteSaid = {};
 //
 
 // The Account Box button
-static void BtnAccountBoxButtonCallback(GUI_BUTTON *btn, INT32 reason);
+static void BtnAccountBoxButtonCallback(GUI_BUTTON *btn, UINT32 reason);
 static BUTTON_PICS* guiAccountBoxButtonImage;
 static GUIButtonRef guiAccountBoxButton;
 
 //File Box
-static void BtnFileBoxButtonCallback(GUI_BUTTON *btn, INT32 reason);
+static void BtnFileBoxButtonCallback(GUI_BUTTON *btn, UINT32 reason);
 static GUIButtonRef guiFileBoxButton;
 
 // The 'X' to close the video conf window button
-static void BtnXToCloseMercVideoButtonCallback(GUI_BUTTON *btn, INT32 reason);
+static void BtnXToCloseMercVideoButtonCallback(GUI_BUTTON *btn, UINT32 reason);
 static GUIButtonRef guiXToCloseMercVideoButton;
 
 
@@ -498,9 +498,9 @@ void RemoveMercBackGround()
 }
 
 
-static void BtnAccountBoxButtonCallback(GUI_BUTTON *btn, INT32 reason)
+static void BtnAccountBoxButtonCallback(GUI_BUTTON *btn, UINT32 reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		if (LaptopSaveInfo.gubPlayersMercAccountStatus == MERC_NO_ACCOUNT)
 			guiCurrentLaptopMode = LAPTOP_MODE_MERC_NO_ACCOUNT;
@@ -516,9 +516,9 @@ static void BtnAccountBoxButtonCallback(GUI_BUTTON *btn, INT32 reason)
 }
 
 
-static void BtnFileBoxButtonCallback(GUI_BUTTON *btn, INT32 reason)
+static void BtnFileBoxButtonCallback(GUI_BUTTON *btn, UINT32 reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		guiCurrentLaptopMode = LAPTOP_MODE_MERC_FILES;
 	}
@@ -529,15 +529,13 @@ static void ScheduleNewMercsToBeAvailable();
 static BOOLEAN ShouldTheMercSiteServerGoDown(void);
 
 
-void DailyUpdateOfMercSite( UINT16 usDate)
+void DailyUpdateOfMercSite()
 {
-	INT32 iNumDays;
-
 	//if its the first day, leave
-	if( usDate == 1 )
+	if (GetWorldDay() == 1)
 		return;
 
-	iNumDays = 0;
+	INT32 iNumDays = 0;
 
 	//loop through all of the hired mercs from M.E.R.C.
 	for (const MERCListingModel* m : GCM->getMERCListings())
@@ -613,9 +611,9 @@ static BOOLEAN HasLarryRelapsed(void);
 
 /**
  * Returns the ProfileID of this profile listing.
- * 
- * This method handles LARRY logic (LARRY_NORMAL becoming LARRY_DRUNK once 
- * relapsed), and should always be used instead of directly accessing the 
+ *
+ * This method handles LARRY logic (LARRY_NORMAL becoming LARRY_DRUNK once
+ * relapsed), and should always be used instead of directly accessing the
  * field profileID
  */
 ProfileID GetProfileIDFromMERCListing(const MERCListingModel* listing)
@@ -745,9 +743,9 @@ static void InitDestroyXToCloseVideoWindow(BOOLEAN fCreate)
 }
 
 
-static void BtnXToCloseMercVideoButtonCallback(GUI_BUTTON *btn, INT32 reason)
+static void BtnXToCloseMercVideoButtonCallback(GUI_BUTTON *btn, UINT32 reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		//Stop speck from talking
 		//ShutupaYoFace(g_video_speck_face);
@@ -902,7 +900,7 @@ static void HandleTalkingSpeck(void)
 }
 
 
-static void MercSiteSubTitleRegionCallBack(MOUSE_REGION* pRegion, INT32 iReason);
+static void MercSiteSubTitleRegionCallBack(MOUSE_REGION* pRegion, UINT32 iReason);
 
 
 void DisplayTextForSpeckVideoPopUp(const ST::string& str)
@@ -977,7 +975,6 @@ static BOOLEAN GetSpeckConditionalOpening(BOOLEAN fJustEnteredScreen)
 {
 	static UINT16	usQuoteToSay=MERC_VIDEO_SPECK_SPEECH_NOT_TALKING;
 	BOOLEAN	fCanSayLackOfPaymentQuote = TRUE;
-	BOOLEAN fCanUseIdleTag = FALSE;
 
 	//If we just entered the screen, reset some variables
 	if( fJustEnteredScreen )
@@ -1008,12 +1005,13 @@ static BOOLEAN GetSpeckConditionalOpening(BOOLEAN fJustEnteredScreen)
 	else if( LaptopSaveInfo.ubPlayerBeenToMercSiteStatus == MERC_SITE_SECOND_VISIT )
 	{
 		StartSpeckTalking( SPECK_QUOTE_ALTERNATE_OPENING_1_TOUGH_START );
-		fCanUseIdleTag = TRUE;
 	}
 
 	// We have been here at least 2 times before, Check which quote we should use
 	else
 	{
+		BOOLEAN fCanUseIdleTag = FALSE;
+
 		//if the player has not hired any MERC mercs before
 		// CJC Dec 1 2002: fixing this, so near-bankrupt msg will play
 		if( !IsAnyMercMercsHired( ) && CalcMercDaysServed() == 0)
@@ -1097,29 +1095,12 @@ static BOOLEAN GetSpeckConditionalOpening(BOOLEAN fJustEnteredScreen)
 
 		if( fCanUseIdleTag )
 		{
-			UINT8 ubRandom = Random( 100 );
-
-			if( ubRandom < 50 )
+			if (Chance(50))
 			{
-				ubRandom = Random( 4 );
-
-				switch( ubRandom )
-				{
-					case 0:
-						StartSpeckTalking( SPECK_QUOTE_ALTERNATE_OPENING_TAG_ON_AFTER_OTHER_TAGS_1 );
-						break;
-					case 1:
-						StartSpeckTalking( SPECK_QUOTE_ALTERNATE_OPENING_TAG_ON_AFTER_OTHER_TAGS_2 );
-						break;
-					case 2:
-						StartSpeckTalking( SPECK_QUOTE_ALTERNATE_OPENING_TAG_ON_AFTER_OTHER_TAGS_3 );
-						break;
-					case 3:
-						StartSpeckTalking( SPECK_QUOTE_ALTERNATE_OPENING_TAG_ON_AFTER_OTHER_TAGS_4 );
-						break;
-					default:
-						SLOGA("GetSpeckConditionalOpening: Problem with random");
-				}
+				// Ensure these quotes are contiguous
+				static_assert(SPECK_QUOTE_ALTERNATE_OPENING_TAG_ON_AFTER_OTHER_TAGS_1 ==
+				              SPECK_QUOTE_ALTERNATE_OPENING_TAG_ON_AFTER_OTHER_TAGS_4 - 3);
+				StartSpeckTalking(SPECK_QUOTE_ALTERNATE_OPENING_TAG_ON_AFTER_OTHER_TAGS_1 + Random(4));
 			}
 		}
 	}
@@ -1282,9 +1263,9 @@ static UINT8 CountNumberOfMercMercsWhoAreDead(void)
 
 
 //Mouse Call back for the pop up text box
-static void MercSiteSubTitleRegionCallBack(MOUSE_REGION* pRegion, INT32 iReason)
+static void MercSiteSubTitleRegionCallBack(MOUSE_REGION* pRegion, UINT32 iReason)
 {
-	if (iReason & MSYS_CALLBACK_REASON_LBUTTON_UP || iReason & MSYS_CALLBACK_REASON_RBUTTON_UP)
+	if (iReason & MSYS_CALLBACK_REASON_ANY_BUTTON_UP)
 	{
 		StopSpeckFromTalking( );
 	}
@@ -1314,7 +1295,7 @@ static void HandlePlayerHiringMerc(const MERCListingModel* hired)
 	gusMercVideoSpeckSpeech = MERC_VIDEO_SPECK_SPEECH_NOT_TALKING;
 
 	auto quotes = hired->getQuotesByType(SpeckQuoteType::CROSS_SELL);
-	for (SpeckQuote quote : quotes)
+	for (SpeckQuote const& quote : quotes)
 	{
 		if (IsMercMercAvailable(quote->relatedMercID))
 		{
@@ -1575,7 +1556,7 @@ static std::vector<UINT8> GetAvailableRandomQuotes()
 	for (const MERCListingModel* m : GCM->getMERCListings())
 	{
 		if (!IsMercMercAvailable(GetProfileIDFromMERCListing(m))) continue;
-		for (auto q : m->getQuotesByType(SpeckQuoteType::ADVERTISE))
+		for (auto const& q : m->getQuotesByType(SpeckQuoteType::ADVERTISE))
 		{
 			quotes.push_back(q->quoteID);
 		}
@@ -1657,7 +1638,7 @@ static BOOLEAN CanMercBeAvailableYet(const MERCListingModel* merc)
 }
 
 // update the value of ubLastMercAvailableId for save game compatability
-static void SetLastMercArrival(const MERCListingModel* merc) 
+static void SetLastMercArrival(const MERCListingModel* merc)
 {
 	switch (merc->profileID)
 	{
@@ -1673,10 +1654,10 @@ void SyncLastMercFromSaveGame()
 {
 	// This allows us to load saves from old versions and vanilla
 	//
-	// In the old implementation, the M.E.R.C. list has 2 LARRY profiles (NORMAL and DRUNK), so 
+	// In the old implementation, the M.E.R.C. list has 2 LARRY profiles (NORMAL and DRUNK), so
 	// the index is off by 1 for mercs after LARRY
 	//
-	// But this only accounts version upgrade. If you are downgrading, you may need to wait for 
+	// But this only accounts version upgrade. If you are downgrading, you may need to wait for
 	// a few days before the last merc becomes available again.
 	int iLastMercID = -1;
 	switch (LaptopSaveInfo.ubLastMercAvailableId)
@@ -1686,7 +1667,7 @@ void SyncLastMercFromSaveGame()
 	}
 
 	if (iLastMercID <= 0) return;
-	
+
 	for (const MERCListingModel* merc : GCM->getMERCListings())
 	{
 		// check for exactly the case that we are off by 1 due to LARRY

@@ -34,7 +34,6 @@ Filler, Padding, Unused, filler: remove, partially bogus
 FindCacheStructDataIndex(): should return pointer instead of index
 FindValidInsertionCode(): MARK_DIRTY necessary?
 GetDialogueDataFilename(): checking for MANNY does nothing
-GetLoadedSectorString(): gbWorldSectorZ <-> !gbWorldSectorZ
 GetNumberOfPastMercsOnPlayersTeam(): callers
 GetSectorIDString(): complicated
 GetTimeRemainingOnSoldiersContract(): callers
@@ -218,9 +217,6 @@ ubKeyUnused
 ubOwnershipUnused
 ubWeight: only one reader
 fUsed
-
-REAL_OBJECT
-OneOverMass: always 1/60.f
 
 SOLDIERCREATESTRUCT
 fStatic: strange

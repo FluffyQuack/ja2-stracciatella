@@ -1,7 +1,6 @@
 #include "Font_Control.h"
 #include "Timer_Control.h"
 #include "Debug.h"
-#include "MemMan.h"
 #include "Overhead_Types.h"
 #include "Soldier_Control.h"
 #include "Random.h"
@@ -61,7 +60,7 @@ void StatChange(SOLDIERTYPE& s, StatKind const stat, UINT16 const n_chances, Sta
 
 	if (s.bAssignment == ASSIGNMENT_POW)
 	{
-		SLOGE("StatChange: %s improving stats while POW! stat %d", s.name.c_str(), stat);
+		SLOGE("StatChange: {} improving stats while POW! stat {}", s.name, stat);
 		return;
 	}
 
@@ -187,7 +186,7 @@ static void ProcessStatChange(MERCPROFILESTRUCT& p, StatKind const ubStat, UINT1
 			break;
 
 		default:
-			SLOGE("ProcessStatChange: Rcvd unknown ubStat %d", ubStat);
+			SLOGE("ProcessStatChange: Rcvd unknown ubStat {}", ubStat);
 			return;
 	}
 
@@ -360,7 +359,7 @@ static void ProcessStatChange(MERCPROFILESTRUCT& p, StatKind const ubStat, UINT1
 	{
 		// increment counters that track how often stat changes are being awarded
 		p.usStatChangeChances[ubStat]   += usNumChances;
-		p.usStatChangeSuccesses[ubStat] += ABS(sSubPointChange);
+		p.usStatChangeSuccesses[ubStat] += std::abs(sSubPointChange);
 	}
 }
 
@@ -385,12 +384,10 @@ static void ChangeStat(MERCPROFILESTRUCT& p, SOLDIERTYPE* const pSoldier, StatKi
 	UINT32 *puiStatTimerPtr = NULL;
 	BOOLEAN fChangeTypeIncrease;
 	BOOLEAN fChangeSalary;
-	UINT32 uiLevelCnt;
 	UINT8 ubMercMercIdValue = 0;
 	UINT16 usIncreaseValue = 0;
-	UINT16 usSubpointsPerPoint;
 
-	usSubpointsPerPoint = SubpointsPerPoint(ubStat, p.bExpLevel);
+	UINT16 const usSubpointsPerPoint = SubpointsPerPoint(ubStat, p.bExpLevel);
 
 	// build ptrs to appropriate profiletype stat fields
 	switch( ubStat )
@@ -462,7 +459,8 @@ static void ChangeStat(MERCPROFILESTRUCT& p, SOLDIERTYPE* const pSoldier, StatKi
 			break;
 
 		default:
-			break;
+			// SubpointsPerPoint() already logs an error for invalid ubStat values
+			return;
 	}
 
 
@@ -721,7 +719,7 @@ static void ChangeStat(MERCPROFILESTRUCT& p, SOLDIERTYPE* const pSoldier, StatKi
 			if (fChangeSalary)
 			{
 				// increase all salaries and medical deposits, once for each level gained
-				for (uiLevelCnt = 0; uiLevelCnt < (UINT32) sPtsChanged; uiLevelCnt++)
+				for (INT16 levelCnt = 0; levelCnt < sPtsChanged; ++levelCnt)
 				{
 					p.sSalary = (INT16) CalcNewSalary(p.sSalary, fChangeTypeIncrease,
 										MAX_DAILY_SALARY);
@@ -1030,7 +1028,7 @@ static UINT16 SubpointsPerPoint(StatKind const ubStat, INT8 const bExpLevel)
 			break;
 
 		default:
-			SLOGE("SubpointsPerPoint: Unknown ubStat %d", ubStat);
+			SLOGE("SubpointsPerPoint: Unknown ubStat {}", ubStat);
 			return(100);
 	}
 
@@ -1308,15 +1306,14 @@ void HourlyProgressUpdate(void)
 		// at 70% add Iggy to the world
 		if (first_event_trigger(gamepolicy(progress_event_iggy_min)))
 		{
-			gMercProfiles[ IGGY ].sSectorX = 5;
-			gMercProfiles[ IGGY ].sSectorY = MAP_ROW_C;
+			gMercProfiles[ IGGY ].sSector = SGPSector(5, MAP_ROW_C);
 		}
 		#undef first_event_trigger
 
 		gStrategicStatus.ubHighestProgress = ubCurrentProgress;
 
 		// debug message
-		SLOGD("New player progress record: %d%%", gStrategicStatus.ubHighestProgress );
+		SLOGD("New player progress record: {}%", gStrategicStatus.ubHighestProgress);
 	}
 }
 
@@ -1362,7 +1359,7 @@ void AwardExperienceBonusToActiveSquad( UINT8 ubExpBonusType )
 ST::string BuildStatChangeString(const ST::string& name, BOOLEAN fIncrease, INT16 sPtsChanged, StatKind ubStat)
 {
 	UINT8 ubStringIndex;
-	UINT16 absPointsChanged = ABS( (int)sPtsChanged );
+	UINT16 absPointsChanged = std::abs((int)sPtsChanged);
 
 
 	Assert( sPtsChanged != 0 );
@@ -1396,25 +1393,24 @@ ST::string BuildStatChangeString(const ST::string& name, BOOLEAN fIncrease, INT1
 
 static UINT8 CalcImportantSectorControl(void)
 {
-	UINT8 ubMapX, ubMapY;
 	UINT8 ubSectorControlPts = 0;
 
-
-	for ( ubMapX = 1; ubMapX < MAP_WORLD_X - 1; ubMapX++ )
+	SGPSector sector;
+	for (sector.x = 1; sector.x < MAP_WORLD_X - 1; sector.x++)
 	{
-		for ( ubMapY = 1; ubMapY < MAP_WORLD_Y - 1; ubMapY++ )
+		for (sector.y = 1; sector.y < MAP_WORLD_Y - 1; sector.y++)
 		{
 			// if player controlled
-			if (!StrategicMap[CALCULATE_STRATEGIC_INDEX(ubMapX, ubMapY)].fEnemyControlled)
+			if (!StrategicMap[sector.AsStrategicIndex()].fEnemyControlled)
 			{
 				// towns where militia can be trained and SAM sites are important sectors
-				if ( MilitiaTrainingAllowedInSector( ubMapX, ubMapY, 0 ) )
+				if (MilitiaTrainingAllowedInSector(sector))
 				{
 					ubSectorControlPts++;
 
 					// SAM sites count double - they have no income, but have significant
 					// air control value
-					if ( IsThisSectorASAMSector( ubMapX, ubMapY, 0 ) )
+					if (IsThisSectorASAMSector(sector))
 					{
 						ubSectorControlPts++;
 					}

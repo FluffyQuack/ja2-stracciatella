@@ -4,6 +4,7 @@
 #include "SaveLoadGame.h"
 #include "FileMan.h"
 #include "externalized/TestUtils.h"
+#include <algorithm>
 
 const uint8_t s_savedGameHeaderVanilla[] = {
 	0x63,0x00,0x00,0x00,0x42,0x75,0x69,0x6c,0x64,0x20,0x30,0x34,0x2e,0x31,0x32,0x2e,
@@ -100,9 +101,9 @@ TEST(SaveLoadGameTest, structParsers)
 		EXPECT_EQ(header.uiDay,                       2u);
 		EXPECT_EQ(header.ubHour,                      9);
 		EXPECT_EQ(header.ubMin,                       51);
-		EXPECT_EQ(header.sSectorX,                    15);
-		EXPECT_EQ(header.sSectorY,                    4);
-		EXPECT_EQ(header.bSectorZ,                    0);
+		EXPECT_EQ(header.sSector.x,                   15);
+		EXPECT_EQ(header.sSector.y,                   4);
+		EXPECT_EQ(header.sSector.z,                   0);
 		EXPECT_EQ(header.ubNumOfMercsOnPlayersTeam,   6);
 		EXPECT_EQ(header.iCurrentBalance,             13030);
 		// UINT32   uiCurrentScreen;
@@ -127,9 +128,9 @@ TEST(SaveLoadGameTest, structParsers)
 		EXPECT_EQ(header.uiDay,                       1u);
 		EXPECT_EQ(header.ubHour,                      1);
 		EXPECT_EQ(header.ubMin,                       0);
-		EXPECT_EQ(header.sSectorX,                    9);
-		EXPECT_EQ(header.sSectorY,                    1);
-		EXPECT_EQ(header.bSectorZ,                    0);
+		EXPECT_EQ(header.sSector.x,                   9);
+		EXPECT_EQ(header.sSector.y,                   1);
+		EXPECT_EQ(header.sSector.z,                   0);
 		EXPECT_EQ(header.ubNumOfMercsOnPlayersTeam,   1);
 		EXPECT_EQ(header.iCurrentBalance,             42000);
 		// UINT32   uiCurrentScreen;
@@ -163,7 +164,10 @@ TEST(SaveLoadGameTest, savedGameHeaderValidityCheck)
 	EXPECT_EQ(isValidSavedGameHeader(header), true);
 
 	// parse vanilla header with "strac linux" parser; should be invalid
-	ParseSavedGameHeader(s_savedGameHeaderVanilla, header, true);
+	// this needs some padding bytes at the end to avoid a buffer overrun
+	uint8_t paddedVanillaHeader[SAVED_GAME_HEADER_ON_DISK_SIZE_STRAC_LIN]{};
+	std::copy_n(s_savedGameHeaderVanilla, SAVED_GAME_HEADER_ON_DISK_SIZE, paddedVanillaHeader);
+	ParseSavedGameHeader(paddedVanillaHeader, header, true);
 	EXPECT_EQ(isValidSavedGameHeader(header), false);
 
 	// parse "strac linux" header with vanilla parser; should be invalid
@@ -187,9 +191,9 @@ TEST(SaveLoadGameTest, parseHeaderLinux)
 		EXPECT_EQ(header.uiDay,                       1u);
 		EXPECT_EQ(header.ubHour,                      1);
 		EXPECT_EQ(header.ubMin,                       0);
-		EXPECT_EQ(header.sSectorX,                    9);
-		EXPECT_EQ(header.sSectorY,                    1);
-		EXPECT_EQ(header.bSectorZ,                    0);
+		EXPECT_EQ(header.sSector.x,                   9);
+		EXPECT_EQ(header.sSector.y,                   1);
+		EXPECT_EQ(header.sSector.z,                   0);
 		EXPECT_EQ(header.ubNumOfMercsOnPlayersTeam,   1);
 		EXPECT_EQ(header.iCurrentBalance,             42000);
 		EXPECT_EQ(header.sInitialGameOptions.fGunNut,                 1);
@@ -216,9 +220,9 @@ TEST(SaveLoadGameTest, parseHeaderWin)
 		EXPECT_EQ(header.uiDay,                       2u);
 		EXPECT_EQ(header.ubHour,                      9);
 		EXPECT_EQ(header.ubMin,                       51);
-		EXPECT_EQ(header.sSectorX,                    15);
-		EXPECT_EQ(header.sSectorY,                    4);
-		EXPECT_EQ(header.bSectorZ,                    0);
+		EXPECT_EQ(header.sSector.x,                   15);
+		EXPECT_EQ(header.sSector.y,                   4);
+		EXPECT_EQ(header.sSector.z,                   0);
 		EXPECT_EQ(header.ubNumOfMercsOnPlayersTeam,   6);
 		EXPECT_EQ(header.iCurrentBalance,             13030);
 		EXPECT_EQ(header.sInitialGameOptions.fGunNut,                 1);
@@ -240,9 +244,9 @@ TEST(SaveLoadGameTest, parseHeaderWin)
 		EXPECT_EQ(header.uiDay,                       1u);
 		EXPECT_EQ(header.ubHour,                      1);
 		EXPECT_EQ(header.ubMin,                       0);
-		EXPECT_EQ(header.sSectorX,                    9);
-		EXPECT_EQ(header.sSectorY,                    1);
-		EXPECT_EQ(header.bSectorZ,                    0);
+		EXPECT_EQ(header.sSector.x,                   9);
+		EXPECT_EQ(header.sSector.y,                   1);
+		EXPECT_EQ(header.sSector.z,                   0);
 		EXPECT_EQ(header.ubNumOfMercsOnPlayersTeam,   1);
 		EXPECT_EQ(header.iCurrentBalance,             32000);
 		EXPECT_EQ(header.sInitialGameOptions.fGunNut,                 0);
@@ -269,9 +273,9 @@ TEST(SaveLoadGameTest, parseHeaderMac)
 		EXPECT_EQ(header.uiDay,                       1u);
 		EXPECT_EQ(header.ubHour,                      1);
 		EXPECT_EQ(header.ubMin,                       0);
-		EXPECT_EQ(header.sSectorX,                    9);
-		EXPECT_EQ(header.sSectorY,                    1);
-		EXPECT_EQ(header.bSectorZ,                    0);
+		EXPECT_EQ(header.sSector.x,                   9);
+		EXPECT_EQ(header.sSector.y,                   1);
+		EXPECT_EQ(header.sSector.z,                   0);
 		EXPECT_EQ(header.ubNumOfMercsOnPlayersTeam,   1);
 		EXPECT_EQ(header.iCurrentBalance,             42000);
 		EXPECT_EQ(header.sInitialGameOptions.fGunNut,                 0);

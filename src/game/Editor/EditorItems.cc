@@ -30,7 +30,6 @@
 #include "Keys.h"
 #include "Debug.h"
 #include "Items.h"
-#include "MemMan.h"
 
 #include "ContentManager.h"
 #include "GameInstance.h"
@@ -412,7 +411,7 @@ void InitEditorItemsInfo(ToolbarMode const uiItemType)
 
 				if( eInfo.uiItemType != TBAR_MODE_ITEM_TRIGGERS )
 				{
-					pStr = ItemNames[usCounter];
+					pStr = item->getName();
 				}
 				else
 				{
@@ -481,7 +480,7 @@ void DetermineItemsScrolling()
 	//Right most scroll position.  Calculated by taking every pair of numItems rounded up,
 	//and subtracting 7 (because a scroll index 0 is disabled if there are <=12 items,
 	//index 1 for <=14 items, index 2 for <=16 items...
-	if( eInfo.sScrollIndex == MAX( ((eInfo.sNumItems+1)/2)-6, 0 ) )
+	if (eInfo.sScrollIndex == std::max((eInfo.sNumItems + 1) / 2 - 6, 0))
 		DisableEditorButton( ITEMS_RIGHTSCROLL );
 	else
 		EnableEditorButton( ITEMS_RIGHTSCROLL );
@@ -521,7 +520,7 @@ void RenderEditorItemsInfo()
 	/* Calculate the min and max index that is currently shown.  This determines
 	 * if the highlighted and/or selected items are drawn with the outlines. */
 	INT16 const min_idx = scroll_idx * 2;
-	INT16 const end_idx = MIN(min_idx + 12, eInfo.sNumItems);
+	INT16 const end_idx = std::min(min_idx + 12, int(eInfo.sNumItems));
 
 	// Draw the hilighted and selected items if applicable.
 	if (eInfo.pusItemIndex)
@@ -728,7 +727,7 @@ void AddSelectedItemToWorld(INT16 sGridNo)
 	switch (tempObject.usItem)
 	{
 		case MINE:
-			if (bVisibility == BURIED) usFlags |= WORLD_ITEM_ARMED_BOMB;
+			// Nothing to do here?
 			break;
 
 		case MONEY:
@@ -1464,6 +1463,6 @@ void DisplayItemStatistics()
 	INT16          const highlited  = eInfo.sHilitedItemIndex;
 	INT16          const idx        = highlited != -1 ? highlited : eInfo.sSelItemIndex;
 	UINT8          const foreground = idx == highlited ? FONT_LTRED : FONT_YELLOW;
-	ST::string item_name  = ItemNames[eInfo.pusItemIndex[idx]];
+	ST::string item_name  = GCM->getItem(eInfo.pusItemIndex[idx])->getName();
 	DisplayWrappedString(2, EDITOR_TASKBAR_POS_Y + 41, 97, 2, SMALLCOMPFONT, foreground, item_name, FONT_BLACK, CENTER_JUSTIFIED);
 }

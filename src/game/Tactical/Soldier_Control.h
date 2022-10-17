@@ -8,6 +8,7 @@
 
 #include "Animation_Cache.h"
 #include "JA2Types.h"
+#include "Keys.h"
 #include "Overhead_Types.h"
 #include "Item_Types.h"
 
@@ -269,8 +270,10 @@ enum SoldierClass
 
 struct KEY_ON_RING
 {
-	UINT8 ubKeyID;
-	UINT8 ubNumber;
+	UINT8 ubKeyID{INVALID_KEY_NUMBER};
+	UINT8 ubNumber{0};
+
+	bool isValid() const { return ubKeyID != INVALID_KEY_NUMBER && ubNumber != 0; }
 };
 
 
@@ -302,6 +305,15 @@ enum
 	HIT_BY_TEARGAS = 0x01,
 	HIT_BY_MUSTARDGAS = 0x02,
 	HIT_BY_CREATUREGAS = 0x04,
+};
+
+
+enum WeaponModes : INT8
+{
+	WM_NORMAL = 0,
+	WM_BURST,
+	WM_ATTACHED,
+	NUM_WEAPON_MODES
 };
 
 
@@ -642,9 +654,7 @@ struct SOLDIERTYPE
 	INT8 bAssignment; // soldiers current assignment
 	BOOLEAN fForcedToStayAwake; // forced by player to stay awake, reset to false, the moment they are set to rest or sleep
 	INT8 bTrainStat; // current stat soldier is training
-	INT16 sSectorX; // X position on the Stategic Map
-	INT16 sSectorY; // Y position on the Stategic Map
-	INT8 bSectorZ; // Z sector location
+	SGPSector sSector; // position on the Stategic Map
 	INT32 iVehicleId; // the id of the vehicle the char is in
 	PathSt* pMercPath; // Path Structure
 	UINT8 fHitByGasFlags; // flags
@@ -690,7 +700,7 @@ struct SOLDIERTYPE
 	INT8 bBlockedByAnotherMercDirection;
 	UINT16 usAttackingWeapon;
 	SOLDIERTYPE* target;
-	INT8 bWeaponMode;
+	WeaponModes bWeaponMode;
 	INT8 bAIScheduleProgress;
 	INT16 sOffWorldGridNo;
 	ANITILE* pAniTile;
@@ -827,14 +837,6 @@ struct SOLDIERTYPE
 
 #define LVL_INCREASE					0x0400
 
-
-enum WeaponModes
-{
-	WM_NORMAL = 0,
-	WM_BURST,
-	WM_ATTACHED,
-	NUM_WEAPON_MODES
-};
 
 // TYPEDEFS FOR ANIMATION PROFILES
 struct ANIM_PROF_TILE

@@ -94,12 +94,12 @@ std::vector<CreatureAttackSector> readAttackSectors(const rapidjson::Value& json
 	return attacks;
 }
 
-bool CreatureLairModel::isSectorInLair(uint8_t sectorX, uint8_t sectorY, uint8_t sectorZ) const
+bool CreatureLairModel::isSectorInLair(const SGPSector& sector) const
 {
-	uint8_t sectorId = SECTOR(sectorX, sectorY);
-	for (auto sec : lairSectors)
+	uint8_t sectorId = sector.AsByte();
+	for (auto const& sec : lairSectors)
 	{
-		if (sec.sectorId == sectorId && sec.sectorLevel == sectorZ)
+		if (sec.sectorId == sectorId && sec.sectorLevel == sector.z)
 		{
 			return true;
 		}
@@ -110,13 +110,13 @@ bool CreatureLairModel::isSectorInLair(uint8_t sectorX, uint8_t sectorY, uint8_t
 const CreatureAttackSector* CreatureLairModel::chooseTownSectorToAttack() const
 {
 	unsigned int totalChance = 0;
-	for (auto sec : attackSectors)
+	for (auto const& sec : attackSectors)
 	{
 		totalChance += sec.chance;
 	}
 
 	int random = Random(totalChance);
-	for (auto& sec : attackSectors)
+	for (auto const& sec : attackSectors)
 	{
 		random -= sec.chance;
 		if (random < 0)
@@ -195,32 +195,32 @@ void CreatureLairModel::validateData(const std::vector<const CreatureLairModel*>
 		// The first lair sector in list should be QUEEN_LAIR
 		if (lair->lairSectors.size() < 1 || lair->lairSectors[0].habitatType != QUEEN_LAIR)
 		{
-			STLOGW("The list of lair sectors should be non-empty and begin with the QUEEN_LAIR. Lair ID: {}", lair->lairId);
+			SLOGW("The list of lair sectors should be non-empty and begin with the QUEEN_LAIR. Lair ID: {}", lair->lairId);
 		}
 
 		// all lair sectors should be adjacent and defined as underground sector
-		int8_t x = 0, y = 0, z = -1;
-		for (auto sec : lair->lairSectors)
+		SGPSector prev(0, 0, -1);
+		SGPSector curr;
+		for (auto const& sec : lair->lairSectors)
 		{
-			if (z != -1)
+			curr = SGPSector::FromSectorID(sec.sectorId, sec.sectorLevel);
+			if (prev.z != -1)
 			{
-				int distance = abs(SECTORX(sec.sectorId) - x) + abs(SECTORY(sec.sectorId) - y) + abs(sec.sectorLevel - z);
+				int distance = abs(curr.x - prev.x) + abs(curr.y - prev.y) + abs(curr.z - prev.z);
 				if (distance != 1)
 				{
-					STLOGW("The current lair sector ({},{}) is not adjacent to the previous. This may indicate data issues", sec.sectorId, sec.sectorLevel);
+					SLOGW("The current lair sector ({},{}) is not adjacent to the previous. This may indicate data issues", sec.sectorId, sec.sectorLevel);
 				}
 			}
-			x = SECTORX(sec.sectorId);
-			y = SECTORY(sec.sectorId);
-			z = sec.sectorLevel;
+			prev = curr;
 		}
 
 		// all underground sectors must also be defined with UndergroundSectorModel
-		for (auto sec : lair->lairSectors)
+		for (auto const& sec : lair->lairSectors)
 		{
 			if (sec.sectorLevel == 0)
 			{
-				STLOGW("Lair sector ({}) is not in the underground. This may cause problems.", sec.sectorId);
+				SLOGW("Lair sector ({}) is not in the underground. This may cause problems.", sec.sectorId);
 				continue;
 			}
 			bool isDefined = false;

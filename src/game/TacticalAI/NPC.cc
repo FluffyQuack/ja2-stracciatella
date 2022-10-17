@@ -36,6 +36,7 @@
 #include "Text.h"
 #include "Timer_Control.h"
 #include "WeaponModels.h"
+#include <memory>
 #include <string_theory/format>
 #include <string_theory/string>
 
@@ -43,7 +44,15 @@
 #define NUM_CIVQUOTE_SECTORS   20
 #define MINERS_CIV_QUOTE_INDEX 16
 
-static const INT16 gsCivQuoteSector[NUM_CIVQUOTE_SECTORS][2] =
+template<typename T> static inline void FreeNullArray(T*& r)
+{
+	T* const p = r;
+	if (!p) return;
+	r = 0;
+	delete[] p;
+}
+
+static const SGPSector gsCivQuoteSector[NUM_CIVQUOTE_SECTORS] =
 {
 	{  2, MAP_ROW_A },
 	{  2, MAP_ROW_B },
@@ -68,13 +77,12 @@ static const INT16 gsCivQuoteSector[NUM_CIVQUOTE_SECTORS][2] =
 	{  0, 0         },
 };
 
-#define NO_FACT                 (MAX_FACTS - 1)
-#define NO_QUEST                255
-#define QUEST_NOT_STARTED_NUM   100
-#define QUEST_DONE_NUM          200
-#define NO_QUOTE                255
-#define IRRELEVANT              255
-#define MUST_BE_NEW_DAY         254
+constexpr UINT8 NO_QUEST              = 255;
+constexpr UINT8 QUEST_NOT_STARTED_NUM = 100;
+constexpr UINT8 QUEST_DONE_NUM        = 200;
+constexpr UINT8 NO_QUOTE              = 255;
+constexpr UINT8 IRRELEVANT            = 255;
+constexpr UINT8 MUST_BE_NEW_DAY       = 254;
 #define NO_MOVE                 65535
 #define INITIATING_FACTOR       30
 
@@ -160,8 +168,8 @@ static UINT8 const gubAlternateNPCFileNumsForElliotMeanwhiles[] = { 180, 181, 18
 
 static NPCQuoteInfo* ExtractNPCQuoteInfoArrayFromFile(HWFILE const f)
 {
-	SGP::Buffer<NPCQuoteInfo> buf(NUM_NPC_QUOTE_RECORDS);
-	for (NPCQuoteInfo* i = buf; i != buf + NUM_NPC_QUOTE_RECORDS; ++i)
+	auto buf = std::make_unique<NPCQuoteInfo[]>(NUM_NPC_QUOTE_RECORDS);
+	for (NPCQuoteInfo* i = &buf[0]; i != &buf[NUM_NPC_QUOTE_RECORDS]; ++i)
 	{
 		BYTE data[32];
 		f->read(data, sizeof(data));
@@ -178,7 +186,9 @@ static NPCQuoteInfo* ExtractNPCQuoteInfoArrayFromFile(HWFILE const f)
 		EXTR_U16( d, i->fFlags)
 		EXTR_I16( d, i->sRequiredItem)
 		EXTR_U16( d, i->usFactMustBeTrue)
+		if (i->usFactMustBeTrue > FACT_PLAYER_KILLED_BOXERS) i->usFactMustBeTrue = FACT_NONE;
 		EXTR_U16( d, i->usFactMustBeFalse)
+		if (i->usFactMustBeFalse > FACT_PLAYER_KILLED_BOXERS) i->usFactMustBeFalse = FACT_NONE;
 		EXTR_U8(  d, i->ubQuest)
 		EXTR_U8(  d, i->ubFirstDay)
 		EXTR_U8(  d, i->ubLastDay)
@@ -201,7 +211,7 @@ static NPCQuoteInfo* ExtractNPCQuoteInfoArrayFromFile(HWFILE const f)
 		}
 		Assert(d.getConsumed() == lengthof(data));
 	}
-	return buf.Release();
+	return buf.release();
 }
 
 
@@ -312,7 +322,7 @@ try
 }
 catch (const std::exception& e)
 {
-	STLOGE("caught exception: {}", e.what());
+	SLOGE("caught exception: {}", e.what());
 	return 0;
 }
 catch (...) { return 0; }
@@ -374,7 +384,7 @@ static NPCQuoteInfo* EnsureQuoteFileLoaded(UINT8 const ubNPC)
 		{
 			if (!gfTriedToLoadQuoteInfoArray[ubNPC]) // don't report the error a second time
 			{
-				SLOGE("NPC needs NPC file: %d.", ubNPC );
+				SLOGE("NPC needs NPC file: {}.", ubNPC);
 				gfTriedToLoadQuoteInfoArray[ubNPC] = TRUE;
 			}
 			// error message at this point!
@@ -447,7 +457,7 @@ static NPCQuoteInfo* LoadCivQuoteFile(UINT8 const idx)
 	}
 	else
 	{
-		sprintf(buf, NPCDATADIR "/%c%d.npc", 'A' + gsCivQuoteSector[idx][1] - 1, gsCivQuoteSector[idx][0]);
+		sprintf(buf, NPCDATADIR "/%s.npc", gsCivQuoteSector[idx].AsShortString().c_str());
 		filename = buf;
 	}
 	AutoSGPFile f(GCM->openGameResForReading(filename));
@@ -1042,7 +1052,7 @@ static UINT8 HandleNPCBeingGivenMoneyByPlayer(UINT8 const ubNPC, UINT32 const ui
 
 					if ( giHospitalRefund > 0 )
 					{
-						giHospitalRefund = __max( 0, giHospitalRefund - iCost + uiMoneyAmount );
+						giHospitalRefund = std::max(0U, giHospitalRefund - iCost + uiMoneyAmount);
 					}
 					giHospitalTempBalance = 0;
 				}
@@ -1135,9 +1145,9 @@ static UINT8 NPCConsiderQuote(UINT8 const ubNPC, UINT8 const ubMerc, Approach co
 
 	if (ubApproach != NPC_INITIATING_CONV && ubMerc != NO_PROFILE)
 	{
-		SLOGD("New Approach for NPC ID: %d '%s' against Merc: %d '%s'\n\
-														\tTesting Record #: %d",
-					ubNPC, GetProfile(ubNPC).zNickname.c_str(), ubMerc, GetProfile(ubMerc).zNickname.c_str(), ubQuoteNum);
+		SLOGD("New Approach for NPC ID: {} '{}' against Merc: {} '{}'\n\
+														\tTesting Record #: {}",
+			ubNPC, GetProfile(ubNPC).zNickname, ubMerc, GetProfile(ubMerc).zNickname, ubQuoteNum);
 	}
 
 	if (pNPCQuoteInfo->fFlags & QUOTE_FLAG_SAID)
@@ -1150,57 +1160,59 @@ static UINT8 NPCConsiderQuote(UINT8 const ubNPC, UINT8 const ubMerc, Approach co
 		return( FALSE );
 	}
 
+	/* quest ∈ [0, MAX_QUESTS) : Quest in progress
+	 * quest ∈ [100, MAX_QUESTS + 100) : Quest not started
+	 * quest ∈ [200, MAX_QUESTS + 200) : Quest done */
+	UINT8 const quest = pNPCQuoteInfo->ubQuest;
+
 	// if the quote is quest-specific, is the player on that quest?
-	if (pNPCQuoteInfo->ubQuest != NO_QUEST)
+	if (quest != NO_QUEST)
 	{
-		if (pNPCQuoteInfo->ubQuest > QUEST_DONE_NUM && (pNPCQuoteInfo->ubQuest - QUEST_DONE_NUM) < MAX_QUESTS)
+		if (quest % 100 >= MAX_QUESTS)
 		{
-			if (gubQuest[pNPCQuoteInfo->ubQuest - QUEST_DONE_NUM] != QUESTDONE)
+			throw std::out_of_range(ST::format("invalid quest index: {}", quest).c_str());
+		}
+
+		if (quest > QUEST_DONE_NUM)
+		{
+			if (gubQuest[quest - QUEST_DONE_NUM] != QUESTDONE)
 			{
 				return( FALSE );
 			}
 		}
-		else if (pNPCQuoteInfo->ubQuest > QUEST_NOT_STARTED_NUM && (pNPCQuoteInfo->ubQuest - QUEST_NOT_STARTED_NUM) < MAX_QUESTS)
+		else if (quest > QUEST_NOT_STARTED_NUM)
 		{
-			if (gubQuest[pNPCQuoteInfo->ubQuest - QUEST_NOT_STARTED_NUM] != QUESTNOTSTARTED)
+			if (gubQuest[quest - QUEST_NOT_STARTED_NUM] != QUESTNOTSTARTED)
 			{
 				return( FALSE );
 			}
 		}
-		else if (pNPCQuoteInfo->ubQuest < MAX_QUESTS)
+		else if (gubQuest[quest] != QUESTINPROGRESS)
 		{
-			if (gubQuest[pNPCQuoteInfo->ubQuest] != QUESTINPROGRESS)
-			{
-				return( FALSE );
-			}
-		}
-		else
-		{
-			ST::string err = ST::format("invalid quest index: {}", pNPCQuoteInfo->ubQuest);
-			throw std::runtime_error(err.to_std_string());
+			return( FALSE );
 		}
 	}
 
 	// if there are facts to be checked, check them
-	if (pNPCQuoteInfo->usFactMustBeTrue != NO_FACT)
+	if (pNPCQuoteInfo->usFactMustBeTrue != FACT_NONE)
 	{
 		fTrue = CheckFact((Fact)pNPCQuoteInfo->usFactMustBeTrue, ubNPC);
 		if (ubApproach != NPC_INITIATING_CONV)
 		{
-			SLOGD("Fact (%d:'%s') Must be True, status is %s",
-						pNPCQuoteInfo->usFactMustBeTrue, FactDescText[pNPCQuoteInfo->usFactMustBeTrue].c_str(),
+			SLOGD("Fact ({}:'{}') Must be True, status is {}",
+						pNPCQuoteInfo->usFactMustBeTrue, FactDescText[pNPCQuoteInfo->usFactMustBeTrue],
 						fTrue ? "True" : "False, returning");
 		}
 		if (!fTrue) return FALSE;
 	}
 
-	if (pNPCQuoteInfo->usFactMustBeFalse != NO_FACT)
+	if (pNPCQuoteInfo->usFactMustBeFalse != FACT_NONE)
 	{
 		fTrue = CheckFact((Fact)pNPCQuoteInfo->usFactMustBeFalse, ubNPC);
 		if (ubApproach != NPC_INITIATING_CONV)
 		{
-			SLOGD("Fact(%d:'%s') Must be False status is  %s",
-						pNPCQuoteInfo->usFactMustBeFalse, FactDescText[pNPCQuoteInfo->usFactMustBeFalse].c_str(),
+			SLOGD("Fact({}:'{}') Must be False status is  {}",
+						pNPCQuoteInfo->usFactMustBeFalse, FactDescText[pNPCQuoteInfo->usFactMustBeFalse],
 						(fTrue == TRUE) ? "True, return" : "FALSE" );
 		}
 		if (fTrue)	return( FALSE );
@@ -1213,7 +1225,7 @@ static UINT8 NPCConsiderQuote(UINT8 const ubNPC, UINT8 const ubMerc, Approach co
 	{
 		if (ubApproach != NPC_INITIATING_CONV)
 		{
-			SLOGD("Approach Taken(%d) must equal required Approach(%d) = %s",
+			SLOGD("Approach Taken({}) must equal required Approach({}) = {}",
 						ubApproach, pNPCQuoteInfo->ubApproachRequired,
 						(ubApproach != pNPCQuoteInfo->ubApproachRequired) ? "TRUE, return" : "FALSE" );
 		}
@@ -1243,7 +1255,7 @@ static UINT8 NPCConsiderQuote(UINT8 const ubNPC, UINT8 const ubMerc, Approach co
 	{
 		if (ubApproach != NPC_INITIATING_CONV)
 		{
-			SLOGD("Time constraints. Current Day(%d) must <= Day last spoken too (%d) : %s",
+			SLOGD("Time constraints. Current Day({}) must <= Day last spoken too ({}) : {}",
 						uiDay, pNPCProfile->ubLastDateSpokenTo,
 						(uiDay <= pNPCProfile->ubLastDateSpokenTo) ? "TRUE, return" : "FALSE" );
 		}
@@ -1258,7 +1270,7 @@ static UINT8 NPCConsiderQuote(UINT8 const ubNPC, UINT8 const ubMerc, Approach co
 	{
 		if (ubApproach != NPC_INITIATING_CONV)
 		{
-			SLOGD("Current Day(%d) is before Required first day(%d) = %s",
+			SLOGD("Current Day({}) is before Required first day({}) = {}",
 						uiDay, pNPCQuoteInfo->ubFirstDay,
 						(uiDay < pNPCQuoteInfo->ubFirstDay) ? "False, returning" : "True" );
 		}
@@ -1270,7 +1282,7 @@ static UINT8 NPCConsiderQuote(UINT8 const ubNPC, UINT8 const ubMerc, Approach co
 	{
 		if (ubApproach != NPC_INITIATING_CONV)
 		{
-			SLOGD("Current Day(%d) is after Required first day(%d) = %s",
+			SLOGD("Current Day({}) is after Required first day({}) = {}",
 						uiDay, pNPCQuoteInfo->ubFirstDay,
 						(uiDay > pNPCQuoteInfo->ubLastDay) ? "TRUE, returning" : "FALSE" );
 		}
@@ -1283,7 +1295,7 @@ static UINT8 NPCConsiderQuote(UINT8 const ubNPC, UINT8 const ubMerc, Approach co
 	{
 		if (ubApproach != NPC_INITIATING_CONV)
 		{
-			SLOGD("Opinion Required.  Talk Desire (%d), Opinion Required(%d) : %s",
+			SLOGD("Opinion Required.  Talk Desire ({}), Opinion Required({}) : {}",
 						ubTalkDesire, pNPCQuoteInfo->ubOpinionRequired,
 						(ubTalkDesire < pNPCQuoteInfo->ubOpinionRequired) ? "False, return" : "False, continue" );
 		}
@@ -1358,7 +1370,7 @@ void ResetOncePerConvoRecordsForNPC( UINT8 ubNPC )
 
 void ResetOncePerConvoRecordsForAllNPCsInLoadedSector( void )
 {
-	if ( gWorldSectorX == 0 || gWorldSectorY == 0 )
+	if (!gWorldSector.IsValid())
 	{
 		return;
 	}
@@ -1369,9 +1381,7 @@ void ResetOncePerConvoRecordsForAllNPCsInLoadedSector( void )
 		if (!p->isNPCorRPC()) continue;
 
 		ProfileID ubMercID = p->getID();
-		if ( gMercProfiles[ubMercID].sSectorX == gWorldSectorX &&
-				gMercProfiles[ubMercID].sSectorY == gWorldSectorY &&
-				gMercProfiles[ubMercID].bSectorZ == gbWorldSectorZ &&
+		if (gMercProfiles[ubMercID].sSector == gWorldSector &&
 				gpNPCQuoteInfoArray[ubMercID] != NULL )
 		{
 			ResetOncePerConvoRecordsForNPC(ubMercID);
@@ -1418,6 +1428,7 @@ static void ReturnItemToPlayer(ProfileID const merc, OBJECTTYPE* const o)
 	if (!o) return;
 
 	SOLDIERTYPE* const s = FindSoldierByProfileID(merc);
+	if (!s) return;
 
 	// Try to auto place object and then if it fails, put into cursor
 	if (!AutoPlaceObject(s, o, FALSE))
@@ -1610,7 +1621,7 @@ void ConverseFull(UINT8 const ubNPC, UINT8 const ubMerc, Approach bApproach, UIN
 					break;
 				case TRIGGER_NPC:
 					// if triggering, pass in the approach data as the record to consider
-					STLOGD("Handling trigger {}/{} at {}", gMercProfiles[ubNPC].zNickname.c_str(), approach_record, GetJA2Clock());
+					SLOGD("Handling trigger {}/{} at {}", gMercProfiles[ubNPC].zNickname, approach_record, GetJA2Clock());
 					NPCConsiderTalking(ubNPC, ubMerc, bApproach, approach_record, pNPCQuoteInfoArray, &pQuotePtr, &ubRecordNum);
 					break;
 				default:
@@ -1723,11 +1734,14 @@ void ConverseFull(UINT8 const ubNPC, UINT8 const ubMerc, Approach bApproach, UIN
 				if ( pQuotePtr->sActionData <= -NPC_ACTION_TURN_TO_FACE_NEAREST_MERC )
 				{
 					SOLDIERTYPE* const pSoldier = FindSoldierByProfileID(ubNPC);
-					ZEROTIMECOUNTER( pSoldier->AICounter );
-					if (pSoldier->bNextAction == AI_ACTION_WAIT)
+					if (pSoldier)
 					{
-						pSoldier->bNextAction = AI_ACTION_NONE;
-						pSoldier->usNextActionData = 0;
+						ZEROTIMECOUNTER( pSoldier->AICounter );
+						if (pSoldier->bNextAction == AI_ACTION_WAIT)
+						{
+							pSoldier->bNextAction = AI_ACTION_NONE;
+							pSoldier->usNextActionData = 0;
+						}
 					}
 					NPCDoAction( ubNPC, (UINT16) -(pQuotePtr->sActionData), ubRecordNum );
 				}
@@ -1760,7 +1774,7 @@ void ConverseFull(UINT8 const ubNPC, UINT8 const ubMerc, Approach bApproach, UIN
 						SOLDIERTYPE* const pSoldier = FindSoldierByProfileID(ubMerc);
 
 						// Is this one of us?
-						if ( pSoldier->bTeam == OUR_TEAM )
+						if (pSoldier && pSoldier->bTeam == OUR_TEAM)
 						{
 							INT8 const bSlot = FindExactObj(pSoldier, o);
 							if (bSlot != NO_SLOT)
@@ -1799,17 +1813,17 @@ void ConverseFull(UINT8 const ubNPC, UINT8 const ubMerc, Approach bApproach, UIN
 				}
 
 				// Set things
-				if (pQuotePtr->usSetFactTrue != NO_FACT)
+				if (pQuotePtr->usSetFactTrue != FACT_NONE)
 				{
 					SetFactTrue((Fact)pQuotePtr->usSetFactTrue);
 				}
 				if (pQuotePtr->ubEndQuest != NO_QUEST)
 				{
-					EndQuest( pQuotePtr->ubEndQuest, gWorldSectorX, gWorldSectorY );
+					EndQuest(pQuotePtr->ubEndQuest, gWorldSector);
 				}
 				if (pQuotePtr->ubStartQuest != NO_QUEST)
 				{
-					StartQuest( pQuotePtr->ubStartQuest, gWorldSectorX, gWorldSectorY );
+					StartQuest(pQuotePtr->ubStartQuest, gWorldSector);
 				}
 
 				// Give item to merc?
@@ -1870,38 +1884,43 @@ void ConverseFull(UINT8 const ubNPC, UINT8 const ubMerc, Approach bApproach, UIN
 				else if ( pQuotePtr->usGiftItem != 0 )
 				{
 					{
-						INT8 bInvPos;
-
 						SOLDIERTYPE* const pSoldier = FindSoldierByProfileID(ubNPC);
+						if (pSoldier)
+						{
+							// Look for item....
+							INT8 const bInvPos = FindObj( pSoldier, pQuotePtr->usGiftItem );
+							if (bInvPos == NO_SLOT) throw std::logic_error("NPC.cc: Gift item does not exist in NPC.");
 
-						// Look for item....
-						bInvPos = FindObj( pSoldier, pQuotePtr->usGiftItem );
-
-						AssertMsg( bInvPos != NO_SLOT, "NPC.C:  Gift item does not exist in NPC." );
-
-						TalkingMenuGiveItem( ubNPC, &(pSoldier->inv[ bInvPos ] ), bInvPos );
+							TalkingMenuGiveItem( ubNPC, &(pSoldier->inv[ bInvPos ] ), bInvPos );
+						}
 					}
 				}
 				// Action before movement?
 				if ( pQuotePtr->sActionData < 0 && pQuotePtr->sActionData > -NPC_ACTION_TURN_TO_FACE_NEAREST_MERC )
 				{
 					SOLDIERTYPE* const pSoldier = FindSoldierByProfileID(ubNPC);
-					ZEROTIMECOUNTER( pSoldier->AICounter );
-					if (pSoldier->bNextAction == AI_ACTION_WAIT)
+					if (pSoldier)
 					{
-						pSoldier->bNextAction = AI_ACTION_NONE;
-						pSoldier->usNextActionData = 0;
+						ZEROTIMECOUNTER( pSoldier->AICounter );
+						if (pSoldier->bNextAction == AI_ACTION_WAIT)
+						{
+							pSoldier->bNextAction = AI_ACTION_NONE;
+							pSoldier->usNextActionData = 0;
+						}
 					}
 					NPCDoAction( ubNPC, (UINT16) -(pQuotePtr->sActionData), ubRecordNum );
 				}
 				else if ( pQuotePtr->usGoToGridno == NO_MOVE && pQuotePtr->sActionData > 0 )
 				{
 					SOLDIERTYPE* const pSoldier = FindSoldierByProfileID(ubNPC);
-					ZEROTIMECOUNTER( pSoldier->AICounter );
-					if (pSoldier->bNextAction == AI_ACTION_WAIT)
+					if (pSoldier)
 					{
-						pSoldier->bNextAction = AI_ACTION_NONE;
-						pSoldier->usNextActionData = 0;
+						ZEROTIMECOUNTER( pSoldier->AICounter );
+						if (pSoldier->bNextAction == AI_ACTION_WAIT)
+						{
+							pSoldier->bNextAction = AI_ACTION_NONE;
+							pSoldier->usNextActionData = 0;
+						}
 					}
 					NPCDoAction( ubNPC, (UINT16) (pQuotePtr->sActionData), ubRecordNum );
 				}
@@ -2181,7 +2200,7 @@ void TriggerNPCRecord(UINT8 const ubTriggerNPC, UINT8 const record)
 	}
 	else
 	{ // don't do anything
-		SLOGW("trigger of %d, record %d cannot proceed, possible error", ubTriggerNPC, record);
+		SLOGW("trigger of {}, record {} cannot proceed, possible error", ubTriggerNPC, record);
 	}
 }
 
@@ -2201,7 +2220,7 @@ void TriggerNPCRecordImmediately(UINT8 const ubTriggerNPC, UINT8 const record)
 	}
 	else
 	{ // don't do anything
-		SLOGW("trigger of %d, record %d cannot proceed, possible error", ubTriggerNPC, record);
+		SLOGW("trigger of {}, record {} cannot proceed, possible error", ubTriggerNPC, record);
 	}
 }
 
@@ -2220,6 +2239,7 @@ void PCsNearNPC( UINT8 ubNPC )
 	// Clear values!
 	// Get value for NPC
 	SOLDIERTYPE* const pSoldier = FindSoldierByProfileID(ubNPC);
+	if (!pSoldier) return;
 	pSoldier->ubQuoteRecord = 0;
 
 	for ( ubLoop = 0; ubLoop < NUM_NPC_QUOTE_RECORDS; ubLoop++ )
@@ -2249,6 +2269,7 @@ BOOLEAN PCDoesFirstAidOnNPC( UINT8 ubNPC )
 	if (!pNPCQuoteInfoArray) return FALSE; // error
 
 	SOLDIERTYPE* const pSoldier = FindSoldierByProfileID(ubNPC);
+	if (!pSoldier) return FALSE;
 	// Clear values!
 	pSoldier->ubQuoteRecord = 0;
 
@@ -2278,6 +2299,7 @@ static void TriggerClosestMercWhoCanSeeNPC(UINT8 ubNPC, NPCQuoteInfo* pQuotePtr)
 	UINT8	ubNumMercs = 0;
 
 	const SOLDIERTYPE* const pSoldier = FindSoldierByProfileID(ubNPC);
+	if (!pSoldier) return;
 
 	// Loop through all our guys and randomly say one from someone in our sector
 	SOLDIERTYPE* mercs_in_sector[40];
@@ -2650,26 +2672,26 @@ void HandleNPCChangesForTacticalTraversal(const SOLDIERTYPE* s)
 	MERCPROFILESTRUCT& p = GetProfile(s->ubProfile);
 	switch (s->ubQuoteActionID)
 	{
-		case QUOTE_ACTION_ID_TRAVERSE_EAST:  p.sSectorX++; break;
-		case QUOTE_ACTION_ID_TRAVERSE_SOUTH: p.sSectorY++; break;
-		case QUOTE_ACTION_ID_TRAVERSE_WEST:  p.sSectorX--; break;
-		case QUOTE_ACTION_ID_TRAVERSE_NORTH: p.sSectorY--; break;
+		case QUOTE_ACTION_ID_TRAVERSE_EAST:  p.sSector.x++; break;
+		case QUOTE_ACTION_ID_TRAVERSE_SOUTH: p.sSector.y++; break;
+		case QUOTE_ACTION_ID_TRAVERSE_WEST:  p.sSector.x--; break;
+		case QUOTE_ACTION_ID_TRAVERSE_NORTH: p.sSector.y--; break;
 		default: return;
 	}
 
 	// Call to change the NPC's Sector Location
-	ChangeNpcToDifferentSector(p, p.sSectorX, p.sSectorY, p.bSectorZ);
+	ChangeNpcToDifferentSector(p, p.sSector);
 }
 
 
-void HandleVictoryInNPCSector(INT16 const x, INT16 const y, INT16 const z)
+void HandleVictoryInNPCSector(const SGPSector& sector)
 {
 	// handle special cases of victory in certain sector
 
 	// not the surface?..leave
-	if (z != 0) return;
+	if (sector.z != 0) return;
 
-	switch (SECTOR(x, y))
+	switch (sector.AsByte())
 	{
 		case SEC_F10:
 			FOR_EACH_IN_TEAM(s, CIV_TEAM)
@@ -2761,23 +2783,22 @@ BOOLEAN RecordHasDialogue(UINT8 const ubNPC, UINT8 const ubRecord)
 }
 
 
-static INT8 FindCivQuoteFileIndex(INT16 const x, INT16 const y, INT16 const z)
+static INT8 FindCivQuoteFileIndex(const SGPSector& sector)
 {
-	if (z > 0) return MINERS_CIV_QUOTE_INDEX;
+	if (sector.z > 0) return MINERS_CIV_QUOTE_INDEX;
 
 	for (UINT8 i = 0; i != NUM_CIVQUOTE_SECTORS; ++i)
 	{
-		if (gsCivQuoteSector[i][0] != x) continue;
-		if (gsCivQuoteSector[i][1] != y) continue;
+		if (gsCivQuoteSector[i] != sector) continue;
 		return i;
 	}
 	return -1;
 }
 
 
-INT8 ConsiderCivilianQuotes(INT16 const x, INT16 const y, INT16 const z, BOOLEAN const set_as_used)
+INT8 ConsiderCivilianQuotes(const SGPSector& sector, BOOLEAN const set_as_used)
 {
-	INT8 const quote_file_idx = FindCivQuoteFileIndex(x, y, z);
+	INT8 const quote_file_idx = FindCivQuoteFileIndex(sector);
 	if (quote_file_idx == -1) return -1; // no hints for this sector
 
 	NPCQuoteInfo* const quotes = EnsureCivQuoteFileLoaded(quote_file_idx);
@@ -2795,7 +2816,7 @@ INT8 ConsiderCivilianQuotes(INT16 const x, INT16 const y, INT16 const z, BOOLEAN
 
 		if (q.ubStartQuest != NO_QUEST)
 		{
-			StartQuest(q.ubStartQuest, gWorldSectorX, gWorldSectorY);
+			StartQuest(q.ubStartQuest, gWorldSector);
 		}
 
 		return q.ubQuoteNum;

@@ -212,7 +212,7 @@ UINT8 ShootingStanceChange( SOLDIERTYPE * pSoldier, ATTACKTYPE * pAttack, INT8 b
 	}
 	for (bLoop = 0; bLoop < 3; bLoop++)
 	{
-		bStanceDiff = ABS( bLoop - bStanceNum );
+		bStanceDiff = std::abs(bLoop - bStanceNum);
 		if (bStanceDiff == 2 && bAPsAfterAttack < AP_CROUCH + AP_PRONE)
 		{
 			// can't consider this!
@@ -468,7 +468,7 @@ BOOLEAN IsActionAffordable(SOLDIERTYPE *pSoldier)
 			break;
 
 		case AI_ACTION_PICKUP_ITEM:           // grab things lying on the ground
-			bMinPointsNeeded = __max( MinPtsToMove( pSoldier ), AP_PICKUP_ITEM );
+			bMinPointsNeeded = std::max(MinPtsToMove(pSoldier), INT8(AP_PICKUP_ITEM));
 			break;
 
 		case AI_ACTION_OPEN_OR_CLOSE_DOOR:
@@ -679,12 +679,12 @@ INT16 RandDestWithinRange(SOLDIERTYPE *pSoldier)
 		sOrigX = usOrigin % MAXCOL;
 		sOrigY = usOrigin / MAXCOL;
 
-		sMaxLeft  = MIN(usMaxDist, sOrigX);
-		sMaxRight = MIN(usMaxDist,MAXCOL - (sOrigX + 1));
+		sMaxLeft  = std::min(int(usMaxDist), int(sOrigX));
+		sMaxRight = std::min(int(usMaxDist), MAXCOL - (sOrigX + 1));
 
 		// determine maximum vertical limits
-		sMaxUp   = MIN(usMaxDist, sOrigY);
-		sMaxDown = MIN(usMaxDist,MAXROW - (sOrigY + 1));
+		sMaxUp   = std::min(int(usMaxDist), int(sOrigY));
+		sMaxDown = std::min(int(usMaxDist), MAXROW - (sOrigY + 1));
 
 		sXRange = sMaxLeft + sMaxRight + 1;
 		sYRange = sMaxUp + sMaxDown + 1;
@@ -1203,7 +1203,7 @@ static INT16 FindClosestClimbPointAvailableToAI(SOLDIERTYPE* pSoldier, INT16 sSt
 		if (pSoldier->bOrders == ONGUARD || pSoldier->bOrders == CLOSEPATROL)
 		{
 			//Make it so he cant climb down off the roof
-			STLOGD("TacticalAI: soldier #{} is on guard ({}) and not allowed to climb down", pSoldier->ubID, pSoldier->bOrders);
+			SLOGD("TacticalAI: soldier #{} is on guard ({}) and not allowed to climb down", pSoldier->ubID, pSoldier->bOrders);
 			return NOWHERE;
 		}
 	}
@@ -1491,9 +1491,7 @@ INT16 DistanceToClosestFriend( SOLDIERTYPE * pSoldier )
 		else
 		{
 			// compare sector #s
-			if ( (pSoldier->sSectorX != pTargetSoldier->sSectorX) ||
-				(pSoldier->sSectorY != pTargetSoldier->sSectorY) ||
-				(pSoldier->bSectorZ != pTargetSoldier->bSectorZ) )
+			if (pSoldier->sSector != pTargetSoldier->sSector)
 			{
 				continue;
 			}
@@ -1572,7 +1570,7 @@ BOOLEAN InLightAtNight( INT16 sGridNo, INT8 bLevel )
 	UINT8 ubBackgroundLightLevel;
 
 	// do not consider us to be "in light" if we're in an underground sector
-	if ( gbWorldSectorZ > 0 )
+	if (gWorldSector.z > 0)
 	{
 		return( FALSE );
 	}
@@ -1809,7 +1807,7 @@ INT8 CalcMorale(SOLDIERTYPE *pSoldier)
 		(pSoldier->bAttitude == BRAVESOLO || pSoldier->bAttitude == BRAVEAID))
 		bMoraleCategory = MORALE_WORRIED;
 
-	SLOGD("Morale = %d (category %d), iOurTotalThreat %d, iTheirTotalThreat %d",
+	SLOGD("Morale = {} (category {}), iOurTotalThreat {}, iTheirTotalThreat {}",
 				sMorale, bMoraleCategory, iOurTotalThreat, iTheirTotalThreat);
 
 	return(bMoraleCategory);
@@ -2058,7 +2056,7 @@ UINT8 GetTraversalQuoteActionID( INT8 bDirection )
 UINT8 SoldierDifficultyLevel( const SOLDIERTYPE * pSoldier )
 {
 	INT8 bDifficultyBase;
-	INT8 bDifficulty;
+	int bDifficulty;
 
 	// difficulty modifier ranges from 0 to 100
 	// and we want to end up with a number between 0 and 4 (4=hardest)
@@ -2104,9 +2102,7 @@ UINT8 SoldierDifficultyLevel( const SOLDIERTYPE * pSoldier )
 			break;
 
 	}
-
-	bDifficulty = __max( bDifficulty, 0 );
-	bDifficulty = __min( bDifficulty, 4 );
+	bDifficulty = std::clamp(bDifficulty, 0, 4);
 
 	return( (UINT8) bDifficulty );
 }
@@ -2118,7 +2114,7 @@ BOOLEAN ValidCreatureTurn( SOLDIERTYPE * pCreature, INT8 bNewDirection )
 	INT8    bLoop;
 	BOOLEAN fFound;
 
-	bDirChange = (INT8) QuickestDirection( pCreature->bDirection, bNewDirection );
+	bDirChange = QuickestDirection( pCreature->bDirection, bNewDirection );
 
 	for( bLoop = 0; bLoop < 2; bLoop++ )
 	{

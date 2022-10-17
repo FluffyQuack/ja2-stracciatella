@@ -152,7 +152,7 @@ static AttachmentInfo g_ceramic_attachment(CERAMIC_PLATES, "CERAMIC PLATES");
 static AttachmentInfo g_detonator_attachment(DETONATOR, "DETONATOR");
 
 GUIButtonRef guiActionItemButton;
-static void ActionItemCallback(GUI_BUTTON* btn, INT32 reason);
+static void ActionItemCallback(GUI_BUTTON* btn, UINT32 reason);
 INT8 gbActionItemIndex = ACTIONITEM_MEDIUM;
 INT8 gbDefaultBombTrapLevel = 9;
 
@@ -538,9 +538,9 @@ void UpdateItemStatsPanel()
 }
 
 
-static void RealisticOnlyCheckboxCallback(GUI_BUTTON* btn, INT32 reason)
+static void RealisticOnlyCheckboxCallback(GUI_BUTTON* btn, UINT32 reason)
 {
-	if( reason & MSYS_CALLBACK_REASON_LBUTTON_UP )
+	if( reason & MSYS_CALLBACK_REASON_POINTER_UP )
 	{
 		giRealisticCheckboxButton->uiFlags |= BUTTON_CLICKED_ON | BUTTON_DIRTY;
 		giSciFiCheckboxButton->uiFlags     &= ~BUTTON_CLICKED_ON;
@@ -554,9 +554,9 @@ static void RealisticOnlyCheckboxCallback(GUI_BUTTON* btn, INT32 reason)
 }
 
 
-static void SciFiOnlyCheckboxCallback(GUI_BUTTON* btn, INT32 reason)
+static void SciFiOnlyCheckboxCallback(GUI_BUTTON* btn, UINT32 reason)
 {
-	if( reason & MSYS_CALLBACK_REASON_LBUTTON_UP )
+	if( reason & MSYS_CALLBACK_REASON_POINTER_UP )
 	{
 		giRealisticCheckboxButton->uiFlags &= ~BUTTON_CLICKED_ON;
 		giRealisticCheckboxButton->uiFlags |= BUTTON_DIRTY;
@@ -570,9 +570,9 @@ static void SciFiOnlyCheckboxCallback(GUI_BUTTON* btn, INT32 reason)
 }
 
 
-static void BothModesCheckboxCallback(GUI_BUTTON* btn, INT32 reason)
+static void BothModesCheckboxCallback(GUI_BUTTON* btn, UINT32 reason)
 {
-	if( reason & MSYS_CALLBACK_REASON_LBUTTON_UP )
+	if( reason & MSYS_CALLBACK_REASON_POINTER_UP )
 	{
 		giRealisticCheckboxButton->uiFlags &= ~BUTTON_CLICKED_ON;
 		giRealisticCheckboxButton->uiFlags |= BUTTON_DIRTY;
@@ -636,7 +636,7 @@ static bool MakeAttachmentButton(AttachmentInfo& a, INT16 const x, INT16 const y
 
 
 static void ReEvaluateAttachmentStatii(void);
-static void ToggleWeaponAttachment(GUI_BUTTON* btn, INT32 reason);
+static void ToggleWeaponAttachment(GUI_BUTTON* btn, UINT32 reason);
 
 
 static void SetupGunGUI()
@@ -684,7 +684,7 @@ static void ExtractAndUpdateGunGUI(void)
 	if( i == -1 )
 		i = 20 + Random( 81 );
 	else
-		i = MIN( i, 100 );
+		i = std::min(i, 100);
 	gpItem->bGunStatus = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 1, i );
 	//Update the ammo
@@ -692,18 +692,18 @@ static void ExtractAndUpdateGunGUI(void)
 	if( i == -1 )
 		i = Random( 1 + GCM->getWeapon( gpItem->usItem )->ubMagSize );
 	else
-		i = MIN( i, GCM->getWeapon( gpItem->usItem )->ubMagSize );
+		i = std::min(i, int(GCM->getWeapon(gpItem->usItem)->ubMagSize));
 	gpItem->ubGunShotsLeft = (UINT8)i;
 	SetInputFieldStringWithNumericStrictValue( 2, i );
 	//Update the trap level
 	i = GetNumericStrictValueFromField( 3 );
-	i = ( i == -1 ) ? 0 : MIN( i, 20 );
+	i = ( i == -1 ) ? 0 : std::min(i, 20);
 	gpItem->bTrap = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 3, i );
 	if( gpEditingItemPool )
 	{
 		giDefaultExistChance = GetNumericStrictValueFromField( 4 );
-		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : MAX( 1, MIN( giDefaultExistChance, 100 ) );
+		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : std::clamp(giDefaultExistChance, 1, 100);
 		GetWorldItem(gpEditingItemPool->iItemIndex).ubNonExistChance = 100 - giDefaultExistChance;
 		SetInputFieldStringWithNumericStrictValue( 4, giDefaultExistChance );
 	}
@@ -732,25 +732,26 @@ static void RemoveAmmoGUI(void)
 
 static void ExtractAndUpdateAmmoGUI(void)
 {
-	INT32 i;
 	//Update the number of clips
-	i = GetNumericStrictValueFromField( 1 );
+	int i = GetNumericStrictValueFromField(1);
+	int perPocket = GCM->getItem(gpItem->usItem)->getPerPocket();
 	if( i == -1 )
-		i = 1 + Random( GCM->getItem(gpItem->usItem )->getPerPocket() );
+		i = 1 + Random(perPocket);
 	else
-		i = MAX( 1, MIN( i, GCM->getItem(gpItem->usItem )->getPerPocket() ) );
+		i = perPocket > 1 ? std::clamp(i, 1, perPocket) : 1;
+
 	gpItem->ubNumberOfObjects = (UINT8)i;
 	SetInputFieldStringWithNumericStrictValue( 1, i );
 	CreateItems( gpItem->usItem, 100, gpItem->ubNumberOfObjects, gpItem );
 	//Update the trap level
 	i = GetNumericStrictValueFromField( 2 );
-	i = ( i == -1 ) ? 0 : MIN( i, 20 );
+	i = ( i == -1 ) ? 0 : std::min(i, 20);
 	gpItem->bTrap = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 2, i );
 	if( gpEditingItemPool )
 	{
 		giDefaultExistChance = GetNumericStrictValueFromField( 3 );
-		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : MAX( 1, MIN( giDefaultExistChance, 100 ) );
+		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : std::clamp(giDefaultExistChance, 1, 100);
 		GetWorldItem(gpEditingItemPool->iItemIndex).ubNonExistChance = 100 - giDefaultExistChance;
 		SetInputFieldStringWithNumericStrictValue( 3, giDefaultExistChance );
 	}
@@ -777,9 +778,9 @@ static void ToggleAttachment(AttachmentInfo& a)
 }
 
 
-static void ToggleItemAttachment(GUI_BUTTON* const btn, INT32 const reason)
+static void ToggleItemAttachment(GUI_BUTTON* const btn, UINT32 const reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		ToggleAttachment(*btn->GetUserPtr<AttachmentInfo>());
 	}
@@ -816,18 +817,18 @@ static void ExtractAndUpdateArmourGUI(void)
 	if( i == -1 )
 		i = 20 + Random( 81 );
 	else
-		i = MIN( i, 100 );
+		i = std::min(i, 100);
 	gpItem->bStatus[0] = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 1, i );
 	//Update the trap level
 	i = GetNumericStrictValueFromField( 2 );
-	i = ( i == -1 ) ? 0 : MIN( i, 20 );
+	i = ( i == -1 ) ? 0 : std::min(i, 20);
 	gpItem->bTrap = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 2, i );
 	if( gpEditingItemPool )
 	{
 		giDefaultExistChance = GetNumericStrictValueFromField( 3 );
-		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : MAX( 1, MIN( giDefaultExistChance, 100 ) );
+		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : std::clamp(giDefaultExistChance, 1, 100);
 		GetWorldItem(gpEditingItemPool->iItemIndex).ubNonExistChance = 100 - giDefaultExistChance;
 		SetInputFieldStringWithNumericStrictValue( 3, giDefaultExistChance );
 	}
@@ -862,18 +863,18 @@ static void ExtractAndUpdateEquipGUI(void)
 	if( i == -1 )
 		i = 20 + Random( 81 );
 	else
-		i = MIN( i, 100 );
+		i = std::min(i, 100);
 	gpItem->bStatus[0] = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 1, i );
 	//Update the trap level
 	i = GetNumericStrictValueFromField( 2 );
-	i = ( i == -1 ) ? 0 : MIN( i, 20 );
+	i = ( i == -1 ) ? 0 : std::min(i, 20);
 	gpItem->bTrap = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 2, i );
 	if( gpEditingItemPool )
 	{
 		giDefaultExistChance = GetNumericStrictValueFromField( 3 );
-		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : MAX( 1, MIN( giDefaultExistChance, 100 ) );
+		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : std::clamp(giDefaultExistChance, 1, 100);
 		GetWorldItem(gpEditingItemPool->iItemIndex).ubNonExistChance = 100 - giDefaultExistChance;
 		SetInputFieldStringWithNumericStrictValue( 3, giDefaultExistChance );
 	}
@@ -910,36 +911,36 @@ static void RemoveExplosivesGUI(void)
 
 static void ExtractAndUpdateExplosivesGUI(void)
 {
-	INT32 i;
 	//Update the explosives status
-	i = GetNumericStrictValueFromField( 1 );
+	int i = GetNumericStrictValueFromField(1);
 	if( i == -1 )
 		i = 20 + Random( 81 );
 	else
-		i = MIN( i, 100 );
+		i = std::min(i, 100);
 	gpItem->bStatus[0] = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 1, i );
 	//Update the quantity
-	if( GCM->getItem(gpItem->usItem )->getPerPocket() > 1 )
+	int perPocket = GCM->getItem(gpItem->usItem)->getPerPocket();
+	if (perPocket > 1)
 	{
 		i = GetNumericStrictValueFromField( 2 );
 		if( i == -1 )
-			i = 1 + Random( GCM->getItem(gpItem->usItem )->getPerPocket() );
+			i = 1 + Random(perPocket);
 		else
-			i = MAX( 1, MIN( i, GCM->getItem(gpItem->usItem )->getPerPocket() ) );
+			i = std::clamp(i, 1, perPocket);
 		gpItem->ubNumberOfObjects = (UINT8)i;
 		SetInputFieldStringWithNumericStrictValue( 2, i );
 		CreateItems( gpItem->usItem, gpItem->bStatus[0], gpItem->ubNumberOfObjects, gpItem );
 	}
 	//Update the trap level
 	i = GetNumericStrictValueFromField( 3 );
-	i = ( i == -1 ) ? 0 : MIN( i, 20 );
+	i = ( i == -1 ) ? 0 : std::min(i, 20);
 	gpItem->bTrap = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 3, i );
 	if( gpEditingItemPool )
 	{
 		giDefaultExistChance = GetNumericStrictValueFromField( 4 );
-		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : MAX( 1, MIN( giDefaultExistChance, 100 ) );
+		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : std::clamp(giDefaultExistChance, 1, 100);
 		GetWorldItem(gpEditingItemPool->iItemIndex).ubNonExistChance = 100 - giDefaultExistChance;
 		SetInputFieldStringWithNumericStrictValue( 4, giDefaultExistChance );
 	}
@@ -966,14 +967,14 @@ static void ExtractAndUpdateMoneyGUI(void)
 	if( i == -1 )
 		i = Random( 20000 );
 	else
-		i = MAX( 1, MIN( i, 20000 ) );
+		i = std::clamp(i, 1, 20000);
 	gpItem->uiMoneyAmount = i;
 	gpItem->bStatus[0] = 100;
 	SetInputFieldStringWithNumericStrictValue( 1, i );
 	if( gpEditingItemPool )
 	{
 		giDefaultExistChance = GetNumericStrictValueFromField( 2 );
-		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : MAX( 1, MIN( giDefaultExistChance, 100 ) );
+		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : std::clamp(giDefaultExistChance, 1, 100);
 		GetWorldItem(gpEditingItemPool->iItemIndex).ubNonExistChance = 100 - giDefaultExistChance;
 		SetInputFieldStringWithNumericStrictValue( 2, giDefaultExistChance );
 	}
@@ -985,7 +986,7 @@ static void RemoveMoneyGUI(void)
 }
 
 
-static void OwnershipGroupButtonCallback(GUI_BUTTON* btn, INT32 reason);
+static void OwnershipGroupButtonCallback(GUI_BUTTON* btn, UINT32 reason);
 
 
 static void SetupOwnershipGUI(void)
@@ -996,9 +997,9 @@ static void SetupOwnershipGUI(void)
 }
 
 
-static void OwnershipGroupButtonCallback(GUI_BUTTON* btn, INT32 reason)
+static void OwnershipGroupButtonCallback(GUI_BUTTON* btn, UINT32 reason)
 {
-	if( reason & MSYS_CALLBACK_REASON_LBUTTON_DWN )
+	if( reason & MSYS_CALLBACK_REASON_POINTER_DWN )
 	{
 		InitPopupMenu(btn, OWNERSHIPGROUP_POPUP, DIR_UPLEFT);
 	}
@@ -1019,7 +1020,7 @@ static void ExtractAndUpdateOwnershipGUI(void)
 	if( i == -1 )
 		i = Random( 0 );
 	else
-		i = MAX( 0, MIN( i, 255 ) );
+		i = std::clamp(i, 0, 255);
 	gpItem->ubOwnerProfile = (UINT8)i;
 	SetInputFieldStringWithNumericStrictValue( 1, i );
 }
@@ -1047,7 +1048,7 @@ static void ExtractAndUpdateKeysGUI(void)
 	if( gpEditingItemPool )
 	{
 		giDefaultExistChance = GetNumericStrictValueFromField( 1 );
-		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : MAX( 1, MIN( giDefaultExistChance, 100 ) );
+		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : std::clamp(giDefaultExistChance, 1, 100);
 		GetWorldItem(gpEditingItemPool->iItemIndex).ubNonExistChance = 100 - giDefaultExistChance;
 		SetInputFieldStringWithNumericStrictValue( 1, giDefaultExistChance );
 	}
@@ -1084,12 +1085,12 @@ static void ExtractAndUpdateActionItemsGUI(void)
 	if( i == -1 )
 		i = 20 + Random( 81 );
 	else
-		i = MIN( i, 100 );
+		i = std::min(i, 100);
 	gpItem->bStatus[0] = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 1, i );
 	//Update the trap level
 	i = GetNumericStrictValueFromField( 2 );
-	i = ( i == -1 ) ? 0 : MIN( i, 20 );
+	i = ( i == -1 ) ? 0 : std::min(i, 20);
 	if( i != gpItem->bTrap )
 		gbDefaultBombTrapLevel = (INT8)i;
 	gpItem->bTrap = (INT8)i;
@@ -1098,7 +1099,7 @@ static void ExtractAndUpdateActionItemsGUI(void)
 	if( gpEditingItemPool )
 	{
 		giDefaultExistChance = GetNumericStrictValueFromField( 3 );
-		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : MAX( 1, MIN( giDefaultExistChance, 100 ) );
+		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : std::clamp(giDefaultExistChance, 1, 100);
 		GetWorldItem(gpEditingItemPool->iItemIndex).ubNonExistChance = 100 - giDefaultExistChance;
 		SetInputFieldStringWithNumericStrictValue( 3, giDefaultExistChance );
 	}
@@ -1111,9 +1112,9 @@ static void RemoveActionItemsGUI(void)
 }
 
 
-static void AlarmTriggerCheckboxCallback(GUI_BUTTON* btn, INT32 reason)
+static void AlarmTriggerCheckboxCallback(GUI_BUTTON* btn, UINT32 reason)
 {
-	if( reason & MSYS_CALLBACK_REASON_LBUTTON_UP )
+	if( reason & MSYS_CALLBACK_REASON_POINTER_UP )
 	{
 		if (btn->Clicked())
 			gpItem->fFlags |= OBJECT_ALARM_TRIGGER;
@@ -1149,19 +1150,19 @@ static void ExtractAndUpdateTriggersGUI(void)
 	INT32 i;
 	//Update the trap level
 	i = GetNumericStrictValueFromField( 1 );
-	i = ( i == -1 ) ? 0 : MIN( i, 20 );
+	i = ( i == -1 ) ? 0 : std::min(i, 20);
 	gpItem->bTrap = (INT8)i;
 	SetInputFieldStringWithNumericStrictValue( 1, i );
 
 	i = GetNumericStrictValueFromField( 2 );
-	i = ( i == -1 ) ? 0 : MAX( 0, MIN( i, 99 ) );
+	i = ( i == -1 ) ? 0 : std::clamp(i, 0, 99);
 	gpItem->ubTolerance = (UINT8)i;
 	SetInputFieldStringWithNumericStrictValue( 2, i );
 
 	if( gpEditingItemPool )
 	{
 		giDefaultExistChance = GetNumericStrictValueFromField( 3 );
-		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : MAX( 1, MIN( giDefaultExistChance, 100 ) );
+		giDefaultExistChance = ( giDefaultExistChance == -1 ) ? 100 : std::clamp(giDefaultExistChance, 1, 100);
 		GetWorldItem(gpEditingItemPool->iItemIndex).ubNonExistChance = 100 - giDefaultExistChance;
 		SetInputFieldStringWithNumericStrictValue( 3, giDefaultExistChance );
 	}
@@ -1177,9 +1178,9 @@ static void RemoveTriggersGUI(void)
 }
 
 
-static void ToggleWeaponAttachment(GUI_BUTTON* const btn, INT32 const reason)
+static void ToggleWeaponAttachment(GUI_BUTTON* const btn, UINT32 const reason)
 {
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		ToggleAttachment(*btn->GetUserPtr<AttachmentInfo>());
 		ReEvaluateAttachmentStatii();
@@ -1187,9 +1188,9 @@ static void ToggleWeaponAttachment(GUI_BUTTON* const btn, INT32 const reason)
 }
 
 
-static void ActionItemCallback(GUI_BUTTON* btn, INT32 reason)
+static void ActionItemCallback(GUI_BUTTON* btn, UINT32 reason)
 {
-	if( reason & MSYS_CALLBACK_REASON_LBUTTON_UP )
+	if( reason & MSYS_CALLBACK_REASON_POINTER_UP )
 	{
 		InitPopupMenu( guiActionItemButton, ACTIONITEM_POPUP, DIR_UPLEFT );
 	}

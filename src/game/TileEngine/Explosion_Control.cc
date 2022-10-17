@@ -29,7 +29,6 @@
 #include "LoadSaveExplosionType.h"
 #include "Logger.h"
 #include "Map_Information.h"
-#include "MemMan.h"
 #include "Message.h"
 #include "Morale.h"
 #include "OppList.h"
@@ -138,7 +137,7 @@ void InternalIgniteExplosion(SOLDIERTYPE* const owner, const INT16 sX, const INT
 
 
 	gTacticalStatus.ubAttackBusyCount++;
-	SLOGD("Incrementing Attack: Explosion gone off, Count now %d", gTacticalStatus.ubAttackBusyCount);
+	SLOGD("Incrementing Attack: Explosion gone off, Count now {}", gTacticalStatus.ubAttackBusyCount);
 
 	EXPLOSIONTYPE* const e = GetFreeExplosion();
 	if (e == NULL) return;
@@ -340,7 +339,7 @@ static STRUCTURE* RemoveOnWall(GridNo const grid_no, StructureFlags const flags,
 		STRUCTURE* const base = FindBaseStructure(attached);
 		if (!base)
 		{ // Error!
-			SLOGW("Problems removing structure attached to wall at %d", grid_no);
+			SLOGW("Problems removing structure attached to wall at {}", grid_no);
 			break;
 		}
 
@@ -360,7 +359,7 @@ static STRUCTURE* RemoveOnWall(GridNo const grid_no, StructureFlags const flags,
 static bool ExplosiveDamageStructureAtGridNo(STRUCTURE* const pCurrent, STRUCTURE** const ppNextCurrent, INT16 const grid_no, INT16 const wound_amt, UINT32 const uiDist, BOOLEAN* const pfRecompileMovementCosts, BOOLEAN const only_walls, SOLDIERTYPE* const owner, INT8 const level)
 {
 	BOOLEAN_S skipDamage = false;
-	BeforeStructureDamaged(gWorldSectorX, gWorldSectorY, gbWorldSectorZ, grid_no, pCurrent, uiDist, &skipDamage);
+	BeforeStructureDamaged(gWorldSector.x, gWorldSector.y, gWorldSector.z, grid_no, pCurrent, uiDist, &skipDamage);
 	if (skipDamage)
 	{
 		return true;
@@ -389,7 +388,7 @@ static bool ExplosiveDamageStructureAtGridNo(STRUCTURE* const pCurrent, STRUCTUR
 		if (bDamageReturnVal == STRUCTURE_NOT_DAMAGED) return true;
 
 		BOOLEAN fDestroyed = (bDamageReturnVal == STRUCTURE_DESTROYED);
-		OnStructureDamaged(gWorldSectorX, gWorldSectorY, gbWorldSectorZ, grid_no, pCurrent, wound_amt, fDestroyed);
+		OnStructureDamaged(gWorldSector.x, gWorldSector.y, gWorldSector.z, grid_no, pCurrent, wound_amt, fDestroyed);
 
 		STRUCTURE* const base         = FindBaseStructure(pCurrent);
 		GridNo     const base_grid_no = base->sGridNo;
@@ -765,9 +764,9 @@ static BOOLEAN DamageSoldierFromBlast(SOLDIERTYPE* const pSoldier, SOLDIERTYPE* 
 
 	// Increment attack counter...
 	gTacticalStatus.ubAttackBusyCount++;
-	SLOGD("Incrementing Attack: Explosion dishing out damage, Count now %d", gTacticalStatus.ubAttackBusyCount);
+	SLOGD("Incrementing Attack: Explosion dishing out damage, Count now {}", gTacticalStatus.ubAttackBusyCount);
 
-	sNewWoundAmt = sWoundAmt - __min( sWoundAmt, 35 ) * ArmourVersusExplosivesPercent( pSoldier ) / 100;
+	sNewWoundAmt = sWoundAmt - std::min(int(sWoundAmt), 35) * ArmourVersusExplosivesPercent(pSoldier) / 100;
 	if ( sNewWoundAmt < 0 )
 	{
 		sNewWoundAmt = 0;
@@ -1038,7 +1037,7 @@ static BOOLEAN ExpAffect(const INT16 sBombGridNo, const INT16 sGridNo, const UIN
 			sBreathAmt = 0;
 
 		// damage structures
-		if ( uiDist <= __max( 1, (UINT32) (pExplosive->ubDamage / 30) ) )
+		if ( uiDist <= std::max(1U, (UINT32) (pExplosive->ubDamage / 30)))
 		{
 			if ( GCM->getItem(usItem)->isGrenade() )
 			{
@@ -1114,7 +1113,7 @@ static BOOLEAN ExpAffect(const INT16 sBombGridNo, const INT16 sGridNo, const UIN
 	{
 		// Drop blood ....
 		// Get blood quantity....
-		InternalDropBlood(sGridNo, 0, HUMAN, __max(MAXBLOODQUANTITY - uiDist * 2 /* XXX always >= 0, because uiDist is unsigned */, 0), 1);
+		InternalDropBlood(sGridNo, 0, HUMAN, std::max(MAXBLOODQUANTITY - uiDist * 2 /* XXX always >= 0, because uiDist is unsigned */, 0U), 1);
 	}
 
 	if ( sSubsequent != ERASE_SPREAD_EFFECT && sSubsequent != BLOOD_SPREAD_EFFECT )
@@ -1593,7 +1592,7 @@ void SpreadEffect(const INT16 sGridNo, const UINT8 ubRadius, const UINT16 usItem
 			{
 				uiTempSpot = uiNewSpot;
 
-				SLOGD("Explosion affects %d", uiNewSpot);
+				SLOGD("Explosion affects {}", uiNewSpot);
 				// ok, do what we do here...
 				if (ExpAffect(sGridNo, uiNewSpot, cnt / 2, usItem, owner, fSubsequent, &fAnyMercHit, bLevel, smoke))
 				{
@@ -1633,7 +1632,7 @@ void SpreadEffect(const INT16 sGridNo, const UINT8 ubRadius, const UINT16 usItem
 							if ( ubKeepGoing )
 							{
 								// ok, do what we do here
-								SLOGD("Explosion affects %d", uiNewSpot);
+								SLOGD("Explosion affects {}", uiNewSpot);
 								if (ExpAffect(sGridNo, uiNewSpot, (INT16)((cnt + branchCnt) / 2), usItem, owner, fSubsequent, &fAnyMercHit, bLevel, smoke))
 								{
 									fRecompileMovement = TRUE;
@@ -1694,7 +1693,7 @@ void SpreadEffect(const INT16 sGridNo, const UINT8 ubRadius, const UINT16 usItem
 
 		// if anything has been done to change movement costs and this is a potential POW situation, check
 		// paths for POWs
-		if ( gWorldSectorX == 13 && gWorldSectorY == MAP_ROW_I )
+		if (gWorldSector.x == 13 && gWorldSector.y == MAP_ROW_I)
 		{
 			DoPOWPathChecks();
 		}
@@ -1831,7 +1830,7 @@ static void PerformItemAction(INT16 sGridNo, OBJECTTYPE* pObj)
 			else
 			{
 				// error message here
-				SLOGW("Action item to open door in gridno %d but there is none!", sGridNo );
+				SLOGW("Action item to open door in gridno {} but there is none!", sGridNo);
 			}
 			break;
 		case ACTION_ITEM_CLOSE_DOOR:
@@ -1859,7 +1858,7 @@ static void PerformItemAction(INT16 sGridNo, OBJECTTYPE* pObj)
 			else
 			{
 				// error message here
-				SLOGW("Action item to close door in gridno %d but there is none!", sGridNo );
+				SLOGW("Action item to close door in gridno {} but there is none!", sGridNo);
 			}
 			break;
 		case ACTION_ITEM_TOGGLE_DOOR:
@@ -1879,7 +1878,7 @@ static void PerformItemAction(INT16 sGridNo, OBJECTTYPE* pObj)
 			else
 			{
 				// error message here
-				SLOGW("Action item to toggle door in gridno %d but there is none!", sGridNo );
+				SLOGW("Action item to toggle door in gridno {} but there is none!", sGridNo);
 			}
 			break;
 		case ACTION_ITEM_UNLOCK_DOOR:
@@ -2130,7 +2129,7 @@ static void PerformItemAction(INT16 sGridNo, OBJECTTYPE* pObj)
 									ChangeSoldierState(tgt, STANDING, 0, TRUE);
 									TeleportSoldier(*tgt, sTeleportSpot, false);
 
-									HandleMoraleEvent(tgt, MORALE_SEX, gWorldSectorX, gWorldSectorY, gbWorldSectorZ);
+									HandleMoraleEvent(tgt, MORALE_SEX, gWorldSector);
 									FatigueCharacter(*tgt);
 									FatigueCharacter(*tgt);
 									FatigueCharacter(*tgt);
@@ -2171,7 +2170,7 @@ static void PerformItemAction(INT16 sGridNo, OBJECTTYPE* pObj)
 			break;
 		default:
 			// error message here
-			SLOGW("Action item with invalid action in gridno %d!", sGridNo );
+			SLOGW("Action item with invalid action in gridno {}!", sGridNo);
 			break;
 	}
 }

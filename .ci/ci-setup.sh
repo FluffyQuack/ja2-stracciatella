@@ -47,13 +47,13 @@ elif [[ "$CI_TARGET" == "linux-mingw64" ]]; then
 
     # Google Cloud SDK for Artifact Upload
     linux-install-google-cloud-sdk
-    
+
     # Rust via Rustup
     unix-install-rustup x86_64-pc-windows-gnu
 elif [[ "$CI_TARGET" == "mac" ]]; then
     # sccache for compilation caching
     macOS-install-via-brew sccache
-    
+
     # Google Cloud SDK for Artifact Upload
     macOS-install-via-brew-cask google-cloud-sdk
     source "$(brew --prefix)/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc"
@@ -90,7 +90,9 @@ elif [[ "$CI_TARGET" == "android" ]]; then
     unix-install-rustup armv7-linux-androideabi aarch64-linux-android i686-linux-android x86_64-linux-android
 
     # Specific version of Android NDK
-    linux-install-via-android-sdkmanager "ndk;21.0.6113669"
+    linux-install-via-android-sdkmanager "ndk;25.0.8775105"
+
+    linux-setup-android-signing-keys
 else
     echo "unexpected target ${CI_TARGET}"
     exit 1
@@ -98,7 +100,6 @@ fi
 
 # print build environment info
 rustup show
-env
 which rustc
 rustc -V
 which cargo

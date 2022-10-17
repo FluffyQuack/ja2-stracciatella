@@ -3,7 +3,6 @@
 #include "Types.h"
 #include "Game_Events.h"
 #include "Game_Clock.h"
-#include "MemMan.h"
 #include "Font_Control.h"
 #include "Message.h"
 #include "Text.h"
@@ -68,7 +67,7 @@ static void AdjustClockToEventStamp(STRATEGICEVENT* pEvent, UINT32* puiAdjustmen
 void ProcessPendingGameEvents(UINT32 uiAdjustment, const UINT8 ubWarpCode)
 {
 	STRATEGICEVENT *curr, *pEvent, *prev, *temp;
-	BOOLEAN fDeleteEvent = FALSE, fDeleteQueuedEvent = FALSE;
+	BOOLEAN fDeleteEvent = FALSE;
 
 	gfTimeInterrupt = FALSE;
 	gfProcessingGameEvents = TRUE;
@@ -97,12 +96,10 @@ void ProcessPendingGameEvents(UINT32 uiAdjustment, const UINT8 ubWarpCode)
 			{ //make sure that we are processing the last event for that second
 				AdjustClockToEventStamp( curr, &uiAdjustment );
 
-				fDeleteEvent = ExecuteStrategicEvent( curr );
+				fDeleteEvent = ExecuteStrategicEvent(curr);
 
-				if( curr && prev && fDeleteQueuedEvent )
-				{ //The only case where we are deleting a node in the middle of the list
-					prev->next = curr->next;
-				}
+				//The only case where we are deleting a node in the middle of the list
+				//This will happen down below in the if (fDeleteEvent) block
 			}
 			else
 			{ //We are at the current target warp time however, there are still other events following in this time cycle.
@@ -184,7 +181,7 @@ STRATEGICEVENT* AddAdvancedStrategicEvent(StrategicEventFrequency const event_ty
 	if (gfProcessingGameEvents && timestamp <= guiTimeStampOfCurrentlyExecutingEvent)
 	{ /* Prevent infinite loops of posting events that are the same time or
 		* earlier than the event currently being processed */
-		SLOGD("Event Rejected (id %d): Can't post events <= time while inside an event callback. This is a special case situation that isn't a bug.", callback_id);
+		SLOGD("Event Rejected (id {}): Can't post events <= time while inside an event callback. This is a special case situation that isn't a bug.", callback_id);
 		return 0;
 	}
 

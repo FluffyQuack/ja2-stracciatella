@@ -61,7 +61,8 @@ static SGPVObject* guiContentButton;
 static UINT8   gubCurPageNum;
 static BOOLEAN gfInToc =  FALSE;
 static BOOLEAN gfExitingAimHistory;
-static BOOLEAN AimHistorySubPagesVisitedFlag[NUM_AIM_HISTORY_PAGES];
+// This flag gets set for the TOC and the actual history pages, therefore we need one more
+static BOOLEAN AimHistorySubPagesVisitedFlag[NUM_AIM_HISTORY_PAGES + 1];
 
 
 static MOUSE_REGION gSelectedHistoryTocMenuRegion[NUM_AIM_HISTORY_PAGES];
@@ -99,7 +100,7 @@ enum AimHistoryTextLocations
 
 void EnterInitAimHistory()
 {
-	std::fill_n(AimHistorySubPagesVisitedFlag, NUM_AIM_HISTORY_PAGES, 0);
+	std::fill(std::begin(AimHistorySubPagesVisitedFlag), std::end(AimHistorySubPagesVisitedFlag), 0);
 }
 
 
@@ -215,7 +216,7 @@ void RenderAimHistory()
 }
 
 
-static void BtnHistoryMenuButtonCallback(GUI_BUTTON* btn, INT32 reason);
+static void BtnHistoryMenuButtonCallback(GUI_BUTTON* btn, UINT32 reason);
 
 
 static void InitAimHistoryMenuBar(void)
@@ -287,7 +288,7 @@ static void DisplayAimHistoryParagraph(UINT8 ubPageNum, UINT8 ubNumParagraphs)
 }
 
 
-static void SelectHistoryTocMenuRegionCallBack(MOUSE_REGION* pRegion, INT32 iReason);
+static void SelectHistoryTocMenuRegionCallBack(MOUSE_REGION* pRegion, UINT32 iReason);
 
 
 static void InitTocMenu(void)
@@ -335,11 +336,11 @@ static void ChangingAimHistorySubPage(UINT8 ubSubPageNumber);
 static void ResetAimHistoryButtons();
 
 
-static void SelectHistoryTocMenuRegionCallBack(MOUSE_REGION* pRegion, INT32 iReason)
+static void SelectHistoryTocMenuRegionCallBack(MOUSE_REGION* pRegion, UINT32 iReason)
 {
 	if(gfInToc)
 	{
-		if (iReason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+		if (iReason & MSYS_CALLBACK_REASON_POINTER_UP)
 		{
 			gubCurPageNum = (UINT8)MSYS_GetRegionUserData( pRegion, 0 );
 			ChangingAimHistorySubPage( gubCurPageNum );
@@ -353,11 +354,11 @@ static void SelectHistoryTocMenuRegionCallBack(MOUSE_REGION* pRegion, INT32 iRea
 }
 
 
-static void BtnHistoryMenuButtonCallback(GUI_BUTTON *btn, INT32 reason)
+static void BtnHistoryMenuButtonCallback(GUI_BUTTON *btn, UINT32 reason)
 {
 	UINT8	const ubRetValue = btn->GetUserData();
 
-	if (reason & MSYS_CALLBACK_REASON_LBUTTON_UP)
+	if (reason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		ResetAimHistoryButtons();
 
@@ -385,7 +386,7 @@ static void BtnHistoryMenuButtonCallback(GUI_BUTTON *btn, INT32 reason)
 				break;
 
 			case 4: //Next Page
-				if (gubCurPageNum + 1 < NUM_AIM_HISTORY_PAGES)
+				if (gubCurPageNum < NUM_AIM_HISTORY_PAGES)
 				{
 					gubCurPageNum++;
 					ChangingAimHistorySubPage(gubCurPageNum);

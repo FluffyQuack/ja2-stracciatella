@@ -1672,7 +1672,7 @@ static void SetBlueFlagFlags(void)
 void InitLoadedWorld(void)
 {
 	//if the current sector is not valid, dont init the world
-	if( gWorldSectorX == 0 || gWorldSectorY == 0 )
+	if (!gWorldSector.IsValid())
 	{
 		return;
 	}
@@ -1988,23 +1988,14 @@ try
 						++pSummary->usExitGridSize[loop];
 						EXITGRID* const eg = &pSummary->ExitGrid[loop];
 						eg->usGridNo      = exitGrid.usGridNo;
-						eg->ubGotoSectorX = exitGrid.ubGotoSectorX;
-						eg->ubGotoSectorY = exitGrid.ubGotoSectorY;
-						eg->ubGotoSectorZ = exitGrid.ubGotoSectorZ;
-						if (eg->ubGotoSectorX != exitGrid.ubGotoSectorX ||
-								eg->ubGotoSectorY != exitGrid.ubGotoSectorY)
-						{
-							pSummary->fInvalidDest[loop] = TRUE;
-						}
+						eg->ubGotoSector = exitGrid.ubGotoSector;
 					}
 					break;
 				}
 
 				const EXITGRID* const eg = &pSummary->ExitGrid[loop];
 				if (eg->usGridNo      == exitGrid.usGridNo      &&
-						eg->ubGotoSectorX == exitGrid.ubGotoSectorX &&
-						eg->ubGotoSectorY == exitGrid.ubGotoSectorY &&
-						eg->ubGotoSectorZ == exitGrid.ubGotoSectorZ)
+						eg->ubGotoSector == exitGrid.ubGotoSector)
 				{ //same destination.
 					++pSummary->usExitGridSize[loop];
 					break;
@@ -2463,7 +2454,7 @@ void LoadWorldFromSGPFile(SGPFile *f)
 	else
 	{
 		// ja2 demo has 3.13
-		SLOGW("Map has an unexpected version (%f %u), expect problems", dMajorMapVersion, gMapInformation.ubMapVersion);
+		SLOGW("Map has an unexpected version ({} {}), expect problems", dMajorMapVersion, gMapInformation.ubMapVersion);
 	}
 
 	ValidateAndUpdateMapVersionIfNecessary();
@@ -2502,6 +2493,8 @@ void LoadWorldFromSGPFile(SGPFile *f)
 	RenderProgressBar(0, 80);
 
 	gfWorldLoaded = TRUE;
+
+	GenerateBuildings();
 
 	RenderProgressBar(0, 100);
 	DequeueAllKeyBoardEvents();
@@ -2547,8 +2540,8 @@ void TrashWorld(void)
 	TrashWorldItems();
 	TrashOverheadMap();
 
-	DecaySmokeEffects(0xffffff);
-	DecayLightEffects(0xffffff);
+	DecaySmokeEffects(0xffffff, false);
+	DecayLightEffects(0xffffff, false);
 	ResetSmokeEffects();
 	ResetLightEffects();
 
@@ -2660,7 +2653,7 @@ void LoadMapTileset(TileSetID const id)
 	}
 	else
 	{
-		SLOGD("Tileset %d has no callback function for movement costs. Using default.", id);
+		SLOGD("Tileset {} has no callback function for movement costs. Using default.", id);
 		SetTilesetOneTerrainValues();
 	}
 
@@ -3060,7 +3053,7 @@ static bool IsRoofVisibleForWireframe(GridNo const sMapPos)
 TEST(WorldDef, asserts)
 {
 	EXPECT_EQ(sizeof(TEAMSUMMARY), 15u);
-	EXPECT_EQ(sizeof(SUMMARYFILE), 408u);
+	EXPECT_EQ(sizeof(SUMMARYFILE), 416u);
 }
 
 #endif

@@ -44,8 +44,8 @@ void Soldier::removePendingAction()
 {
 	if(mSoldier->ubPendingAction != NO_PENDING_ACTION)
 	{
-		SLOGD("%s: remove pending action %s",
-			getPofileName().c_str(),
+		SLOGD("{}: remove pending action {}",
+			getPofileName(),
 			Internals::getActionName(mSoldier->ubPendingAction));
 
 		mSoldier->ubPendingAction = NO_PENDING_ACTION;
@@ -90,8 +90,8 @@ bool Soldier::anyoneHasPendingAction(UINT8 action, UINT8 team)
 
 void Soldier::setPendingAction(UINT8 action)
 {
-	SLOGD("%s: set pending action %s (previous %s)",
-		getPofileName().c_str(),
+	SLOGD("{}: set pending action {} (previous {})",
+		getPofileName(),
 		Internals::getActionName(action),
 		Internals::getActionName(mSoldier->ubPendingAction));
 
@@ -267,12 +267,12 @@ static bool isHeadPosition(int8_t pos)
 
 static void showGearEquipMessage(const SOLDIERTYPE* s, uint16_t usItem)
 {
-	ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(*GCM->getNewString(NS_SOLDIER_EQUIPS_ITEM), s->name, ItemNames[usItem]));
+	ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(*GCM->getNewString(NS_SOLDIER_EQUIPS_ITEM), s->name, GCM->getItem(usItem)->getName()));
 }
 
 static void showGearRemoveMessage(const SOLDIERTYPE* s, uint16_t usItem)
 {
-	ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(*GCM->getNewString(NS_SOLDIER_REMOVES_ITEM), s->name, ItemNames[usItem]));
+	ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, st_format_printf(*GCM->getNewString(NS_SOLDIER_REMOVES_ITEM), s->name, GCM->getItem(usItem)->getName()));
 }
 
 const std::vector<ITEMDEFINE> HEAD_GEARS_DAY   { SUNGOGGLES };

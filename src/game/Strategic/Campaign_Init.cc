@@ -6,7 +6,6 @@
 #include "GameInstance.h"
 #include "GamePolicy.h"
 #include "GameSettings.h"
-#include "MemMan.h"
 #include "Overhead.h"
 #include "Queen_Command.h"
 #include "Quests.h"
@@ -118,7 +117,7 @@ void InitNewCampaign()
 	{
 		// Allow overhead view of start sector on game onset.
 		UINT16 uiStartSector = gamepolicy(start_sector);
-		SetSectorFlag(SECTORX(uiStartSector), SECTORY(uiStartSector), 0, SF_ALREADY_VISITED);
+		SetSectorFlag(SGPSector(uiStartSector), SF_ALREADY_VISITED);
 	}
 	//Generates the initial forces in a new campaign.  The idea is to randomize numbers and sectors
 	//so that no two games are the same.

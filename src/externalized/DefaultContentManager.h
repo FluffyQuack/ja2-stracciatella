@@ -7,6 +7,7 @@
 #include "IGameDataLoader.h"
 #include "StringEncodingTypes.h"
 #include "RustInterface.h"
+#include "ItemStrings.h"
 
 #include "rapidjson/document.h"
 #include <string_theory/string>
@@ -21,7 +22,7 @@ class DefaultContentManager : public ContentManager, public IGameDataLoader
 public:
 	DefaultContentManager(RustPointer<EngineOptions> engineOptions);
 
-	virtual ~DefaultContentManager() override;
+	virtual ~DefaultContentManager() noexcept(false) override;
 
 	void logConfiguration() const override;
 
@@ -63,8 +64,6 @@ public:
 
 	/** Load encrypted string from game resource file. */
 	virtual ST::string loadEncryptedString(const ST::string& fileName, uint32_t seek_chars, uint32_t read_chars) const override;
-
-	virtual ST::string loadEncryptedString(SGPFile* File, uint32_t seek_chars, uint32_t read_chars) const override;
 
 	/** Load dialogue quote from file. */
 	virtual ST::string* loadDialogQuoteFromFile(const ST::string& filename, int quote_number) override;
@@ -128,7 +127,7 @@ public:
 	virtual const std::vector<const CreatureLairModel*>& getCreatureLairs() const override;
 	virtual const CreatureLairModel* getCreatureLair(uint8_t lairId) const override;
 	virtual const CreatureLairModel* getCreatureLairByMineId(uint8_t mineId) const override;
-	virtual const MineModel* getMineForSector(uint8_t sectorX, uint8_t sectorY, uint8_t sectorZ) const override;
+	virtual const MineModel* getMineForSector(const SGPSector& sector) const override;
 	virtual const MineModel* getMine(uint8_t mineId) const override;
 	virtual const std::vector<const MineModel*>& getMines() const override;
 	virtual const std::vector<const SamSiteModel*>& getSamSites() const override;
@@ -193,7 +192,7 @@ protected:
 	std::map<ST::string, const WeaponModel*> m_weaponMap;
 	std::map<ST::string, const ItemModel*> m_itemMap;
 	std::map<uint16_t, uint16_t> m_mapItemReplacements;
-	std::map<MusicMode, const std::vector<const ST::string*>*> m_musicMap;
+	std::multimap<MusicMode, const ST::string> m_musicMap;
 
 	std::vector<std::vector<const WeaponModel*> > mNormalGunChoice;
 	std::vector<std::vector<const WeaponModel*> > mExtendedGunChoice;
@@ -221,7 +220,7 @@ protected:
 	const CacheSectorsModel* m_cacheSectors;
 	const LoadingScreenModel* m_loadingScreenModel;
 	const MovementCostsModel* m_movementCosts;
-	std::map<std::tuple<uint8_t, uint8_t>, uint8_t> m_sectorLandTypes;
+	std::map<SGPSector, uint8_t> m_sectorLandTypes;
 
 	std::vector<const BloodCatPlacementsModel*> m_bloodCatPlacements;
 	std::vector<const BloodCatSpawnsModel*> m_bloodCatSpawns;
@@ -246,9 +245,9 @@ protected:
 
 	RustPointer<Vfs> m_vfs;
 
-	bool loadWeapons();
-	bool loadItems();
-	bool loadMagazines();
+	bool loadWeapons(const VanillaItemStrings& vanillaItemStrings);
+	bool loadItems(const VanillaItemStrings& vanillaItemStrings);
+	bool loadMagazines(const VanillaItemStrings& vanillaItemStrings);
 	bool loadCalibres();
 	bool loadAmmoTypes();
 	bool loadArmyData();

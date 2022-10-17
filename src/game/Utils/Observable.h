@@ -51,7 +51,7 @@ public:
 	{
 		if (listeners.find(key) == listeners.end())
 		{
-			STLOGW("There is no listener for key '{}'", key);
+			SLOGW("There is no listener for key '{}'", key);
 			return *this;
 		}
 
@@ -70,7 +70,7 @@ public:
 			SLOGD("Observable has no listeners");
 		}
 
-		for (auto l : listeners)
+		for (auto const& l : listeners)
 		{
 			l.second(arg1, args...);
 		}

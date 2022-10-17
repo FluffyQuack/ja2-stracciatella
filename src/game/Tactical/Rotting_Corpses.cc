@@ -40,7 +40,6 @@
 #include "Strategic.h"
 #include "QArray.h"
 #include "Interface.h"
-#include "MemMan.h"
 #include "WorldMan.h"
 
 #include "FileMan.h"
@@ -813,9 +812,7 @@ static void AddCrowToCorpse(ROTTING_CORPSE* pCorpse)
 	// Put him flying over corpse pisition
 	MercCreateStruct = SOLDIERCREATE_STRUCT{};
 	MercCreateStruct.ubProfile = NO_PROFILE;
-	MercCreateStruct.sSectorX = gWorldSectorX;
-	MercCreateStruct.sSectorY = gWorldSectorY;
-	MercCreateStruct.bSectorZ = gbWorldSectorZ;
+	MercCreateStruct.sSector = gWorldSector;
 	MercCreateStruct.bBodyType = bBodyType;
 	MercCreateStruct.bDirection = SOUTH;
 	MercCreateStruct.bTeam = CIV_TEAM;
@@ -900,7 +897,7 @@ void HandleRottingCorpses( )
 		return;
 	}
 
-	if ( gbWorldSectorZ > 0 )
+	if (gWorldSector.z > 0)
 	{
 		return;
 	}
@@ -996,7 +993,7 @@ void CorpseHit( INT16 sGridNo, UINT16 usStructureID )
 
 	if ( pCorpse == NULL )
 	{
-		SLOGD("Bullet hit corpse but corpse cannot be found at: %d", sBaseGridNo );
+		SLOGD("Bullet hit corpse but corpse cannot be found at: {}", sBaseGridNo);
 		return;
 	}
 
@@ -1042,7 +1039,7 @@ void VaporizeCorpse( INT16 sGridNo, UINT16 usStructureID )
 
 	if ( pCorpse == NULL )
 	{
-		SLOGW("Vaporize corpse but corpse cannot be found at: %d", sBaseGridNo );
+		SLOGW("Vaporize corpse but corpse cannot be found at: {}", sBaseGridNo);
 		return;
 	}
 
@@ -1355,7 +1352,7 @@ void LookForAndMayCommentOnSeeingCorpse( SOLDIERTYPE *pSoldier, INT16 sGridNo, U
 	ROTTING_CORPSE *pCorpse;
 	INT8            bToleranceThreshold = 0;
 
-	if ( QuoteExp_HeadShotOnly[ pSoldier->ubProfile ] == 1 )
+	if (pSoldier->ubProfile >= QuoteExp_HeadShotOnly.size() || QuoteExp_HeadShotOnly[pSoldier->ubProfile] == 1)
 	{
 		return;
 	}

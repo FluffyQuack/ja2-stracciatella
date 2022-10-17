@@ -18,7 +18,6 @@
 #include "GameSettings.h"
 #include "Quests.h"
 #include "Soldier_Profile.h"
-#include "MemMan.h"
 #include "FileMan.h"
 #include "ContentManager.h"
 #include "GameInstance.h"
@@ -173,7 +172,7 @@ INT32 AddItemToWorld(INT16 sGridNo, const OBJECTTYPE* const pObject, const UINT8
 	if (sGridNo == NOWHERE)
 	{
 		// Display warning.....
-		SLOGW("Item %d was given invalid grid location %d. Please report", pObject->usItem, sGridNo);
+		SLOGW("Item {} was given invalid grid location {}. Please report", pObject->usItem, sGridNo);
 		return -1;
 	}
 
@@ -277,20 +276,20 @@ void LoadWorldItemsFromMap(HWFILE const f)
 			if (itemReplacements.find(o.usItem) != itemReplacements.end())
 			{
 				auto item = itemReplacements.at(o.usItem);
-				if (item == 0) 
+				if (item == 0)
 				{
-					STLOGW("Map item #{} removed", o.usItem);
+					SLOGW("Map item #{} removed", o.usItem);
 					continue;
 				}
 
-				STLOGD("Map item #{} replaced by #{}", o.usItem, item);
+				SLOGD("Map item #{} replaced by #{}", o.usItem, item);
 				o.usItem = item;
 			}
 
 			const ItemModel* item = GCM->getItem(o.usItem);
 			if (item->getFlags() & ITEM_NOT_EDITOR) {
 				// This item is not placable by Editor. Maybe the map was created for a different item set.
-				STLOGW("Skipping non-Editor item #{}({}) at gridNo {}", item->getItemIndex(), item->getInternalName(), wi.sGridNo);
+				SLOGW("Skipping non-Editor item #{}({}) at gridNo {}", item->getItemIndex(), item->getInternalName(), wi.sGridNo);
 				continue;
 			}
 
@@ -364,7 +363,8 @@ void LoadWorldItemsFromMap(HWFILE const f)
 	if (!gfEditMode)
 	{
 		DeleteWorldItemsBelongingToTerroristsWhoAreNotThere();
-		if (gWorldSectorX == 3 && gWorldSectorY == MAP_ROW_P && gbWorldSectorZ == 1)
+		static const SGPSector medunaBasement(3, MAP_ROW_P, 1);
+		if (gWorldSector == medunaBasement)
 		{
 			DeleteWorldItemsBelongingToQueenIfThere();
 		}
@@ -388,7 +388,7 @@ static void DeleteWorldItemsBelongingToTerroristsWhoAreNotThere(void)
 
 			MERCPROFILESTRUCT const& p = GetProfile(pid);
 			// and they were not set in the current sector
-			if (p.sSectorX == gWorldSectorX && p.sSectorY == gWorldSectorY) continue;
+			if (p.sSector == gWorldSector) continue;
 
 			// then all items in this location should be deleted
 			const INT16 sGridNo = wi.sGridNo;
@@ -410,9 +410,7 @@ static void DeleteWorldItemsBelongingToQueenIfThere(void)
 {
 	MERCPROFILESTRUCT& q = GetProfile(QUEEN);
 
-	if (q.sSectorX != gWorldSectorX ||
-			q.sSectorY != gWorldSectorY ||
-			q.bSectorZ != gbWorldSectorZ)
+	if (q.sSector != gWorldSector)
 	{
 		return;
 	}

@@ -11,9 +11,8 @@
 #include "Handle_Items.h"
 #include "Quests.h"
 #include "Scheduling.h"
-#include "MemMan.h"
 #include "Items.h"
-
+#include "Observable.h"
 #include "ContentManager.h"
 #include "DealerInventory.h"
 #include "DealerModel.h"
@@ -45,6 +44,7 @@ UINT8 gubLastSpecialItemAddedAtElement = 255;
 ARMS_DEALER_STATUS gArmsDealerStatus[ NUM_ARMS_DEALERS ];
 DEALER_ITEM_HEADER gArmsDealersInventory[ NUM_ARMS_DEALERS ][ MAXITEMS ];
 
+Observable<> OnDealerInventoryUpdated;
 
 static void AdjustCertainDealersInventory(void);
 static void InitializeOneArmsDealer(ArmsDealerID);
@@ -242,7 +242,7 @@ void LoadArmsDealerInventoryFromSavedGameFile(HWFILE const f, UINT32 const saveg
 
 
 static void ConvertCreatureBloodToElixir(void);
-static void DailyCheckOnItemQuantities(void);
+void DailyCheckOnItemQuantities();
 static void SimulateArmsDealerCustomer(void);
 
 
@@ -290,7 +290,7 @@ static void SimulateArmsDealerCustomer(void)
 				if ( usItemIndex == JAR_ELIXIR )
 				{
 					// only allow selling of standard # of items so those converted from blood given by player will be available
-					ubItemsSold = HowManyItemsAreSold( ubArmsDealer, usItemIndex, (UINT8) __min( 3, gArmsDealersInventory[ ubArmsDealer ][ usItemIndex ].ubPerfectItems), FALSE);
+					ubItemsSold = HowManyItemsAreSold(ubArmsDealer, usItemIndex, (UINT8) std::min(UINT8(3), gArmsDealersInventory[ubArmsDealer][usItemIndex].ubPerfectItems), FALSE);
 				}
 				else
 				{
@@ -325,7 +325,7 @@ static void SimulateArmsDealerCustomer(void)
 }
 
 
-static void DailyCheckOnItemQuantities(void)
+void DailyCheckOnItemQuantities()
 {
 	UINT16  usItemIndex;
 	UINT8   ubMaxSupply;
@@ -430,7 +430,7 @@ static void ConvertCreatureBloodToElixir(void)
 	if ( ubBloodAvailable )
 	{
 		// start converting blood into elixir!
-		//ubAmountToConvert = (UINT8) __min( 5 + Random( 3 ), ubBloodAvailable );
+		//ubAmountToConvert = (UINT8) std::min(5 + Random( 3 ), ubBloodAvailable);
 		ubAmountToConvert = ubBloodAvailable;
 
 		// create item info describing a perfect item
@@ -489,11 +489,13 @@ static void AdjustCertainDealersInventory(void)
 	{
 		GuaranteeAtLeastXItemsOfIndex( ARMS_DEALER_FRANZ, VIDEO_CAMERA, 1 );
 	}
+
+	OnDealerInventoryUpdated();
 }
 
 
 static UINT32 GetArmsDealerItemTypeFromItemNumber(UINT16 usItem);
-static void RemoveRandomItemFromArmsDealerInventory(ArmsDealerID, UINT16 usItemIndex, UINT8 ubHowMany);
+void RemoveRandomItemFromArmsDealerInventory(ArmsDealerID, UINT16 usItemIndex, UINT8 ubHowMany);
 
 
 static void LimitArmsDealersInventory(ArmsDealerID const ubArmsDealer, UINT32 uiDealerItemType, UINT8 ubMaxNumberOfItemType)
@@ -847,7 +849,7 @@ static UINT32 GetArmsDealerItemTypeFromItemNumber(UINT16 usItem)
 			return( 0 );
 
 		default:
-			AssertMsg(FALSE, String("GetArmsDealerItemTypeFromItemNumber(), invalid class %d for item %d.  DF 0.",
+			AssertMsg(FALSE, ST::format("GetArmsDealerItemTypeFromItemNumber(), invalid class {} for item {}. DF 0.",
 						GCM->getItem(usItem)->getItemClass(), usItem));
 			break;
 	}
@@ -997,7 +999,7 @@ BOOLEAN CanDealerTransactItem(ArmsDealerID const ubArmsDealer, UINT16 const usIt
 			return( CanDealerRepairItem( ubArmsDealer, usItemIndex ) );
 
 		default:
-			AssertMsg( FALSE, String( "CanDealerTransactItem(), type of dealer %d.  AM 0.", GetDealer(ubArmsDealer)->type) );
+			AssertMsg(FALSE, ST::format("CanDealerTransactItem(), type of dealer {}. AM 0.", GetDealer(ubArmsDealer)->type));
 			return(FALSE);
 	}
 
@@ -1033,7 +1035,7 @@ BOOLEAN CanDealerRepairItem(ArmsDealerID const ubArmsDealer, UINT16 const usItem
 	}
 	else
 	{
-		AssertMsg(FALSE, String("CanDealerRepairItem(), Arms Dealer %d is not a recognized repairman!.  AM 1.", ubArmsDealer));
+		AssertMsg(FALSE, ST::format("CanDealerRepairItem(), Arms Dealer {} is not a recognized repairman!.  AM 1.", ubArmsDealer));
 	}
 
 	// can't repair this...
@@ -1465,7 +1467,7 @@ static void AddItemToArmsDealerInventory(ArmsDealerID const ubArmsDealer, UINT16
 			if (!fFoundOne)
 			{
 				// then we're going to have to allocate some more space...
-				ubElementsToAdd = MAX( SPECIAL_ITEMS_ALLOCED_AT_ONCE, ubHowMany);
+				ubElementsToAdd = std::max(SPECIAL_ITEMS_ALLOCED_AT_ONCE, int(ubHowMany));
 
 				Assert(gArmsDealersInventory[ubArmsDealer][usItemIndex].SpecialItem.size() + ubElementsToAdd <= UINT8_MAX);
 				ResizeSpecialItemArray(&gArmsDealersInventory[ubArmsDealer][usItemIndex], static_cast<UINT8>(gArmsDealersInventory[ubArmsDealer][usItemIndex].SpecialItem.size() + ubElementsToAdd));
@@ -1564,7 +1566,7 @@ void RemoveItemFromArmsDealerInventory(ArmsDealerID const ubArmsDealer, UINT16 c
 }
 
 
-static void RemoveRandomItemFromArmsDealerInventory(ArmsDealerID const ubArmsDealer, UINT16 const usItemIndex, UINT8 ubHowMany)
+void RemoveRandomItemFromArmsDealerInventory(ArmsDealerID const ubArmsDealer, UINT16 const usItemIndex, UINT8 ubHowMany)
 {
 	UINT8 ubWhichOne;
 	UINT8 ubSkippedAlready;
@@ -1697,7 +1699,7 @@ BOOLEAN AddDeadArmsDealerItemsToWorld(SOLDIERTYPE const* const pSoldier)
 				// function is called, there are times when we're not guarenteed that sGridNo is good
 				while ( ubLeftToDrop > 0)
 				{
-					ubNowDropping = MIN( ubLeftToDrop, ubHowManyMaxAtATime );
+					ubNowDropping = std::min(ubLeftToDrop, ubHowManyMaxAtATime);
 
 					MakeObjectOutOfDealerItems( usItemIndex, &SpclItemInfo, &TempObject, ubNowDropping );
 					AddItemToPool( pSoldier->sInitialGridNo, &TempObject, INVISIBLE, 0, 0, 0 );
@@ -2278,7 +2280,7 @@ UINT16 CalcValueOfItemToDealer(ArmsDealerID const ubArmsDealer, UINT16 const usI
 	if( !fDealerSelling )
 	{
 		// junk dealer won't buy expensive stuff at all, expensive dealer won't buy junk at all
-		if ( ABS( (INT8) ubDealerPriceClass - (INT8) ubItemPriceClass ) == 2 )
+		if (std::abs((INT8) ubDealerPriceClass - (INT8) ubItemPriceClass) == 2)
 		{
 			return( 0 );
 		}
@@ -2475,13 +2477,13 @@ UINT32 CalculateMinutesClosedBetween(ArmsDealerID const ubArmsDealer, UINT32 uiS
 		if ( uiStartTime < uiOpeningTime )
 		{
 			// add how many minutes in the time range BEFORE the store opened that day
-			uiMinutesClosed += ( MIN( uiOpeningTime, uiEndTime ) - uiStartTime );
+			uiMinutesClosed += ( std::min(uiOpeningTime, uiEndTime ) - uiStartTime);
 		}
 
 		if ( uiEndTime > uiClosingTime )
 		{
 			// add how many minutes in the time range AFTER the store closed that day
-			uiMinutesClosed += ( uiEndTime - MAX( uiClosingTime, uiStartTime ) );
+			uiMinutesClosed += ( uiEndTime - std::max(uiClosingTime, uiStartTime ));
 		}
 	}
 	else

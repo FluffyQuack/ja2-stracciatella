@@ -58,20 +58,16 @@
 #include "WordWrap.h"
 #include "WorldMan.h"
 #include <map>
+#include <memory>
 #include <queue>
 #include <string_theory/format>
-struct MercPopUpBox;
 
-
-#define QUOTE_MESSAGE_SIZE			520
 
 #define DIALOGUE_DEFAULT_SUBTITLE_WIDTH	200
 #define TEXT_DELAY_MODIFIER			60
 
 
-typedef std::queue<DialogueEvent*>DialogueQueue;
-
-BOOLEAN fExternFacesLoaded = FALSE;
+using DialogueQueue = std::queue<std::unique_ptr<DialogueEvent>>;
 
 static std::map<ProfileID, FACETYPE*> externalNPCFaces;
 
@@ -195,9 +191,7 @@ void PreloadExternalNPCFaces()
 {
 	// go and grab all external NPC faces that are needed for the game who won't exist as soldiertypes
 
-	if (fExternFacesLoaded) return;
-
-	fExternFacesLoaded = TRUE;
+	if (!externalNPCFaces.empty()) return;
 
 	for (size_t i = 0; i < lengthof(preloadedExternalNPCFaces); i++)
 	{
@@ -208,14 +202,13 @@ void PreloadExternalNPCFaces()
 
 void UnloadExternalNPCFaces()
 {
-	if (!fExternFacesLoaded) return;
-	fExternFacesLoaded = FALSE;
-
 	// Remove all external NPC faces.
-	for (auto entry : externalNPCFaces)
+	for (auto const& entry : externalNPCFaces)
 	{
 		DeleteFace(entry.second);
 	}
+
+	externalNPCFaces.clear();
 }
 
 
@@ -463,12 +456,11 @@ void HandleDialogue()
 	}
 
 	// If here, pick current one from queue and play
-	DialogueEvent*const d = ghDialogueQ.front();
+	auto const& d = ghDialogueQ.front();
 
 	// If we are in auto bandage, ignore any quotes!
 	if (gTacticalStatus.fAutoBandageMode || !d->Execute())
 	{
-		delete d;
 		if(!ghDialogueQ.empty()) ghDialogueQ.pop();
 	}
 }
@@ -478,7 +470,7 @@ void DialogueEvent::Add(DialogueEvent* const d)
 {
 	try
 	{
-		ghDialogueQ.push(d);
+		ghDialogueQ.emplace(d);
 	}
 	catch (...)
 	{
@@ -949,7 +941,7 @@ static void HandleTacticalNPCTextUI(UINT8 ubCharacterNum, const ST::string& zQuo
 }
 
 
-static void ExecuteTacticalTextBox(INT16 sLeftPosition, INT16 sTopPosition, const ST::string& pString);
+void ExecuteTacticalTextBox(INT16 sLeftPosition, INT16 sTopPosition, const ST::string& pString);
 
 
 // Handlers for tactical UI stuff
@@ -999,10 +991,10 @@ static void HandleTacticalTextUI(ProfileID profile_id, const ST::string& zQuoteS
 
 
 static void RenderSubtitleBoxOverlay(VIDEO_OVERLAY* pBlitter);
-static void TextOverlayClickCallback(MOUSE_REGION* pRegion, INT32 iReason);
+static void TextOverlayClickCallback(MOUSE_REGION* pRegion, UINT32 iReason);
 
 
-static void ExecuteTacticalTextBox(INT16 sLeftPosition, INT16 sTopPosition, const ST::string& pString)
+void ExecuteTacticalTextBox(INT16 sLeftPosition, INT16 sTopPosition, const ST::string& pString)
 {
 	// check if mouse region created, if so, do not recreate
 	if (fTextBoxMouseRegionCreated) return;
@@ -1024,7 +1016,7 @@ static void ExecuteTacticalTextBox(INT16 sLeftPosition, INT16 sTopPosition, cons
 }
 
 
-static void FaceOverlayClickCallback(MOUSE_REGION* pRegion, INT32 iReason);
+static void FaceOverlayClickCallback(MOUSE_REGION* pRegion, UINT32 iReason);
 static void RenderFaceOverlay(VIDEO_OVERLAY* pBlitter);
 
 
@@ -1290,10 +1282,9 @@ static void RenderFaceOverlay(VIDEO_OVERLAY* const blt)
 		MPrint(sFontX, sFontY, s->name);
 
 		// What sector are we in, (and is it the same as ours?)
-		if (s->sSectorX != gWorldSectorX || s->sSectorY != gWorldSectorY ||
-			s->bSectorZ != gbWorldSectorZ || s->fBetweenSectors)
+		if (s->sSector != gWorldSector || s->fBetweenSectors)
 		{
-			ST::string sector_id = GetSectorIDString(s->sSectorX, s->sSectorY, s->bSectorZ, FALSE);
+			ST::string sector_id = GetSectorIDString(s->sSector, FALSE);
 			sector_id = ReduceStringLength(sector_id, 64, BLOCKFONT2);
 			FindFontCenterCoordinates(x + 12, y + 68, 73, 9, sector_id, BLOCKFONT2, &sFontX, &sFontY);
 			MPrint(sFontX, sFontY, sector_id);
@@ -1403,37 +1394,6 @@ void SayQuoteFromAnyBodyInSector(UINT16 const quote_id)
 	ChooseRedIfPresentAndAirRaid(mercs_in_sector, n_mercs, quote_id);
 }
 
-
-void SayQuoteFromAnyBodyInThisSector(INT16 const x, INT16 const y, INT8 const z, UINT16 const quote_id)
-{
-	// Loop through all our guys and randomly say one from someone in our sector
-	INT32       n_mercs = 0;
-	SOLDIERTYPE* mercs_in_sector[20];
-	FOR_EACH_IN_TEAM(i, OUR_TEAM)
-	{
-		// Add guy if he's a candidate
-		SOLDIERTYPE& s = *i;
-		if (s.sSectorX != x)
-			continue;
-		if (s.sSectorY != y)
-			continue;
-		if (s.bSectorZ != z)
-			continue;
-		if (AM_AN_EPC(&s))
-			continue;
-		if (s.uiStatusFlags & SOLDIER_GASSED)
-			continue;
-		if (AM_A_ROBOT(&s))
-			continue;
-		if (s.fMercAsleep)
-			continue;
-		mercs_in_sector[n_mercs++] = &s;
-	}
-
-	ChooseRedIfPresentAndAirRaid(mercs_in_sector, n_mercs, quote_id);
-}
-
-
 void SayQuoteFromNearbyMercInSector(GridNo const gridno, INT8 const distance, UINT16 const quote_id)
 {
 	// Loop through all our guys and randomly say one from someone in our sector
@@ -1522,16 +1482,16 @@ void SayQuote58FromNearbyMercInSector(GridNo const gridno, INT8 const distance, 
 }
 
 
-static void TextOverlayClickCallback(MOUSE_REGION* pRegion, INT32 iReason)
+static void TextOverlayClickCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 {
 	static BOOLEAN fLButtonDown = FALSE;
 
-	if (iReason & MSYS_CALLBACK_REASON_LBUTTON_DWN )
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_DWN )
 	{
 		fLButtonDown = TRUE;
 	}
 
-	if (iReason & MSYS_CALLBACK_REASON_LBUTTON_UP && fLButtonDown )
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_UP && fLButtonDown )
 	{
 		if(  gpCurrentTalkingFace != NULL )
 		{
@@ -1545,16 +1505,16 @@ static void TextOverlayClickCallback(MOUSE_REGION* pRegion, INT32 iReason)
 }
 
 
-static void FaceOverlayClickCallback(MOUSE_REGION* pRegion, INT32 iReason)
+static void FaceOverlayClickCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 {
 	static BOOLEAN fLButtonDown = FALSE;
 
-	if (iReason & MSYS_CALLBACK_REASON_LBUTTON_DWN )
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_DWN )
 	{
 		fLButtonDown = TRUE;
 	}
 
-	if (iReason & MSYS_CALLBACK_REASON_LBUTTON_UP && fLButtonDown )
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_UP && fLButtonDown )
 	{
 		if(  gpCurrentTalkingFace != NULL )
 		{

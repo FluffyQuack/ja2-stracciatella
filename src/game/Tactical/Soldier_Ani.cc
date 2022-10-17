@@ -6,7 +6,6 @@
 #include "Overhead.h"
 #include "Soldier_Find.h"
 #include "Debug.h"
-#include "MemMan.h"
 #include "Overhead_Types.h"
 #include "Soldier_Control.h"
 #include "Animation_Cache.h"
@@ -86,7 +85,7 @@ static const DOUBLE gHopFenceForwardNWDist[NUMSOLDIERBODYTYPES]     = { 2.7, 1.0
 static const DOUBLE gHopFenceForwardFullSEDist[NUMSOLDIERBODYTYPES] = { 1.1, 1.0, 2.1, 1.1 };
 static const DOUBLE gHopFenceForwardFullNWDist[NUMSOLDIERBODYTYPES] = { 0.8, 0.2, 2.7, 0.8 };
 static const DOUBLE gFalloffBackwardsDist[NUMSOLDIERBODYTYPES]      = { 1, 0.8, 1, 1 };
-static const DOUBLE gClimbUpRoofDist[NUMSOLDIERBODYTYPES]           = { 2, 0.1, 2, 2 };
+static const float  gClimbUpRoofDist[NUMSOLDIERBODYTYPES]           = { 2.0f, 0.1f, 2.0f, 2.0f };
 static const DOUBLE gClimbUpRoofLATDist[NUMSOLDIERBODYTYPES]        = { 0.7, 0.5, 0.7, 0.5 };
 static const DOUBLE gClimbDownRoofStartDist[NUMSOLDIERBODYTYPES]    = { 5.0, 1.0, 1, 1 };
 static const DOUBLE gClimbUpRoofDistGoingLower[NUMSOLDIERBODYTYPES] = { 0.9, 0.1, 1, 1 };
@@ -399,13 +398,9 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 
 					uiJumpAddress = NO_JUMP;
 
-					if ( anAniFrame == 999 )
-					{
-						// Fail jump, re-load old anim
-						ChangeSoldierState( pSoldier, usOldAnimState, 0, FALSE );
-						return( TRUE );
-					}
-					break;
+					// Fail jump, re-load old anim
+					ChangeSoldierState( pSoldier, usOldAnimState, 0, FALSE );
+					return( TRUE );
 
 				case 437:
 
@@ -491,8 +486,8 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 					pSoldier->fInNonintAnim = FALSE;
 
 					if (pSoldier->usAnimState == STEAL_ITEM) {
-						SLOGD(ST::format("Reducing attacker busy count..., CODE FROM ANIMATION {} ( {} )",
-							gAnimControl[pSoldier->usAnimState].zAnimStr, pSoldier->usAnimState));
+						SLOGD("Reducing attacker busy count..., CODE FROM ANIMATION {} ( {} )",
+							gAnimControl[pSoldier->usAnimState].zAnimStr, pSoldier->usAnimState);
 						ReduceAttackBusyCount(pSoldier, FALSE);
 					}
 
@@ -807,14 +802,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 
 					// CODE: HANDLE CLIMBING ROOF,
 					// Move merc up
-					if ( pSoldier->bDirection == NORTH )
-					{
-						SetSoldierHeight( pSoldier, (FLOAT)(pSoldier->dHeightAdjustment + gClimbUpRoofDist[ pSoldier->ubBodyType ] ) );
-					}
-					else
-					{
-						SetSoldierHeight( pSoldier, (FLOAT)(pSoldier->dHeightAdjustment + gClimbUpRoofDist[ pSoldier->ubBodyType ] ) );
-					}
+					SetSoldierHeight(pSoldier, pSoldier->dHeightAdjustment + gClimbUpRoofDist[pSoldier->ubBodyType]);
 					break;
 
 				case 455:
@@ -831,14 +819,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 
 					// CODE: HANDLE CLIMBING ROOF,
 					// Move merc DOWN
-					if ( pSoldier->bDirection == NORTH )
-					{
-						SetSoldierHeight( pSoldier, (FLOAT)(pSoldier->dHeightAdjustment - gClimbUpRoofDist[ pSoldier->ubBodyType ] ) );
-					}
-					else
-					{
-						SetSoldierHeight( pSoldier, (FLOAT)(pSoldier->dHeightAdjustment - gClimbUpRoofDist[ pSoldier->ubBodyType ] ) );
-					}
+					SetSoldierHeight(pSoldier, pSoldier->dHeightAdjustment - gClimbUpRoofDist[pSoldier->ubBodyType]);
 					break;
 
 				case 457:
@@ -951,7 +932,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 					{
 						INT16 sDiff = pSoldier->sHeightAdjustment - pSoldier->sDesiredHeight;
 
-						if ( ABS( sDiff ) > 4 )
+						if (std::abs(sDiff) > 4)
 						{
 							if ( sDiff > 0 )
 							{
@@ -1673,7 +1654,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 
 								default:
 									// IF we are here - something is wrong - we should have a death animation here
-									SLOGD("Death sequence needed for animation %d",
+									SLOGD("Death sequence needed for animation {}",
 										pSoldier->usAnimState);
 									return TRUE;
 							}
@@ -1700,8 +1681,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 								gfPotentialTeamChangeDuringDeath = TRUE;
 
 								// Release attacker
-								SLOGD(
-									"Releasesoldierattacker, code 497 = check for death");
+								SLOGD("Releasesoldierattacker, code 497 = check for death");
 								ReleaseSoldiersAttacker( pSoldier );
 
 								// ATE: OK - the above call can potentially
@@ -1927,8 +1907,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 						else
 						{
 							// IF we are here - something is wrong - we should have a death animation here
-							SLOGD(
-								"Soldier Ani: GOTO Stance not chained properly: %d %d %d",
+							SLOGD("Soldier Ani: GOTO Stance not chained properly: {} {} {}",
 								ubDesiredHeight, ubCurrentHeight, pSoldier->usAnimState);
 							SoldierGotoStationaryStance(pSoldier);
 							return TRUE;
@@ -2231,16 +2210,14 @@ no_cry:
 				case 753:
 
 					// code: freeup attcker
-					SLOGD(
-						"Reducing attacker busy count..., CODE FROM ANIMATION %s ( %d )",
+					SLOGD("Reducing attacker busy count..., CODE FROM ANIMATION {} ( {} )",
 						gAnimControl[pSoldier->usAnimState].zAnimStr, pSoldier->usAnimState);
 					ReduceAttackBusyCount(pSoldier, FALSE);
 
 					// ATE: Here, reduce again if creaturequeen tentical attack...
 					if ( pSoldier->usAnimState == QUEEN_SWIPE )
 					{
-						SLOGD(
-							"Reducing attacker busy count for end of queen swipe");
+						SLOGD("Reducing attacker busy count for end of queen swipe");
 						ReduceAttackBusyCount(pSoldier, FALSE);
 					}
 					break;
@@ -2280,8 +2257,7 @@ no_cry:
 
 					// INcrement attacker busy count....
 					gTacticalStatus.ubAttackBusyCount++;
-					SLOGD(
-						"Incrementing attacker busy count..., CODE FROM ANIMATION %s ( %d ) : Count now %d",
+					SLOGD("Incrementing attacker busy count..., CODE FROM ANIMATION {} ( {} ) : Count now {}",
 						gAnimControl[pSoldier->usAnimState].zAnimStr, pSoldier->usAnimState,
 						gTacticalStatus.ubAttackBusyCount);
 					break;
@@ -2548,13 +2524,6 @@ no_cry:
 			}
 			// Adjust frame control pos, and try again
 			pSoldier->usAniCode++;
-		}
-		else if ( sNewAniFrame == 999 )
-		{
-
-			// Go to start, by default
-			pSoldier->usAniCode = 0;
-
 		}
 
 	// Loop here until we break on a real item!
@@ -3050,7 +3019,7 @@ void CheckForAndHandleSoldierDeath(SOLDIERTYPE* pSoldier, BOOLEAN* pfMadeCorpse)
 
 		default:
 			// IF we are here - something is wrong - we should have an animation stop here
-			SLOGW("CODE 440 Error, Death STOP not handled" );
+			SLOGW("CODE 440 Error, Death STOP not handled");
 			return;
 	}
 	ChangeSoldierState(pSoldier, state, 0, FALSE);
@@ -3235,7 +3204,7 @@ BOOLEAN CheckForAndHandleSoldierDyingNotFromHit( SOLDIERTYPE *pSoldier )
 			case BLOODCAT_HIT:               state = BLOODCAT_DYING;        break;
 
 			default:
-				SLOGD("Death state %d has no death hit", pSoldier->usAnimState);
+				SLOGD("Death state {} has no death hit", pSoldier->usAnimState);
 			{
 				BOOLEAN fMadeCorpse;
 				CheckForAndHandleSoldierDeath( pSoldier, &fMadeCorpse );
@@ -3420,7 +3389,7 @@ void HandleCheckForDeathCommonCode(SOLDIERTYPE* const pSoldier)
 
 		default:
 			// IF we are here - something is wrong - we should have a death animation here
-			SLOGD("unconscious hit sequence needed for animation %d", pSoldier->usAnimState);
+			SLOGD("unconscious hit sequence needed for animation {}", pSoldier->usAnimState);
 
 	}
 	// OTHERWISE, GOTO APPROPRIATE STOPANIMATION!
@@ -3452,7 +3421,7 @@ void HandleCheckForDeathCommonCode(SOLDIERTYPE* const pSoldier)
 
 		default:
 			// IF we are here - something is wrong - we should have a death animation here
-			SLOGD("unconscious hit sequence needed for animation %d", pSoldier->usAnimState);
+			SLOGD("unconscious hit sequence needed for animation {}", pSoldier->usAnimState);
 			return;
 	}
 	ChangeSoldierState(pSoldier, state, 0, FALSE);

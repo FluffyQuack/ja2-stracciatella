@@ -1,4 +1,5 @@
 #include "AI.h"
+#include "Ambient_Control.h"
 #include "Animated_ProgressBar.h"
 #include "Animation_Data.h"
 #include "Arms_Dealer_Init.h"
@@ -68,7 +69,6 @@
 #include "MercProfile.h"
 #include "Mercs.h"
 #include "MercTextBox.h"
-#include "MemMan.h"
 #include "Message.h"
 #include "Music_Control.h"
 #include "NPC.h"
@@ -315,8 +315,8 @@ BOOLEAN SaveGame(const ST::string& saveName, const ST::string& gameDesc)
 		 * saving the sector info struct because the
 		 * NewWayOfSavingEnemyAndCivliansToTempFile() will RESET the civ or enemy
 		 * flag AFTER they have been saved. */
-		NewWayOfSavingEnemyAndCivliansToTempFile(gWorldSectorX, gWorldSectorY, gbWorldSectorZ, TRUE,  TRUE);
-		NewWayOfSavingEnemyAndCivliansToTempFile(gWorldSectorX, gWorldSectorY, gbWorldSectorZ, FALSE, TRUE);
+		NewWayOfSavingEnemyAndCivliansToTempFile(gWorldSector, TRUE,  TRUE);
+		NewWayOfSavingEnemyAndCivliansToTempFile(gWorldSector, FALSE, TRUE);
 
 		// Setup the save game header
 		header.uiSavedGameVersion = guiSavedGameVersion;
@@ -327,16 +327,16 @@ BOOLEAN SaveGame(const ST::string& saveName, const ST::string& gameDesc)
 		header.ubHour                    = (UINT8)GetWorldHour();
 		header.ubMin                     = (UINT8)guiMin;
 		header.sInitialGameOptions       = gGameOptions;
-		GetBestPossibleSectorXYZValues(&header.sSectorX, &header.sSectorY, &header.bSectorZ);
+		GetBestPossibleSectorXYZValues(header.sSector);
 		header.ubNumOfMercsOnPlayersTeam = NumberOfMercsOnPlayerTeam();
 		header.iCurrentBalance           = LaptopSaveInfo.iCurrentBalance;
 		header.uiCurrentScreen           = guiPreviousOptionScreen;
-		header.fAlternateSector          = GetSectorFlagStatus(gWorldSectorX, gWorldSectorY, gbWorldSectorZ, SF_USE_ALTERNATE_MAP);
+		header.fAlternateSector          = GetSectorFlagStatus(gWorldSector, SF_USE_ALTERNATE_MAP);
 
 		if (gfWorldLoaded)
 		{
 			header.fWorldLoaded   = TRUE;
-			header.ubLoadScreenID = GetLoadScreenID(gWorldSectorX, gWorldSectorY, gbWorldSectorZ);
+			header.ubLoadScreenID = GetLoadScreenID(gWorldSector);
 		}
 		else
 		{
@@ -357,9 +357,9 @@ BOOLEAN SaveGame(const ST::string& saveName, const ST::string& gameDesc)
 		INJ_U32(   d, header.uiDay)
 		INJ_U8(    d, header.ubHour)
 		INJ_U8(    d, header.ubMin)
-		INJ_I16(   d, header.sSectorX)
-		INJ_I16(   d, header.sSectorY)
-		INJ_I8(    d, header.bSectorZ)
+		INJ_I16(   d, header.sSector.x)
+		INJ_I16(   d, header.sSector.y)
+		INJ_I8(    d, header.sSector.z)
 		INJ_U8(    d, header.ubNumOfMercsOnPlayersTeam)
 		INJ_I32(   d, header.iCurrentBalance)
 		INJ_U32(   d, header.uiCurrentScreen)
@@ -477,7 +477,7 @@ BOOLEAN SaveGame(const ST::string& saveName, const ST::string& gameDesc)
 	}
 	catch (std::runtime_error const& e)
 	{
-		STLOGE("Error saving game: {}", e.what());
+		SLOGE("Error saving game: {}", e.what());
 
 		if (fWePausedIt) UnPauseAfterSaveGame();
 
@@ -544,9 +544,9 @@ void ParseSavedGameHeader(const BYTE *data, SAVED_GAME_HEADER& h, bool stracLinu
 	EXTR_U32(   d, h.uiDay)
 	EXTR_U8(    d, h.ubHour)
 	EXTR_U8(    d, h.ubMin)
-	EXTR_I16(   d, h.sSectorX)
-	EXTR_I16(   d, h.sSectorY)
-	EXTR_I8(    d, h.bSectorZ)
+	EXTR_I16(   d, h.sSector.x)
+	EXTR_I16(   d, h.sSector.y)
+	EXTR_I8(    d, h.sSector.z)
 	EXTR_U8(    d, h.ubNumOfMercsOnPlayersTeam)
 	EXTR_I32(   d, h.iCurrentBalance)
 	EXTR_U32(   d, h.uiCurrentScreen)
@@ -570,7 +570,7 @@ void ParseSavedGameHeader(const BYTE *data, SAVED_GAME_HEADER& h, bool stracLinu
  * This function does only a basic check.  It might not detect all problems. */
 bool isValidSavedGameHeader(SAVED_GAME_HEADER& h)
 {
-	if((h.sSectorX == 0) && (h.sSectorY == 0) && (h.bSectorZ == -1))
+	if((h.sSector.x == 0) && (h.sSector.y == 0) && (h.sSector.z == -1))
 	{
 		// Special case: sector N/A at the game start
 		if((h.uiDay == 0)
@@ -582,11 +582,7 @@ bool isValidSavedGameHeader(SAVED_GAME_HEADER& h)
 	}
 	else
 	{
-		if((h.uiDay == 0)
-			|| (h.sSectorX <= 0) || (h.sSectorX > 16)
-			|| (h.sSectorY <= 0) || (h.sSectorY > 16)
-			|| (h.bSectorZ  < 0) || (h.bSectorZ > 3)
-			|| (h.iCurrentBalance < 0))
+		if (h.uiDay == 0 || !h.sSector.IsValid() || h.iCurrentBalance < 0)
 		{
 			// invalid for sure
 			return false;
@@ -724,7 +720,7 @@ void LoadSavedGame(const ST::string &saveName)
 	//if we are suppose to use the alternate sector
 	if (SaveGameHeader.fAlternateSector)
 	{
-		SetSectorFlag(gWorldSectorX, gWorldSectorY, gbWorldSectorZ, SF_USE_ALTERNATE_MAP);
+		SetSectorFlag(gWorldSector, SF_USE_ALTERNATE_MAP);
 		gfUseAlternateMap = TRUE;
 	}
 
@@ -732,30 +728,27 @@ void LoadSavedGame(const ST::string &saveName)
 	if (SaveGameHeader.fWorldLoaded || version < 50)
 	{
 		//Get the current world sector coordinates
-		INT16 const sLoadSectorX = gWorldSectorX;
-		INT16 const sLoadSectorY = gWorldSectorY;
-		INT8  const bLoadSectorZ = gbWorldSectorZ;
+		SGPSector sLoadSector = gWorldSector;
 
 		// This will guarantee that the sector will be loaded
 		SetWorldSectorInvalid();
 
 		//if we should load a sector (if the person didnt just start the game game)
-		if (sLoadSectorX != 0 && sLoadSectorY != 0)
+		if (sLoadSector.IsValid())
 		{
 			//Load the sector
-			SetCurrentWorldSector(sLoadSectorX, sLoadSectorY, bLoadSectorZ);
+			SetCurrentWorldSector(sLoadSector);
 		}
 	}
 	else
 	{ //By clearing these values, we can avoid "in sector" checks -- at least, that's the theory.
 		SetWorldSectorInvalid();
 
-		INT16 const x = SaveGameHeader.sSectorX;
-		INT16 const y = SaveGameHeader.sSectorY;
-		INT8  const z = SaveGameHeader.bSectorZ;
-		gubLastLoadingScreenID = x == -1 || y == -1 || z == -1 ?
-			LOADINGSCREEN_HELI : GetLoadScreenID(x, y, z);
+		SGPSector sector = SaveGameHeader.sSector;
+		gubLastLoadingScreenID = sector.IsValid() ? GetLoadScreenID(sector) : LOADINGSCREEN_HELI;
 
+		// Ensure we have a ambient sound set loaded
+		HandleNewSectorAmbience(0);
 		BeginLoadScreen();
 	}
 
@@ -1044,11 +1037,11 @@ void LoadSavedGame(const ST::string &saveName)
 	BAR(1, "Final Checks...");
 
 	// Reset the lighting level if we are outside
-	if (gbWorldSectorZ == 0)
+	if (gWorldSector.z == 0)
 		LightSetBaseLevel(GetTimeOfDayAmbientLightLevel());
 
 	//if we have been to this sector before
-//	if (SectorInfo[SECTOR(gWorldSectorX, gWorldSectorY)].uiFlags & SF_ALREADY_VISITED)
+//	if (SectorInfo[gWorldSector.AsByte()].uiFlags & SF_ALREADY_VISITED)
 	{
 		//Reset the fact that we are loading a saved game
 		gTacticalStatus.uiFlags &= ~LOADING_SAVED_GAME;
@@ -1121,20 +1114,19 @@ void LoadSavedGame(const ST::string &saveName)
 		if (s) TacticalRemoveSoldier(*s);
 
 		// add the pilot at a random location!
-		INT16 x = 0, y = 0;
+		// use B15 as fallback sector just in case we can't get a placement sector from GCM.
+		SGPSector sMap{SEC_B15};
 		auto placement = GCM->getNpcPlacement(SKYRIDER);
 		if (placement)
 		{
 			auto sector = placement->pickPlacementSector();
-
-			if (placement->useAlternateMap) SectorInfo[sector].uiFlags |= SF_USE_ALTERNATE_MAP;
-			x = SECTORX(sector);
-			y = SECTORY(sector);
+			if (sector != -1)
+			{
+				if (placement->useAlternateMap) SectorInfo[sector].uiFlags |= SF_USE_ALTERNATE_MAP;
+				sMap = SGPSector(sector);
+			}
 		}
-		MERCPROFILESTRUCT& p = GetProfile(SKYRIDER);
-		p.sSectorX = x;
-		p.sSectorY = y;
-		p.bSectorZ = 0;
+		GetProfile(SKYRIDER).sSector = sMap;
 	}
 
 	if (version < 68)
@@ -1350,7 +1342,7 @@ static void SaveSoldierStructure(HWFILE const f)
 static void LoadSoldierStructure(HWFILE const f, UINT32 savegame_version, bool stracLinuxFormat)
 {
 	// Loop through all the soldier and delete them all
-	FOR_EACH_SOLDIER(i) TacticalRemoveSoldier(*i);
+	TrashAllSoldiers();
 
 	// Loop through all the soldier structs to load
 	void (&reader)(HWFILE, BYTE*, UINT32) = savegame_version < 87 ?
@@ -1436,6 +1428,10 @@ static void LoadSoldierStructure(HWFILE const f, UINT32 savegame_version, bool s
 		{
 			s->next_to_previous_attacker = NULL;
 		}
+
+		// Just in case this save encountered a rare bug or comes
+		// from a mod with a different weapon configuration.
+		EnsureConsistentWeaponMode(s);
 	}
 
 	// Fix robot
@@ -1545,9 +1541,9 @@ static void SaveTacticalStatusToSavedGame(HWFILE const f)
 	// Save the current sector location
 	BYTE  data[5];
 	DataWriter d{data};
-	INJ_I16(d, gWorldSectorX)
-	INJ_I16(d, gWorldSectorY)
-	INJ_I8( d, gbWorldSectorZ)
+	INJ_I16(d, (INT16) gWorldSector.x)
+	INJ_I16(d, (INT16) gWorldSector.y)
+	INJ_I8( d, gWorldSector.z)
 	Assert(d.getConsumed() == lengthof(data));
 
 	f->write(data, sizeof(data));
@@ -1563,9 +1559,9 @@ static void LoadTacticalStatusFromSavedGame(HWFILE const f, bool stracLinuxForma
 	f->read(data, sizeof(data));
 
 	DataReader d{data};
-	EXTR_I16(d, gWorldSectorX)
-	EXTR_I16(d, gWorldSectorY)
-	EXTR_I8( d, gbWorldSectorZ)
+	EXTR_I16(d, gWorldSector.x)
+	EXTR_I16(d, gWorldSector.y)
+	EXTR_I8( d, gWorldSector.z)
 	Assert(d.getConsumed() == lengthof(data));
 }
 
@@ -1744,8 +1740,8 @@ void LoadMercPath(HWFILE const hFile, PathSt** const head)
 static void InjectMeanwhileDefinition(DataWriter& d, MEANWHILE_DEFINITION const& m)
 {
 	size_t start = d.getConsumed();
-	INJ_I16(d, m.sSectorX)
-	INJ_I16(d, m.sSectorY)
+	INJ_I16(d, (INT16) m.sSector.x)
+	INJ_I16(d, (INT16) m.sSector.y)
 	INJ_U16(d, m.usTriggerEvent)
 	INJ_U8( d, m.ubMeanwhileID)
 	INJ_U8( d, m.ubNPCNumber)
@@ -1756,12 +1752,15 @@ static void InjectMeanwhileDefinition(DataWriter& d, MEANWHILE_DEFINITION const&
 static void ExtractMeanwhileDefinition(DataReader& d, MEANWHILE_DEFINITION& m)
 {
 	size_t start = d.getConsumed();
-	EXTR_I16(d, m.sSectorX)
-	EXTR_I16(d, m.sSectorY)
+	INT16 a, b;
+	EXTR_I16(d, a)
+	EXTR_I16(d, b)
 	EXTR_U16(d, m.usTriggerEvent)
 	EXTR_U8( d, m.ubMeanwhileID)
 	EXTR_U8( d, m.ubNPCNumber)
 	Assert(d.getConsumed() == start + 8);
+	m.sSector.x = a;
+	m.sSector.y = b;
 }
 
 
@@ -1857,8 +1856,8 @@ static void SaveGeneralInfo(HWFILE const f)
 	INJ_U8(   d, gubCambriaMedicalObjects)
 	INJ_BOOL( d, gfDisableTacticalPanelButtons)
 	INJ_SKIP( d, 1)
-	INJ_I16(  d, sSelMapX)
-	INJ_I16(  d, sSelMapY)
+	INJ_I16(  d, sSelMap.x)
+	INJ_I16(  d, sSelMap.y)
 	INJ_I32(  d, iCurrentMapSectorZ)
 	INJ_U16(  d, gHelpScreen.usHasPlayerSeenHelpScreenInCurrentScreen)
 	INJ_SKIP( d, 1)
@@ -1867,17 +1866,17 @@ static void SaveGeneralInfo(HWFILE const f)
 	INJ_BOOL( d, gfBoxersResting)
 	INJ_U8(   d, gubDesertTemperature)
 	INJ_U8(   d, gubGlobalTemperature)
-	INJ_I16(  d, SECTORX(g_merc_arrive_sector))
-	INJ_I16(  d, SECTORY(g_merc_arrive_sector))
+	INJ_I16(  d, g_merc_arrive_sector.x)
+	INJ_I16(  d, g_merc_arrive_sector.y)
 	INJ_BOOL( d, gfCreatureMeanwhileScenePlayed)
 	INJ_SKIP_U8(d)
 	INJ_BOOL( d, gfPersistantPBI)
 	INJ_U8(   d, gubEnemyEncounterCode)
 	INJ_BOOL( d, gubExplicitEnemyEncounterCode)
 	INJ_BOOL( d, gfBlitBattleSectorLocator)
-	INJ_U8(   d, gubPBSectorX)
-	INJ_U8(   d, gubPBSectorY)
-	INJ_U8(   d, gubPBSectorZ)
+	INJ_U8(   d, gubPBSector.x)
+	INJ_U8(   d, gubPBSector.y)
+	INJ_U8(   d, gubPBSector.z)
 	INJ_BOOL( d, gfCantRetreatInPBI)
 	INJ_BOOL( d, gfExplosionQueueActive)
 	INJ_SKIP( d, 1)
@@ -2009,8 +2008,8 @@ static void LoadGeneralInfo(HWFILE const f, UINT32 const savegame_version)
 	EXTR_U8(   d, gubCambriaMedicalObjects)
 	EXTR_BOOL( d, gfDisableTacticalPanelButtons)
 	EXTR_SKIP( d, 1)
-	EXTR_I16(  d, sSelMapX)
-	EXTR_I16(  d, sSelMapY)
+	EXTR_I16(  d, sSelMap.x)
+	EXTR_I16(  d, sSelMap.y)
 	EXTR_I32(  d, iCurrentMapSectorZ)
 	EXTR_U16(  d, gHelpScreen.usHasPlayerSeenHelpScreenInCurrentScreen)
 	EXTR_SKIP( d, 1)
@@ -2023,19 +2022,17 @@ static void LoadGeneralInfo(HWFILE const f, UINT32 const savegame_version)
 	INT16 merc_arrive_y;
 	EXTR_I16(  d, merc_arrive_x)
 	EXTR_I16(  d, merc_arrive_y)
-	g_merc_arrive_sector =
-		1 <= merc_arrive_x && merc_arrive_x <= 16 &&
-		1 <= merc_arrive_y && merc_arrive_y <= 16 ? SECTOR(merc_arrive_x, merc_arrive_y) :
-		gamepolicy(start_sector);
+	SGPSector arrival(merc_arrive_x, merc_arrive_y);
+	g_merc_arrive_sector = arrival.IsValid() ? arrival : SGPSector(gamepolicy(start_sector));
 	EXTR_BOOL( d, gfCreatureMeanwhileScenePlayed)
 	EXTR_SKIP_U8(d)
 	EXTR_BOOL( d, gfPersistantPBI)
 	EXTR_U8(   d, gubEnemyEncounterCode)
 	EXTR_BOOL( d, gubExplicitEnemyEncounterCode)
 	EXTR_BOOL( d, gfBlitBattleSectorLocator)
-	EXTR_U8(   d, gubPBSectorX)
-	EXTR_U8(   d, gubPBSectorY)
-	EXTR_U8(   d, gubPBSectorZ)
+	EXTR_U8(   d, gubPBSector.x)
+	EXTR_U8(   d, gubPBSector.y)
+	EXTR_U8(   d, gubPBSector.z)
 	EXTR_BOOL( d, gfCantRetreatInPBI)
 	EXTR_BOOL( d, gfExplosionQueueActive)
 	EXTR_SKIP( d, 1)
@@ -2109,14 +2106,12 @@ static void SaveMeanwhileDefsToSaveGameFile(HWFILE const f)
 }
 
 
-void GetBestPossibleSectorXYZValues(INT16* const psSectorX, INT16* const psSectorY, INT8* const pbSectorZ)
+void GetBestPossibleSectorXYZValues(SGPSector& sSector)
 {
 	//if the current sector is valid
 	if (gfWorldLoaded)
 	{
-		*psSectorX = gWorldSectorX;
-		*psSectorY = gWorldSectorY;
-		*pbSectorZ = gbWorldSectorZ;
+		sSector = gWorldSector;
 		return;
 	}
 
@@ -2125,9 +2120,7 @@ void GetBestPossibleSectorXYZValues(INT16* const psSectorX, INT16* const psSecto
 		const SOLDIERTYPE* const s = Squad[iCurrentTacticalSquad][0];
 		if (s != NULL && s->bAssignment != IN_TRANSIT)
 		{
-			*psSectorX = s->sSectorX;
-			*psSectorY = s->sSectorY;
-			*pbSectorZ = s->bSectorZ;
+			sSector = s->sSector;
 			return;
 		}
 	}
@@ -2138,9 +2131,7 @@ void GetBestPossibleSectorXYZValues(INT16* const psSectorX, INT16* const psSecto
 		if (s->bAssignment != IN_TRANSIT && !s->fBetweenSectors)
 		{
 			//we found an alive, merc that is not moving
-			*psSectorX = s->sSectorX;
-			*psSectorY = s->sSectorY;
-			*pbSectorZ = s->bSectorZ;
+			sSector = s->sSector;
 			return;
 		}
 	}
@@ -2149,16 +2140,12 @@ void GetBestPossibleSectorXYZValues(INT16* const psSectorX, INT16* const psSecto
 	CFOR_EACH_IN_TEAM(s, OUR_TEAM)
 	{
 		//we found an alive, merc that is not moving
-		*psSectorX = s->sSectorX;
-		*psSectorY = s->sSectorY;
-		*pbSectorZ = s->bSectorZ;
+		sSector = s->sSector;
 		return;
 	}
 
 	// if we STILL havent found a merc, give up and use the -1, -1, -1
-	*psSectorX = gWorldSectorX;
-	*psSectorY = gWorldSectorY;
-	*pbSectorZ = gbWorldSectorZ;
+	sSector = gWorldSector;
 }
 
 
@@ -2449,7 +2436,7 @@ static void CalcJA2EncryptionSet(SAVED_GAME_HEADER const& h)
 
 	set  = h.iCurrentBalance;
 	set *= h.ubNumOfMercsOnPlayersTeam + 1;
-	set += h.bSectorZ * 3;
+	set += h.sSector.z * 3;
 	set += h.ubLoadScreenID;
 
 	if (h.fAlternateSector) set += 7;
@@ -2507,7 +2494,7 @@ SaveGameInfo::SaveGameInfo(ST::string name_, HWFILE file) : saveName(name_) {
 			LoadStatesFromSaveFile(file, states);
 			this->enabledMods = GetModInfoFromGameStates(states);
 		} catch (const std::runtime_error &ex) {
-			STLOGW("Could not read mods from save game: {}", ex.what());
+			SLOGW("Could not read mods from save game: {}", ex.what());
 		}
 	}
 }

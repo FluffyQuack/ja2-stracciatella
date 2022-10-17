@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Arms_Dealer.h"
+#include "Item_Types.h"
 #include "Types.h"
 #include "Observable.h"
 #include <variant>
@@ -23,6 +25,16 @@ struct SOLDIERTYPE;
 /*! \struct STRUCTURE
     \brief An structure element on the tactical map */
 struct STRUCTURE;
+/*! \struct MERCPROFILESTRUCT
+    \brief Profile of a character in game; controls soldier's name, appearance and others */
+struct MERCPROFILESTRUCT;
+
+/*! \defgroup funclib-dealers Shops and arms dealers
+    \brief Manage behavior, inventory and prices of dealers */
+
+/*! \struct DEALER_ITEM_HEADER
+    \brief An item in dealer's inventory */
+struct DEALER_ITEM_HEADER;
 
 /**
  * @defgroup observables Observables
@@ -70,22 +82,70 @@ extern Observable<INT16, INT16, INT8, INT16, STRUCTURE*, UINT32, BOOLEAN_S*> Bef
 extern Observable<INT16, INT16, INT8, INT16, STRUCTURE*, UINT8, BOOLEAN> OnStructureDamaged;
 
 /**
- * @defgroup funclib-general General 
- * @brief Functions to compose mod modules
- */
-
-/**
  * When the game about to be saved. This is the place to persist mod game states.
+ * @ingroup observables
  */
 extern Observable<> BeforeGameSaved;
 
 /**
  * Right after a game is loaded. This is the place to restore game states from a saved game.
+ * @ingroup observables
  */
 extern Observable<> OnGameLoaded;
 
+/**
+ * When a dealer/shopkeeper's inventory has been updated
+ * @ingroup observables
+ */
+extern Observable<> OnDealerInventoryUpdated;
+
+/**
+ * Calls for each item transferred from a dealer in a transaction
+ * @param bSelectedArmsDealerID ID of the dealer
+ * @param sItemIndex ID of the item being transacted
+ * @param fDealerSelling TRUE if the dealer is selling to the player. FALSE if the dealer is buying
+ * @ingroup observables
+ */
+extern Observable<INT8, UINT16, BOOLEAN> OnItemTransacted;
+
+/**
+ * Called when an item is being priced by a shopkeeper.
+ * The basic calculation already done at this point, and this gives an opportunity to modify the
+ * final unit price, to give special discounts, etc.
+ * @param gbSelectedArmsDealerID ID of the dealer
+ * @param usItemID ID of the item being priced
+ * @param fDealerSelling TRUE if the dealer is selling to the player. FALSE if the dealer is buying
+ * @param uiUnitPriceAdjusted The observer can override this value to change the item price
+ * @ingroup observables
+ */
+extern Observable<INT8, UINT16, BOOLEAN, UINT32_S*> OnItemPriced;
+
+ /*
+ * When a merc has just be hired and the soldier was just created in the world.
+ * @param soldier the soldier being hired
+ * @ingroup observables
+ */
+extern Observable<SOLDIERTYPE*> OnMercHired;
+
+/**
+ * When an RPC has been recruited into our team.
+ * @param soldier the RPC just recruited
+ * @ingroup observables
+ */
+extern Observable<SOLDIERTYPE*> OnRPCRecruited;
+
+/**
+ * @defgroup funclib-general General
+ * @brief Functions to compose mod modules
+ */
+
+/**
+ * @defgroup funclib-mercs Personnel
+ * @brief Functions to access soldiers and characters in the game
+ */
+
 /** @defgroup funclib-sectors Map sectors
- *  @brief Access and alter sectors' stratgic-level data
+ *  @brief Access and alter sectors' strategic-level data
  */
 
 /**
@@ -142,9 +202,18 @@ OBJECTTYPE* CreateMoney(const UINT32 amt);
 void PlaceItem(const INT16 sGridNo, OBJECTTYPE* const pObject, const INT8 bVisibility);
 
 /**
+ * Gets the Merc Profile data object by profile ID
+ * @param ubProfileID a valid Profile ID
+ * @return pointer to a MERCPROFILESTRUCT struct
+ * @ingroup funclib-mercs
+ */
+MERCPROFILESTRUCT* GetMercProfile(UINT8 ubProfileID);
+
+/**
  * Retrieves a key-value mapping from saved game states.
  * @param key provide a unique key so it will not clash with other mods
  * @return
+ * @ingroup funclib-general
  */
 ExtraGameStatesTable GetGameStates(std::string key);
 
@@ -153,5 +222,56 @@ ExtraGameStatesTable GetGameStates(std::string key);
  * persisted in game saves, and can be retrieved with GetGameStates.
  * @param key provide a unique key so it will not clash with other mods
  * @param states a map of primitive types (string, numeric or boolean)
+ * @ingroup funclib-general
  */
 void PutGameStates(std::string key, ExtraGameStatesTable states);
+
+/**
+ * Refreshes the stocks and cash of all dealers.
+ * @ingroup funclib-dealers
+ */
+void DailyCheckOnItemQuantities();
+
+/**
+ * Make at least X number of the given item available to buy.
+ * @param bDealerID The ID of the dealer to update
+ * @param usItemIndex The index of the Item
+ * @param ubNumItems At least this Number of items will exist in the dealer's inventory
+ * @ingroup funclib-dealers
+ */
+void GuaranteeAtLeastXItemsOfIndex_(INT8, UINT16, UINT8);
+
+/** @ingroup funclib-dealers */
+void RemoveRandomItemFromDealerInventory(INT8 bArmsDealerID, UINT16 usItemIndex, UINT8 ubHowMany);
+
+/** @ingroup funclib-dealers */
+std::vector<DEALER_ITEM_HEADER*> GetDealerInventory(UINT8 ubDealerID);
+
+/** @ingroup funclib-dealers */
+BOOLEAN StartShopKeeperTalking(UINT16 usQuoteNum);
+
+/** @ingroup funclib-dealers */
+void EnterShopKeeperInterfaceScreen(UINT8 ubArmsDealer);
+
+/**
+ * @defgroup ui-control UI controls
+ * @brief Functions for controlling the game UI
+ */
+
+/**
+ * Pops up a basic message box with only the text and an OK button. There is no callback on close and returns the control
+ * flow to the current screen. This is for messages that requires player's immediate attention.
+ * @param text
+ * @ingroup ui-control
+ */
+void DoBasicMessageBox(ST::string text);
+
+/**
+ * Displays a pop-up text box in the tactical view. This is suitable for storytelling, or describing a scene, situation
+ * or items. In Lua, this function is ExecuteTacticalTextBox.
+ * @param sLeftPosition On-screen X-position of the text box
+ * @param sTopPosition On-screen Y-position of the text box
+ * @param pString Text to display
+ * @ingroup ui-control
+ */
+void ExecuteTacticalTextBox_(INT16 sLeftPosition, INT16 sTopPosition, ST::string pString);
