@@ -58,8 +58,9 @@ enum
 static BUTTON_PICS* iMenuImages[NUM_MENU_ITEMS];
 static GUIButtonRef iMenuButtons[NUM_MENU_ITEMS];
 
-static SGPVObject* guiMainMenuBackGroundImage;
-static SGPVObject* guiJa2LogoImage;
+static SGPVObject* guiMainMenuBackGroundImage = 0;
+static SGPVSurface* guiMainMenuBackGroundImage_UB = 0;
+static SGPVObject* guiJa2LogoImage = 0;
 
 static INT8    gbHandledMainMenu = 0;
 static BOOLEAN fInitialRender    = FALSE;
@@ -206,8 +207,15 @@ void InitMainMenu(void)
 	CreateDestroyMainMenuButtons(TRUE);
 
 #	define GFX_DIR LOADSCREENSDIR
-	guiMainMenuBackGroundImage = AddVideoObjectFromFile(GFX_DIR "/mainmenubackground.sti");
-	guiJa2LogoImage            = AddVideoObjectFromFile(GFX_DIR "/ja2logo.sti");
+	if (gameType == GAMETYPE_DEFAULT)
+	{
+		guiMainMenuBackGroundImage = AddVideoObjectFromFile(GFX_DIR "/mainmenubackground.sti");
+		guiJa2LogoImage = AddVideoObjectFromFile(GFX_DIR "/ja2logo.sti");
+	}
+	else if (gameType == GAMETYPE_UB) //Unfinished Business loads a 24-bit main menu background image and doesn't load a logo
+	{
+		guiMainMenuBackGroundImage_UB = AddVideoSurfaceFromFile(INTERFACEDIR "/MM24Background.sti");
+	}
 #undef GFX_DIR
 
 	// If there are no saved games, disable the button
@@ -228,8 +236,15 @@ void InitMainMenu(void)
 static void ExitMainMenu(void)
 {
 	CreateDestroyMainMenuButtons(FALSE);
-	DeleteVideoObject(guiMainMenuBackGroundImage);
-	DeleteVideoObject(guiJa2LogoImage);
+	if(guiMainMenuBackGroundImage)
+		DeleteVideoObject(guiMainMenuBackGroundImage);
+	if (guiMainMenuBackGroundImage_UB)
+		DeleteVideoSurface(guiMainMenuBackGroundImage_UB);
+	if (guiJa2LogoImage)
+		DeleteVideoObject(guiJa2LogoImage);
+	guiMainMenuBackGroundImage = 0;
+	guiMainMenuBackGroundImage_UB = 0;
+	guiJa2LogoImage = 0;
 	gMsgBox.uiExitScreen = MAINMENU_SCREEN;
 }
 
@@ -349,8 +364,18 @@ static void CreateDestroyMainMenuButtons(BOOLEAN fCreate)
 
 static void RenderMainMenu(void)
 {
-	BltVideoObject(FRAME_BUFFER, guiMainMenuBackGroundImage, 0, STD_SCREEN_X,       STD_SCREEN_Y     );
-	BltVideoObject(FRAME_BUFFER, guiJa2LogoImage,            0, STD_SCREEN_X + 188, STD_SCREEN_Y + 15);
+	if (gameType == GAMETYPE_DEFAULT)
+	{
+		if (guiMainMenuBackGroundImage)
+			BltVideoObject(FRAME_BUFFER, guiMainMenuBackGroundImage, 0, STD_SCREEN_X, STD_SCREEN_Y);
+		if (guiJa2LogoImage)
+			BltVideoObject(FRAME_BUFFER, guiJa2LogoImage, 0, STD_SCREEN_X + 188, STD_SCREEN_Y + 15);
+	}
+	else if (gameType == GAMETYPE_UB)
+	{
+		if (guiMainMenuBackGroundImage_UB)
+			BltVideoSurface(FRAME_BUFFER, guiMainMenuBackGroundImage_UB, 0, 0, NULL);
+	}
 	BltVideoSurface(guiSAVEBUFFER, FRAME_BUFFER, 0, 0, NULL);
 }
 
