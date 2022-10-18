@@ -6,6 +6,12 @@
 
 #include <string_theory/string>
 
+enum
+{
+	GAMETYPE_DEFAULT, //Main JA2 release
+	GAMETYPE_UB, //Unfinished Business stand-alone expansion
+	//GAMETYPE_DEMO, //JA2 demo
+};
 
 //If you add any options, MAKE sure you add the corresponding string to the Options Screen string array
 enum
@@ -101,6 +107,8 @@ struct GAME_OPTIONS
 	BOOLEAN	fTurnTimeLimit;
 	UINT8		ubGameSaveMode;
 };
+
+extern int gameType;
 
 //This structure will contain general Ja2 settings  NOT individual game settings.
 extern GAME_SETTINGS gGameSettings;

@@ -32,6 +32,8 @@
 
 #define GAME_SETTINGS_FILE "Ja2.set"
 
+int gameType = GAMETYPE_UB;
+
 GAME_SETTINGS		gGameSettings;
 GAME_OPTIONS		gGameOptions;
 
