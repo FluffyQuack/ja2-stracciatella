@@ -319,7 +319,15 @@ const FactParamsModel* DefaultContentManager::getFactParams(Fact fact) const
 /** Get map file path. */
 ST::string DefaultContentManager::getMapPath(const ST::string& mapName) const
 {
-	ST::string result = MAPSDIR;
+	//ST::string result = MAPSDIR;
+
+	// Ugly way of loading UB maps
+	ST::string result;
+	if (gameType == GAMETYPE_DEFAULT)
+		result = MAPSDIR;
+	else
+		result = "campaigns\\unfinished business";
+
 	result += '/';
 	result += mapName.c_str();
 

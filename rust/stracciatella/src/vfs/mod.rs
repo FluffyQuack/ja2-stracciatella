@@ -237,6 +237,11 @@ impl Vfs {
         // Next are SLF files in vanilla data dir
         self.add_slf_files_from(data_dir_layer, true)?;
 
+        // Add UB maps archive
+        let ub_maps_dir = vanilla_data_dir.join("Campaigns/Unfinished Business");
+        let ub_maps_dir_layer = self.add_dir(&ub_maps_dir)?;
+        self.add_slf_files_from(ub_maps_dir_layer, true)?;
+
         // Last is fallback editor.slf if it exists (does not need to exist)
         if engine_options.run_editor {
             self.add_editor_slf_layer(externalized_layer)?;
