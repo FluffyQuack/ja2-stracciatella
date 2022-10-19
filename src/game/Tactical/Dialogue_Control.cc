@@ -189,6 +189,9 @@ FACETYPE* GetExternalNPCFace(ProfileID mercID)
 
 void PreloadExternalNPCFaces()
 {
+	if (gameType == GAMETYPE_UB) // The NPC faces in preloadedExternalNPCFaces aren't used in Unfinished Business, so skip loading them
+		return;
+
 	// go and grab all external NPC faces that are needed for the game who won't exist as soldiertypes
 
 	if (!externalNPCFaces.empty()) return;
