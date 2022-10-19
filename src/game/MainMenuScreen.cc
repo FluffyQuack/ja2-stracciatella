@@ -1,10 +1,12 @@
 #include "Button_System.h"
+#include "ContentManager.h"
 #include "Cursor_Control.h"
 #include "Cursors.h"
 #include "Directories.h"
 #include "English.h"
 #include "Font.h"
 #include "Font_Control.h"
+#include "GameInstance.h"
 #include "GameSettings.h"
 #include "GameLoop.h"
 #include "GameVersion.h"
@@ -204,6 +206,12 @@ static void CreateDestroyMainMenuButtons(BOOLEAN fCreate);
 
 void InitMainMenu(void)
 {
+	// Check if we're running the base game or the Unfinished Business expansion (Fluffy TODO: we probably should be doing this a better way and in a better place)
+	if (GCM->doesGameResExists(INTERFACEDIR "/MM24Background.sti"))
+		gameType = GAMETYPE_UB;
+	else
+		gameType = GAMETYPE_DEFAULT;
+
 	CreateDestroyMainMenuButtons(TRUE);
 
 #	define GFX_DIR LOADSCREENSDIR
