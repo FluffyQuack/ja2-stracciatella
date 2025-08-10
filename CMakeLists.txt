@@ -114,7 +114,8 @@ if(MSVC)
 		CMAKE_C_FLAGS_RELWITHDEBINFO
 	)
         # force /Z7 instead of /ZI to include debug information in obj file
-        string(REGEX REPLACE "/Zi|/ZI" "/Z7" _value ${${_var}})
+        #string(REGEX REPLACE "/Zi|/ZI" "/Z7" _value ${${_var}})
+        string(REGEX REPLACE "/Z7|/Zi|/ZI" "/Z7 /bigobj" _value ${${_var}})
 		if(NOT ${${_var}} STREQUAL ${_value})
 			set_property(CACHE "${_var}" PROPERTY VALUE "${_value}")
         endif()
@@ -226,7 +227,8 @@ if (MSVC)
     string(REPLACE "SDL2main.lib" "SDL2.dll" SDL_DLL ${SDL2MAIN_LIBRARY})
     add_custom_command(TARGET ${JA2_BINARY} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy
-            ${SDL_DLL} "$<TARGET_FILE_DIR:${JA2_BINARY}>")
+            #${SDL_DLL} "$<TARGET_FILE_DIR:${JA2_BINARY}>")
+            "C:\\apps\\vcpkg\\packages\\sdl2_x64-windows\\bin\\SDL2.dll" "$<TARGET_FILE_DIR:${JA2_BINARY}>")
 endif()
 if (APPLE)
     add_custom_command(TARGET ${JA2_BINARY}
