@@ -1,3 +1,27 @@
+------------- Instructions for compiling 2025 -------------
+
+- Some libraries were found as they were already installed by vcpkg, but FLTK had to be added
+-- vcpkg install fltk
+
+- Find this line in CMakeLists.txt:
+	 string(REGEX REPLACE "/Zi|/ZI" "/Z7" _value ${${_var}})
+- Replace with these two lines (in order to add bigobj compile argument):
+	#string(REGEX REPLACE "/Zi|/ZI" "/Z7" _value ${${_var}})
+	string(REGEX REPLACE "/Z7|/Zi|/ZI" "/Z7 /bigobj" _value ${${_var}})
+
+- Find this line in CMakeLists.txt
+	${SDL_DLL} "$<TARGET_FILE_DIR:${JA2_BINARY}>")
+- Replace with these two lines:
+	#${SDL_DLL} "$<TARGET_FILE_DIR:${JA2_BINARY}>")
+	"C:\\apps\\vcpkg\\packages\\sdl2_x64-windows\\bin\\SDL2.dll" "$<TARGET_FILE_DIR:${JA2_BINARY}>")
+
+- In Visual Studio->Project->CMake Settings->CMake Variables->LOCAL_FLTK_LIB = TRUE
+
+- Remotes:
+-- ja2-ub-comparison: https://github.com/Manuel-K/ja2-ub-comparison
+-- main-repo: https://github.com/ja2-stracciatella/ja2-stracciatella
+
+------------- Below are old instructions I used 2021 or 2022 -------------
 I did this in order to setting this up to to compile in VS2019:
 
 - Edited CMakeLists.txt like so:
