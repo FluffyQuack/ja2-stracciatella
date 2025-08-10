@@ -2,9 +2,9 @@
 
 #include "JsonUtility.h"
 #include "Strategic_Mines.h"
-#include <utility>
+#include "TownModel.h"
 
-MineModel::MineModel(const uint8_t mineId_, const uint8_t entranceSector_, const uint8_t associatedTownId_, 
+MineModel::MineModel(const uint8_t mineId_, const uint8_t entranceSector_, const uint8_t associatedTownId_,
 	const uint8_t mineType_, const uint16_t minimumMineProduction_, const bool headMinerAssigned_,
 	const bool noDepletion_, const bool delayDepletion_,
 	std::vector<std::array<uint8_t, 2>> mineSectors_, const int16_t faceDisplayYOffset_) :
@@ -18,25 +18,25 @@ bool MineModel::isAbandoned() const
 	return minimumMineProduction == 0;
 }
 
-uint8_t mineTypeFromString(const std::string& mineType)
+uint8_t mineTypeFromString(const ST::string& mineType)
 {
 	if (mineType == "GOLD_MINE") return GOLD_MINE;
 	if (mineType == "SILVER_MINE") return SILVER_MINE;
-	
+
 	ST::string err = ST::format("Unrecognized mine type: '{}'", mineType);
 	throw std::runtime_error(err.to_std_string());
 }
 
-std::vector<std::array<uint8_t, 2>> readMineSectors(const rapidjson::Value& sectorsJson)
+std::vector<std::array<uint8_t, 2>> readMineSectors(const JsonValue& sectorsJson)
 {
 	std::vector<std::array<uint8_t, 2>> sectors;
-	for (auto& s: sectorsJson.GetArray())
+	for (auto& s: sectorsJson.toVec())
 	{
-		auto sector = s.GetArray();
-		if (sector.Size() != 2) throw std::runtime_error("Elements in mineSector must be arrays of 2");
+		auto sector = s.toVec();
+		if (sector.size() != 2) throw std::runtime_error("Elements in mineSector must be arrays of 2");
 
-		auto sectorString = sector[0].GetString();
-		auto sectorLevel = sector[1].GetUint();
+		auto& sectorString = sector[0];
+		auto sectorLevel = sector[1].toUInt();
 
 		sectors.push_back(std::array<uint8_t, 2> {
 			JsonUtility::parseSectorID(sectorString),
@@ -46,16 +46,19 @@ std::vector<std::array<uint8_t, 2>> readMineSectors(const rapidjson::Value& sect
 	return sectors;
 }
 
-MineModel* MineModel::deserialize(uint8_t index, const rapidjson::Value& json)
+MineModel* MineModel::deserialize(uint8_t index, const JsonValue& json, const ContentManager* contentManager, const bool jsonIsOnModLayer)
 {
-	auto obj = JsonObjectReader(json);
-	auto entrance = JsonUtility::parseSectorID(obj.GetString("entranceSector"));
-	auto mineSectors = readMineSectors(json["mineSectors"]);
+	auto obj = json.toObject();
+	auto entrance = JsonUtility::parseSectorID(obj["entranceSector"]);
+	auto mineSectors = readMineSectors(obj["mineSectors"]);
+
+	uint8_t townId = obj.getOptionalUInt("associatedTownId");
+	if (townId && jsonIsOnModLayer) SLOGW("Property `associatedTownId` in strategic-mines.json has been deprecated. Use `associatedTown` instead.");
 
 	return new MineModel(
 		index,
 		entrance,
-		obj.GetUInt("associatedTownId"),
+		townId ? townId : contentManager->getTownByName(obj.GetString("associatedTown"))->townId,
 		mineTypeFromString(obj.GetString("mineType")),
 		obj.GetUInt("minimumMineProduction"),
 		obj.getOptionalBool("headMinerAssigned"),

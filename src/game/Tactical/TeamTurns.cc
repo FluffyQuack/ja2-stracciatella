@@ -1,7 +1,6 @@
 #include "LoadSaveData.h"
 #include "Timer_Control.h"
 #include "Types.h"
-#include "FileMan.h"
 #include "Soldier_Control.h"
 #include "Overhead.h"
 #include "Animation_Control.h"
@@ -18,10 +17,8 @@
 #include "Smell.h"
 #include "Game_Clock.h"
 #include "GameSettings.h"
-#include "Soldier_Functions.h"
 #include "Queen_Command.h"
 #include "PathAI.h"
-#include "Strategic_Turns.h"
 #include "Lighting.h"
 #include "Environment.h"
 #include "Explosion_Control.h"
@@ -526,7 +523,6 @@ static void StartInterrupt(void)
 	if (first_interrupter->bTeam == OUR_TEAM)
 	{
 		// start interrupts for everyone on our side at once
-		ST::string sTemp;
 		UINT8   ubInterrupters = 0;
 
 		// build string for display of who gets interrupt
@@ -549,7 +545,7 @@ static void StartInterrupt(void)
 			}
 		}
 
-		sTemp = g_langRes->Message[ STR_INTERRUPT_FOR ];
+		ST::string sTemp = g_langRes->Message[STR_INTERRUPT_FOR];
 
 		// build string in separate loop here, want to linearly process squads...
 		for (INT32 iSquad = 0; iSquad < NUMBER_OF_SQUADS; ++iSquad)
@@ -568,7 +564,7 @@ static void StartInterrupt(void)
 					// add comma to end, we know we have another person after this...
 					sTemp += ", ";
 					ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, sTemp );
-					sTemp = ST::null;
+					sTemp.clear();
 					ubInterrupters = 1;
 				}
 
@@ -578,6 +574,11 @@ static void StartInterrupt(void)
 				}
 				sTemp += s->name;
 			}
+		}
+
+		if (!sTemp.empty())
+		{
+			ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, sTemp);
 		}
 
 		SLOGD("INTERRUPT: starting interrupt for {}", first_interrupter->ubID);
@@ -641,10 +642,16 @@ static void StartInterrupt(void)
 
 
 		// here we have to rebuilt the AI list!
-		BuildAIListForTeam( bTeam );
+		if (!BuildAIListForTeam(bTeam))
+		{
+			// Nobody on that team matched the conditions to get added to the
+			// AI list which means we don't have anyone left for this interrupt.
+			return EndInterrupt(false);
+		}
 
 		// set to the new first interrupter
 		SOLDIERTYPE* const pSoldier = RemoveFirstAIListEntry();
+		AssertMsg(pSoldier, "BuildAIListForTeam returned true but list is empty");
 
 		//if ( gTacticalStatus.ubCurrentTeam == OUR_TEAM)
 		if ( pSoldier->bTeam != OUR_TEAM )
@@ -1108,12 +1115,6 @@ BOOLEAN StandardInterruptConditionsMet(const SOLDIERTYPE* const pSoldier, const 
 	{
 		return(FALSE);
 	}
-
-
-#ifdef RECORDINTERRUPT
-	// this usually starts a new series of logs, so that's why the blank line
-	fprintf(InterruptFile, "\nStandardInterruptConditionsMet by %d vs. %d\n", pSoldier->guynum, pOpponent->ubID);
-#endif
 
 	return(TRUE);
 }

@@ -2,11 +2,11 @@
 #include "AIMMembers.h"
 #include "Assignments.h"
 #include "Button_System.h"
-#include "Campaign_Types.h"
 #include "Cheats.h"
 #include "ContentManager.h"
 #include "Cursors.h"
 #include "Directories.h"
+#include "EDT.h"
 #include "English.h"
 #include "Facts.h"
 #include "Font.h"
@@ -23,6 +23,7 @@
 #include "Merc_Hiring.h"
 #include "MercPortrait.h"
 #include "Mercs.h"
+#include "Object_Cache.h"
 #include "Quests.h"
 #include "ScreenIDs.h"
 #include "Soldier_Control.h"
@@ -38,10 +39,7 @@
 #include "WordWrap.h"
 #include <string_theory/format>
 #include <string_theory/string>
-struct BUTTON_PICS;
 
-
-#define MERCBIOFILE			BINARYDATADIR "/mercbios.edt"
 
 #define MERC_BIO_FONT			FONT14ARIAL//FONT12ARIAL
 #define MERC_BIO_COLOR			FONT_MCOLOR_WHITE
@@ -92,10 +90,6 @@ struct BUTTON_PICS;
 
 #define MERC_BIO_WIDTH			460 - 10
 
-#define MERC_BIO_INFO_TEXT_SIZE		5 * 80
-#define MERC_BIO_ADD_INFO_TEXT_SIZE	2 * 80
-#define MERC_BIO_SIZE			7 * 80
-
 #define MERC_STATS_FIRST_COL_X		MERC_NAME_X
 #define MERC_STATS_FIRST_NUM_COL_X	MERC_STATS_FIRST_COL_X + 90
 #define MERC_STATS_SECOND_COL_X		MERC_FILES_STATS_BOX_X + 170
@@ -107,9 +101,11 @@ struct BUTTON_PICS;
 #define MERC_PORTRAIT_TEXT_OFFSET_Y	110
 
 
-static SGPVObject* guiPortraitBox;
-static SGPVObject* guiStatsBox;
-static SGPVObject* guiBioBox;
+namespace {
+constexpr MultiLanguageGraphic guiStatsBox{ MLG_STATSBOX };
+cache_key_t const guiBioBox{ LAPTOPDIR "/biobox.sti" };
+cache_key_t const guiPortraitBox{ LAPTOPDIR "/portraitbox.sti" };
+}
 
 //
 // Buttons
@@ -147,16 +143,6 @@ void EnterMercsFiles()
 {
 	InitMercBackGround();
 
-	// load the stats box graphic and add it
-	const char* const ImageFile = GetMLGFilename(MLG_STATSBOX);
-	guiStatsBox = AddVideoObjectFromFile(ImageFile);
-
-	// load the Portrait box graphic and add it
-	guiPortraitBox = AddVideoObjectFromFile(LAPTOPDIR "/portraitbox.sti");
-
-	// load the bio box graphic and add it
-	guiBioBox = AddVideoObjectFromFile(LAPTOPDIR "/biobox.sti");
-
 	guiButtonImage    = LoadButtonImage(LAPTOPDIR "/bigbuttons.sti", 0, 1);
 	guiPrevButton     = MakeButton(MercInfo[MERC_FILES_PREVIOUS], MERC_FILES_PREV_BUTTON_X, BtnMercPrevButtonCallback);
 	guiNextButton     = MakeButton(MercInfo[MERC_FILES_NEXT],     MERC_FILES_NEXT_BUTTON_X, BtnMercNextButtonCallback);
@@ -169,9 +155,9 @@ void EnterMercsFiles()
 
 void ExitMercsFiles()
 {
-	DeleteVideoObject(guiPortraitBox);
-	DeleteVideoObject(guiStatsBox);
-	DeleteVideoObject(guiBioBox);
+	RemoveVObject(guiPortraitBox);
+	RemoveVObject(guiStatsBox);
+	RemoveVObject(guiBioBox);
 
 	UnloadButtonImage( guiButtonImage );
 	RemoveButton( guiPrevButton );
@@ -283,7 +269,7 @@ static void BtnMercHireButtonCallback(GUI_BUTTON *btn, UINT32 reason)
 static void DisplayMercFace(const ProfileID pid)
 try
 {
-	BltVideoObject(FRAME_BUFFER, guiPortraitBox, 0, MERC_FILES_PORTRAIT_BOX_X, MERC_FILES_PORTRAIT_BOX_Y);
+	BltVideoObject(FRAME_BUFFER, GetVObject(guiPortraitBox), 0, MERC_FILES_PORTRAIT_BOX_X, MERC_FILES_PORTRAIT_BOX_Y);
 
 	MERCPROFILESTRUCT const&       p = GetProfile(pid);
 	SOLDIERTYPE       const* const s = FindSoldierByProfileIDOnPlayerTeam(pid);
@@ -327,7 +313,7 @@ try
 	else
 	{
 		shaded = FALSE;
-		text   = ST::null;
+		text.clear();
 	}
 
 	BltVideoObject(FRAME_BUFFER, face.get(), 0, MERC_FACE_X, MERC_FACE_Y);
@@ -337,7 +323,7 @@ try
 		FRAME_BUFFER->ShadowRect(MERC_FACE_X, MERC_FACE_Y, MERC_FACE_X + MERC_FACE_WIDTH, MERC_FACE_Y + MERC_FACE_HEIGHT);
 	}
 
-	if (text != NULL)
+	if (!text.empty())
 	{
 		DisplayWrappedString(MERC_FACE_X, MERC_FACE_Y + MERC_PORTRAIT_TEXT_OFFSET_Y, MERC_FACE_WIDTH, 2, FONT14ARIAL, 145, text, FONT_MCOLOR_BLACK, CENTER_JUSTIFIED);
 	}
@@ -347,20 +333,18 @@ catch (...) { /* XXX ignore */ }
 
 static void LoadAndDisplayMercBio(UINT8 ubMercID)
 {
-	UINT32 uiStartLoc;
+	EDTFile mercbios{ EDTFile::MERCBIOS };
 
 	{
 		//load and display the merc bio
-		uiStartLoc = MERC_BIO_SIZE * ubMercID;
-		ST::string sText = GCM->loadEncryptedString(MERCBIOFILE, uiStartLoc, MERC_BIO_INFO_TEXT_SIZE);
+		auto const sText{ mercbios.at(ubMercID, 0) };
 		DisplayWrappedString(MERC_BIO_TEXT_X, MERC_BIO_TEXT_Y, MERC_BIO_WIDTH, 2, MERC_BIO_FONT, MERC_BIO_COLOR, sText, FONT_MCOLOR_BLACK, LEFT_JUSTIFIED);
 	}
 
 	{
 		//load and display the merc's additioanl info (if any)
-		uiStartLoc += MERC_BIO_INFO_TEXT_SIZE;
-		ST::string sText = GCM->loadEncryptedString(MERCBIOFILE, uiStartLoc, MERC_BIO_ADD_INFO_TEXT_SIZE);
-		if( sText[0] != 0 )
+		auto const sText{ mercbios.at(ubMercID, 1) };
+		if (!sText.empty())
 		{
 			DrawTextToScreen(MercInfo[MERC_FILES_ADDITIONAL_INFO], MERC_ADD_BIO_TITLE_X, MERC_ADD_BIO_TITLE_Y, 0, MERC_TITLE_FONT, MERC_TITLE_COLOR, FONT_MCOLOR_BLACK, LEFT_JUSTIFIED);
 			DisplayWrappedString(MERC_ADD_BIO_TEXT_X, MERC_ADD_BIO_TEXT_Y, MERC_BIO_WIDTH, 2, MERC_BIO_FONT, MERC_BIO_COLOR, sText, FONT_MCOLOR_BLACK, LEFT_JUSTIFIED);

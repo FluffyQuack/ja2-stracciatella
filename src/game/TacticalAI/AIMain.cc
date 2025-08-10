@@ -7,17 +7,14 @@
 #include "Overhead_Types.h"
 #include "OppList.h"
 #include "Animation_Control.h"
-#include "Font_Control.h"
 #include "Interface.h"
 #include "PathAI.h"
 #include "Points.h"
-#include "Weapons.h"
 #include "Items.h"
 #include "Handle_Items.h"
 #include "AIInternals.h"
 #include "Animation_Data.h"
 #include "LOS.h"
-#include "Message.h"
 #include "TeamTurns.h"
 #include "NPC.h"
 #include "Dialogue_Control.h"
@@ -42,7 +39,7 @@
 
 #include <algorithm>
 
-#define AI_DELAY 100
+constexpr milliseconds AI_DELAY = 100ms;
 
 
 //
@@ -169,11 +166,6 @@ void HandleSoldierAI( SOLDIERTYPE *pSoldier )
 		{
 			// CAMFIELD, LOOK HERE!
 			return;
-		}
-		else
-		{
-			//Reset counter!
-			RESETTIMECOUNTER(pSoldier->AICounter, AI_DELAY);
 		}
 		//#endif
 	}
@@ -948,7 +940,7 @@ void CancelAIAction(SOLDIERTYPE* const pSoldier)
 }
 
 
-INT16 ActionInProgress(SOLDIERTYPE *pSoldier)
+bool ActionInProgress(SOLDIERTYPE * const pSoldier)
 {
 	// if NPC has a desired destination, but isn't currently going there
 	if ((pSoldier->sFinalDestination != NOWHERE) && (pSoldier->sDestination != pSoldier->sFinalDestination))
@@ -965,12 +957,10 @@ INT16 ActionInProgress(SOLDIERTYPE *pSoldier)
 
 		// don't try to pay any more APs for this, it was paid for once already!
 		pSoldier->bDesiredDirection = (INT8) pSoldier->usActionData;   // turn to face direction in actionData
-		return(TRUE);
 	}
 
-
 	// needs more time to complete action
-	return(TRUE);
+	return true;
 }
 
 
@@ -1348,10 +1338,6 @@ INT8 ExecuteAction(SOLDIERTYPE *pSoldier)
 			else
 			{
 				RESETTIMECOUNTER( pSoldier->AICounter, pSoldier->usActionData );
-				if (pSoldier->ubProfile != NO_PROFILE)
-				{
-					SLOGD("{} waiting {} from {}", pSoldier->name, pSoldier->AICounter, GetJA2Clock());
-				}
 			}
 			ActionDone( pSoldier );
 			break;

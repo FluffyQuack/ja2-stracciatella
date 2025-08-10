@@ -3,15 +3,14 @@
 #include "Animation_Control.h"
 #include "Isometric_Utils.h"
 #include "Overhead.h"
+#include "Random.h"
 #include "WorldMan.h"
 #include "PathAI.h"
 #include "Points.h"
 #include "Smell.h"
-#include "Strategic_Pathing.h"
 #include "Soldier_Control.h"
 #include "Soldier_Macros.h"
 #include "Render_Fun.h"
-#include "Debug.h"
 #include <algorithm>
 #include <array>
 
@@ -97,11 +96,8 @@ int LegalNPCDestination(SOLDIERTYPE *pSoldier, INT16 sGridno, UINT8 ubPathMode, 
 
 
 
-int TryToResumeMovement(SOLDIERTYPE *pSoldier, INT16 sGridno)
+bool TryToResumeMovement(SOLDIERTYPE * const pSoldier, GridNo const sGridno)
 {
-	UINT8 ubSuccess = FALSE;
-
-
 	// have to make sure the old destination is still legal (somebody may
 	// have occupied the destination gridno in the meantime!)
 	if (LegalNPCDestination(pSoldier,sGridno,ENSURE_PATH,WATEROK,0))
@@ -114,26 +110,18 @@ int TryToResumeMovement(SOLDIERTYPE *pSoldier, INT16 sGridno)
 		// make him go to it (needed to continue movement across multiple turns)
 		NewDest(pSoldier,sGridno);
 
-		ubSuccess = TRUE;
-
-		// make sure that it worked (check that pSoldier->sDestination == pSoldier->sGridNo)
-		if (pSoldier->sDestination == sGridno)
-		{
-			ubSuccess = TRUE;
-		}
-		else
+		if (pSoldier->sDestination != sGridno)
 		{
 			// must work even for escorted civs, can't just set the flag
 			CancelAIAction(pSoldier);
 		}
+		return true;
 	}
-	else
-	{
-		// don't black-list anything here, this situation can come up quite
-		// legally if another soldier gets in the way between turns
-		CancelAIAction(pSoldier);
-	}
-	return(ubSuccess);
+
+	// don't black-list anything here, this situation can come up quite
+	// legally if another soldier gets in the way between turns
+	CancelAIAction(pSoldier);
+	return false;
 }
 
 
@@ -155,13 +143,9 @@ static INT16 NextPatrolPoint(SOLDIERTYPE* pSoldier)
 
 
 
-INT8 PointPatrolAI(SOLDIERTYPE *pSoldier)
+bool PointPatrolAI(SOLDIERTYPE * const pSoldier)
 {
-	INT16 sPatrolPoint;
-	INT8  bOldOrders;
-
-
-	sPatrolPoint = pSoldier->usPatrolGrid[pSoldier->bNextPatrolPnt];
+	GridNo sPatrolPoint = pSoldier->usPatrolGrid[pSoldier->bNextPatrolPnt];
 
 	// if we're already there, advance next patrol point
 	if (pSoldier->sGridNo == sPatrolPoint || pSoldier->bNextPatrolPnt == 0)
@@ -186,7 +170,7 @@ INT8 PointPatrolAI(SOLDIERTYPE *pSoldier)
 	{
 		// over-ride orders to something safer
 		pSoldier->bOrders = FARPATROL;
-		return(FALSE);
+		return false;
 	}
 
 
@@ -201,7 +185,7 @@ INT8 PointPatrolAI(SOLDIERTYPE *pSoldier)
 	{
 		// temporarily extend roaming range to infinity by changing orders, else
 		// this won't work if the next patrol point is > 10 tiles away!
-		bOldOrders					= pSoldier->bOrders;
+		auto const bOldOrders = pSoldier->bOrders;
 		pSoldier->bOrders	= ONCALL;
 
 		pSoldier->usActionData = GoAsFarAsPossibleTowards(pSoldier,sPatrolPoint,pSoldier->bAction);
@@ -210,20 +194,16 @@ INT8 PointPatrolAI(SOLDIERTYPE *pSoldier)
 
 		// if it's not possible to get any closer, that's OK, but fail this call
 		if (pSoldier->usActionData == NOWHERE)
-			return(FALSE);
+			return false;
 	}
 
 	// passed all tests - start moving towards next patrol point
-	return(TRUE);
+	return true;
 }
 
-INT8 RandomPointPatrolAI(SOLDIERTYPE *pSoldier)
+bool RandomPointPatrolAI(SOLDIERTYPE * const pSoldier)
 {
-	INT16 sPatrolPoint;
-	INT8  bOldOrders, bPatrolIndex;
-	INT8  bCnt;
-
-	sPatrolPoint = pSoldier->usPatrolGrid[pSoldier->bNextPatrolPnt];
+	GridNo sPatrolPoint = pSoldier->usPatrolGrid[pSoldier->bNextPatrolPnt];
 
 	// if we're already there, advance next patrol point
 	if (pSoldier->sGridNo == sPatrolPoint || pSoldier->bNextPatrolPnt == 0)
@@ -231,12 +211,12 @@ INT8 RandomPointPatrolAI(SOLDIERTYPE *pSoldier)
 		// find next valid patrol point
 		// we keep a count of the # of times we are in here to make sure we don't get into an endless
 		//loop
-		bCnt = 0;
+		INT8 bCnt{0};
 		do
 		{
 			// usPatrolGrid[0] gets used for centre of close etc patrols, so we have to add 1 to the Random #
-			bPatrolIndex = (INT8) PreRandom( pSoldier->bPatrolCnt ) + 1;
-			sPatrolPoint = pSoldier->usPatrolGrid[ bPatrolIndex];
+			auto const patrolIndex = PreRandom(pSoldier->bPatrolCnt) + 1;
+			sPatrolPoint = pSoldier->usPatrolGrid[patrolIndex];
 			bCnt++;
 		}
 		while ( (sPatrolPoint == pSoldier->sGridNo) || ( (sPatrolPoint != NOWHERE) && (bCnt < pSoldier->bPatrolCnt) && (NewOKDestination(pSoldier,sPatrolPoint,IGNOREPEOPLE, pSoldier->bLevel ) < 1)) );
@@ -255,7 +235,7 @@ INT8 RandomPointPatrolAI(SOLDIERTYPE *pSoldier)
 		// do nothing this time around
 		if (pSoldier->sGridNo == sPatrolPoint)
 		{
-			return( FALSE );
+			return false;
 		}
 	}
 
@@ -264,7 +244,7 @@ INT8 RandomPointPatrolAI(SOLDIERTYPE *pSoldier)
 	{
 		// over-ride orders to something safer
 		pSoldier->bOrders = FARPATROL;
-		return(FALSE);
+		return false;
 	}
 
 	// make sure we can get there from here at this time, if we can't get all
@@ -278,7 +258,7 @@ INT8 RandomPointPatrolAI(SOLDIERTYPE *pSoldier)
 	{
 		// temporarily extend roaming range to infinity by changing orders, else
 		// this won't work if the next patrol point is > 10 tiles away!
-		bOldOrders					= pSoldier->bOrders;
+		auto const bOldOrders = pSoldier->bOrders;
 		pSoldier->bOrders	= SEEKENEMY;
 
 		pSoldier->usActionData = GoAsFarAsPossibleTowards(pSoldier,sPatrolPoint,pSoldier->bAction);
@@ -287,13 +267,13 @@ INT8 RandomPointPatrolAI(SOLDIERTYPE *pSoldier)
 
 		// if it's not possible to get any closer, that's OK, but fail this call
 		if (pSoldier->usActionData == NOWHERE)
-			return(FALSE);
+			return false;
 	}
 
 
 	// passed all tests - start moving towards next patrol point
 	SLOGD("{} - POINT PATROL to grid {}", pSoldier->name, pSoldier->usActionData);
-	return(TRUE);
+	return true;
 }
 
 

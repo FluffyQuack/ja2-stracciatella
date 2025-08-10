@@ -1,7 +1,6 @@
 #include "Directories.h"
 #include "Font.h"
 #include "HImage.h"
-#include "Local.h"
 #include "MapScreen.h"
 #include "Radar_Screen.h"
 #include "Line.h"
@@ -21,8 +20,8 @@
 #include "VObject.h"
 #include "Interface_Control.h"
 #include "Game_Clock.h"
+#include "Map_Screen_Interface.h"
 #include "Map_Screen_Interface_Map_Inventory.h"
-#include "Environment.h"
 #include "Meanwhile.h"
 #include "StrategicMap.h"
 #include "Animation_Data.h"
@@ -39,8 +38,6 @@
 #include "GameInstance.h"
 
 #include <cmath>
-
-extern INT32 iCurrentMapSectorZ;
 
 // the squad list font
 #define SQUAD_FONT COMPFONT
@@ -75,7 +72,7 @@ void InitRadarScreen()
 	UINT16        const w = RADAR_WINDOW_WIDTH;
 	UINT16        const h = RADAR_WINDOW_HEIGHT;
 	MOUSE_REGION* const r = &gRadarRegion;
-	MSYS_DefineRegion(r, x, y, x + w, y + h, MSYS_PRIORITY_HIGHEST, 0, RadarRegionMoveCallback, MouseCallbackPrimarySecondary<MOUSE_REGION>(RadarRegionButtonCallbackPrimary, RadarRegionButtonCallbackSecondary));
+	MSYS_DefineRegion(r, x, y, x + w, y + h, MSYS_PRIORITY_HIGHEST, 0, RadarRegionMoveCallback, MouseCallbackPrimarySecondary(RadarRegionButtonCallbackPrimary, RadarRegionButtonCallbackSecondary));
 	r->Disable();
 }
 
@@ -87,7 +84,7 @@ void LoadRadarScreenBitmap(const ST::string& filename)
 	// Grab the Map image
 	ST::string image_filename(GCM->getRadarMapResourceName(FileMan::replaceExtension(FileMan::getFileName(filename), "sti")));
 
-	SGPVObject* const radar = AddVideoObjectFromFile(image_filename.c_str());
+	SGPVObject* const radar = AddVideoObjectFromFile(image_filename);
 	gusRadarImage = radar;
 
 	// ATE: Add a shade table!
@@ -134,7 +131,7 @@ static void RadarRegionMoveCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 	// check if we are allowed to do anything?
 	if (!fRenderRadarScreen) return;
 
-	if (iReason == MSYS_CALLBACK_REASON_MOVE )
+	if (iReason & MSYS_CALLBACK_REASON_MOVE )
 	{
 		if ( pRegion->ButtonState & MSYS_LEFT_BUTTON )
 		{
@@ -230,7 +227,6 @@ void RenderRadarScreen()
 		// Cycle fFlash variable
 		if (COUNTERDONE(RADAR_MAP_BLINK))
 		{
-			RESETCOUNTER(RADAR_MAP_BLINK);
 			gfRadarCurrentGuyFlash = !gfRadarCurrentGuyFlash;
 		}
 
@@ -319,7 +315,6 @@ static void AdjustWorldCenterFromRadarCoords(INT16 sRadarX, INT16 sRadarY)
 
 	INT16 sScreenX, sScreenY;
 	INT16	sTempX_W, sTempY_W;
-	INT16 sNewCenterWorldX, sNewCenterWorldY;
 	INT16 sNumXSteps, sNumYSteps;
 
 	// Use radar scale values to get screen values, then convert ot map values, rounding to nearest middle tile
@@ -349,10 +344,7 @@ static void AdjustWorldCenterFromRadarCoords(INT16 sRadarX, INT16 sRadarY)
 	FromScreenToCellCoordinates( sScreenX, sScreenY, &sTempX_W, &sTempY_W );
 
 	// Adjust these to world center
-	sNewCenterWorldX = (INT16)(gCenterWorldX + sTempX_W);
-	sNewCenterWorldY = (INT16)(gCenterWorldY + sTempY_W);
-
-	SetRenderCenter( sNewCenterWorldX, sNewCenterWorldY );
+	SetRenderCenter( gCenterWorldX + sTempX_W, gCenterWorldY + sTempY_W);
 }
 
 

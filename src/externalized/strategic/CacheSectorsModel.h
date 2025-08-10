@@ -1,17 +1,19 @@
 #pragma once
+
 #include "GameSettings.h"
+#include "Json.h"
+
 #include <array>
 #include <vector>
-#include <rapidjson/document.h>
 
 class CacheSectorsModel
 {
 public:
-	CacheSectorsModel(std::vector<uint8_t> sectors_,
+	CacheSectorsModel(std::vector<uint8_t>&& sectors_,
 		std::array<uint8_t, NUM_DIF_LEVELS> numTroops_,
 		std::array<uint8_t, NUM_DIF_LEVELS> numTroopsVariance_);
 
-	static const CacheSectorsModel* deserialize(const rapidjson::Document& doc);
+	static const CacheSectorsModel* deserialize(const JsonValue& doc);
 
 	// randomly pick one sector from list; returns -1 if the list is empty
 	int16_t pickSector() const;

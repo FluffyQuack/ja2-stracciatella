@@ -2,11 +2,12 @@
 #![allow(dead_code)]
 
 use lru::LruCache;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fmt;
 use std::io;
 use std::io::SeekFrom;
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -45,7 +46,9 @@ impl DirFs {
         fs::read_dir(&path)?;
         Ok(Arc::new(DirFs {
             dir_path: path.to_owned(),
-            canonicalization_cache: Mutex::new(LruCache::new(CANONICALIZATION_CACHE_SIZE)),
+            canonicalization_cache: Mutex::new(LruCache::new(
+                NonZeroUsize::new(CANONICALIZATION_CACHE_SIZE).unwrap(),
+            )),
         }))
     }
 
@@ -139,10 +142,15 @@ impl VfsLayer for DirFs {
         }
     }
 
-    fn read_dir(&self, file_path: &Nfc) -> io::Result<HashSet<Nfc>> {
+    fn exists(&self, file_path: &Nfc) -> io::Result<bool> {
+        let candidates = self.canonicalize(file_path)?;
+        Ok(!candidates.is_empty())
+    }
+
+    fn read_dir(&self, file_path: &Nfc) -> io::Result<BTreeSet<Nfc>> {
         let file_path = file_path.trim_end_matches('/');
         let candidates = self.canonicalize(file_path)?;
-        let mut result = HashSet::new();
+        let mut result = BTreeSet::new();
 
         for candidate in candidates {
             let dir_contents = fs::read_dir(&candidate)?;

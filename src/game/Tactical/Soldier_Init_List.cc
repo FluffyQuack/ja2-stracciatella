@@ -9,19 +9,14 @@
 #include "Soldier_Add.h"
 #include "Soldier_Create.h"
 #include "Soldier_Init_List.h"
-#include "Debug.h"
 #include "Random.h"
-#include "Items.h"
 #include "Map_Information.h"
 #include "Soldier_Profile.h"
 #include "Sys_Globals.h"
 #include "EditorMercs.h"
 #include "Animation_Data.h"
-#include "Message.h"
-#include "Font_Control.h"
 #include "Sound_Control.h"
 #include "Quests.h"
-#include "Render_Fun.h"
 #include "Meanwhile.h"
 #include "Strategic_AI.h"
 #include "Map_Screen_Interface_Map.h"
@@ -30,13 +25,11 @@
 #include "AI.h"
 #include "NPC.h"
 #include "Scheduling.h"
-#include "FileMan.h"
 #include "Logger.h"
 #include "MercProfile.h"
 
 #include "ContentManager.h"
 #include "GameInstance.h"
-#include "externalized/strategic/BloodCatSpawnsModel.h"
 
 BOOLEAN gfOriginalList = TRUE;
 
@@ -242,9 +235,8 @@ void LoadSoldiersFromMap(HWFILE const f, bool stracLinuxFormat)
 
 	if (cow_in_sector)
 	{
-		char str[40];
-		sprintf(str, SOUNDSDIR "/cowmoo%d.wav", Random(3) + 1);
-		PlayJA2SampleFromFile(str, MIDVOLUME, 1, MIDDLEPAN);
+		ST::string str = ST::format(SOUNDSDIR "/cowmoo{}.wav", Random(3) + 1);
+		PlayJA2SampleFromFile(str.c_str(), MIDVOLUME, 1, MIDDLEPAN);
 	}
 }
 
@@ -426,8 +418,7 @@ static void SortSoldierInitList(void)
 
 bool AddPlacementToWorld(SOLDIERINITNODE* const init)
 {
-	SOLDIERCREATE_STRUCT dp;
-	dp = SOLDIERCREATE_STRUCT{};
+	SOLDIERCREATE_STRUCT dp{};
 
 	// First check if this guy has a profile and if so check his location such that it matches
 	if (SOLDIERCREATE_STRUCT* const init_dp = init->pDetailedPlacement)
@@ -481,12 +472,17 @@ bool AddPlacementToWorld(SOLDIERINITNODE* const init)
 					gubQuest[QUEST_KINGPIN_MONEY] == QUESTINPROGRESS &&
 					CheckFact(FACT_KINGPIN_CAN_SEND_ASSASSINS, KINGPIN))))
 				{
+					// Pick a gridno in a square around the door to Hans' shop
+					auto const PickGridNo = [](INT16 const apothem) -> GridNo
+					{
+						std::uniform_int_distribution<INT16> uid(-apothem, apothem);
+						return 13531 + uid(gRandomEngine) + uid(gRandomEngine) * WORLD_COLS;
+					};
+
 					if (dp.ubProfile == NO_PROFILE)
 					{
 						// These guys should be guarding Tony
-						dp.sInsertionGridNo = 13531 +
-							PreRandom(8) * (PreRandom(1) ? -1 : 1) +
-							PreRandom(8) * (PreRandom(1) ? -1 : 1) * WORLD_ROWS;
+						dp.sInsertionGridNo = PickGridNo(7);
 
 						switch (PreRandom(3))
 						{
@@ -498,25 +494,13 @@ bool AddPlacementToWorld(SOLDIERINITNODE* const init)
 					else if (dp.ubProfile == BILLY)
 					{
 						// Billy should now be able to roam around
-						dp.sInsertionGridNo = 13531 +
-							PreRandom(30) * (PreRandom(1) ? -1 : 1) +
-							PreRandom(30) * (PreRandom(1) ? -1 : 1) * WORLD_ROWS;
+						dp.sInsertionGridNo = PickGridNo(29);
 						dp.bOrders = SEEKENEMY;
 					}
 					else if (dp.ubProfile == MADAME)
 					{
 						// She shouldn't be here
 						return true;
-					}
-					else if (dp.ubProfile == NO_PROFILE)
-					{
-						// XXX unreachable due to same condition above
-						UINT8 const room = GetRoom(dp.sInsertionGridNo);
-						if (IN_BROTHEL(room))
-						{
-							// Must be a hooker, shouldn't be here
-							return true;
-						}
 					}
 				}
 			}
@@ -1428,14 +1412,14 @@ void AddSoldierInitListCreatures(BOOLEAN fQueen, UINT8 ubNumLarvae, UINT8 ubNumI
 }
 
 
-SOLDIERINITNODE* FindSoldierInitNodeWithID( UINT16 usID )
+SOLDIERINITNODE* FindSoldierInitNodeWithID(SoldierID const soldierID)
 {
 	FOR_EACH_SOLDIERINITNODE(curr)
 	{
-		if( curr->pSoldier->ubID == usID )
+		if (curr->pSoldier && curr->pSoldier->ubID == soldierID)
 			return curr;
 	}
-	return NULL;
+	return nullptr;
 }
 
 
@@ -1445,7 +1429,7 @@ SOLDIERINITNODE* FindSoldierInitNodeBySoldier(SOLDIERTYPE const& s)
 	{
 		if (i->pSoldier == &s) return i;
 	}
-	return 0;
+	return nullptr;
 }
 
 
@@ -1511,38 +1495,6 @@ void SaveSoldierInitListLinks(HWFILE const hfile)
 		}
 		hfile->write(&curr->ubNodeID,    1);
 		hfile->write(&curr->ubSoldierID, 1);
-	}
-}
-
-
-void LoadSoldierInitListLinks(HWFILE const f)
-{
-	UINT8 slots;
-	f->read(&slots, 1);
-	for (UINT8 n = slots; n != 0; --n)
-	{
-		UINT8 node_id;
-		UINT8 soldier_id;
-		f->read(&node_id,    1);
-		f->read(&soldier_id, 1);
-
-		if (!(gTacticalStatus.uiFlags & LOADING_SAVED_GAME)) continue;
-
-		FOR_EACH_SOLDIERINITNODE(curr)
-		{
-			if (curr->ubNodeID != node_id) continue;
-
-			curr->ubSoldierID = soldier_id;
-			TacticalTeamType const* const team = gTacticalStatus.Team;
-			if ((team[ENEMY_TEAM].bFirstID <= soldier_id &&
-				soldier_id <= team[CREATURE_TEAM].bLastID) ||
-				(team[CIV_TEAM].bFirstID <= soldier_id &&
-				soldier_id <= team[CIV_TEAM].bLastID))
-			{
-				// only enemies, creatures and civilians
-				curr->pSoldier = &GetMan(soldier_id);
-			}
-		}
 	}
 }
 
@@ -1720,8 +1672,7 @@ void AddProfilesUsingProfileInsertionData()
 		if (!ps)
 		{
 			// Create a new soldier, as this one doesn't exist
-			SOLDIERCREATE_STRUCT c;
-			c = SOLDIERCREATE_STRUCT{};
+			SOLDIERCREATE_STRUCT c{};
 			c.bTeam     = CIV_TEAM;
 			c.ubProfile = i;
 			c.sSector  = gWorldSector;

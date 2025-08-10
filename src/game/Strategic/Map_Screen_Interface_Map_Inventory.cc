@@ -1,15 +1,15 @@
 #include "Auto_Resolve.h"
-#include "Buffer.h"
 #include "Directories.h"
 #include "Font.h"
 #include "HImage.h"
 #include "Handle_Items.h"
 #include "Interface.h"
 #include "Isometric_Utils.h"
+#include "ItemModel.h"
 #include "Map_Screen_Interface_Bottom.h"
 #include "Map_Screen_Interface_Map_Inventory.h"
 #include "MessageBoxScreen.h"
-#include "Render_Dirty.h"
+#include "Object_Cache.h"
 #include "Timer_Control.h"
 #include "VObject.h"
 #include "SysUtil.h"
@@ -18,7 +18,6 @@
 #include "Map_Screen_Interface_Map.h"
 #include "Items.h"
 #include "Interface_Items.h"
-#include "Cursor_Control.h"
 #include "Interface_Utils.h"
 #include "Text.h"
 #include "Font_Control.h"
@@ -26,16 +25,12 @@
 #include "World_Items.h"
 #include "Tactical_Save.h"
 #include "Soldier_Control.h"
-#include "Overhead.h"
 #include "English.h"
-#include "Multi_Language_Graphic_Utils.h"
 #include "MapScreen.h"
 #include "Radar_Screen.h"
-#include "Message.h"
 #include "Interface_Panels.h"
 #include "WordWrap.h"
 #include "Button_System.h"
-#include "Debug.h"
 #include "ScreenIDs.h"
 #include "VSurface.h"
 #include "ShopKeeper_Interface.h"
@@ -47,7 +42,6 @@
 #include <string_theory/format>
 #include <string_theory/string>
 
-#include <algorithm>
 #include <climits>
 #include <vector>
 
@@ -85,7 +79,7 @@ BOOLEAN fFlashHighLightInventoryItemOnradarMap = FALSE;
 BOOLEAN fShowMapInventoryPool = FALSE;
 
 // the v-object index value for the background
-static SGPVObject* guiMapInventoryPoolBackground;
+static cache_key_t const guiMapInventoryPoolBackground{ INTERFACEDIR "/sector_inventory.sti" };
 
 // inventory pool list
 std::vector<WORLDITEM> pInventoryPoolList;
@@ -113,34 +107,29 @@ static GUIButtonRef guiMapInvenButton[3];
 static BOOLEAN gfCheckForCursorOverMapSectorInventoryItem = FALSE;
 
 
-// load the background panel graphics for inventory
-void LoadInventoryPoolGraphic(void)
-{
-	// add to V-object index
-	guiMapInventoryPoolBackground = AddVideoObjectFromFile(INTERFACEDIR "/sector_inventory.sti");
-}
-
-
 // remove background panel graphics for inventory
 void RemoveInventoryPoolGraphic( void )
 {
-	// remove from v-object index
-	if( guiMapInventoryPoolBackground )
-	{
-		DeleteVideoObject(guiMapInventoryPoolBackground);
-		guiMapInventoryPoolBackground = 0;
-	}
+	RemoveVObject(guiMapInventoryPoolBackground);
 }
 
 
 static void CheckAndUnDateSlotAllocation(void);
 static void DisplayCurrentSector(void);
 static void DisplayPagesForMapInventoryPool(void);
-static void DrawNumberOfIventoryPoolItems(void);
+static void DrawNumberOfInventoryPoolItems();
 static void DrawTextOnMapInventoryBackground(void);
 static void RenderItemsForCurrentPageOfInventoryPool(void);
 static void UpdateHelpTextForInvnentoryStashSlots(void);
 
+namespace {
+// Print text horizontally and vertically centered inside box
+// x and y are added to the box's x and y.
+void MPrintCenteredInBox(int x, int y, ST::string const& text, SGPBox const& box)
+{
+	MPrint(x + box.x, y + box.y, text, HCenterVCenterAlign(box.w, box.h));
+}
+}
 
 // blit the background panel for the inventory
 void BlitInventoryPoolGraphic( void )
@@ -162,7 +151,7 @@ void BlitInventoryPoolGraphic( void )
 	DisplayPagesForMapInventoryPool( );
 
 	// draw number of items in current inventory
-	DrawNumberOfIventoryPoolItems( );
+	DrawNumberOfInventoryPoolItems();
 
 	// display current sector inventory pool is at
 	DisplayCurrentSector( );
@@ -232,12 +221,7 @@ static BOOLEAN RenderItemInPoolSlot(INT32 iCurrentSlot, INT32 iFirstSlotOnPage)
 	auto sString = ReduceStringLength(GCM->getItem(item.o.usItem)->getShortName(), name_box->w, MAP_IVEN_FONT);
 
 	SetFontAttributes(MAP_IVEN_FONT, FONT_WHITE);
-
-	INT16 x;
-	INT16 y;
-	FindFontCenterCoordinates(dx + name_box->x, dy + name_box->y, name_box->w, name_box->h, sString, MAP_IVEN_FONT, &x, &y);
-	MPrint(x, y, sString);
-
+	MPrintCenteredInBox(dx, dy, sString, *name_box);
 	SetFontDestBuffer(FRAME_BUFFER);
 
 	return TRUE;
@@ -289,7 +273,7 @@ void CreateDestroyMapInventoryPoolButtons( BOOLEAN fExitFromMapScreen )
 		fShowMapInventoryPool = FALSE;
 	}
 */
-	SGPSector sector(sSelMap.x, sSelMap.y, iCurrentMapSectorZ);
+	auto const& sector{ sSelMap };
 	if (fShowMapInventoryPool && !fCreated)
 	{
 		if (gWorldSector == sector)
@@ -403,7 +387,7 @@ static void SaveSeenAndUnseenItems(void)
 	}
 
 	// if this is the loaded sector handle here
-	SGPSector sector(sSelMap.x, sSelMap.y, iCurrentMapSectorZ);
+	auto const& sector{ sSelMap };
 	if (gWorldSector == sector)
 	{
 		ReBuildWorldItemStashForLoadedSector(pSeenItemsList, pUnSeenItems);
@@ -470,7 +454,7 @@ static void CreateMapInventoryPoolSlots(void)
 		UINT16        const y       = STD_SCREEN_Y + inv_box->y;
 		UINT16        const w       = inv_box->w;
 		UINT16        const h       = inv_box->h;
-		MSYS_DefineRegion(&MapInventoryPoolMask, x, y, x + w - 1, y + h - 1, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(MSYS_NO_CALLBACK, MapInvenPoolScreenMaskCallbackSecondary, MapInvenPoolScreenMaskCallbackScroll));
+		MSYS_DefineRegion(&MapInventoryPoolMask, x, y, x + w - 1, y + h - 1, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(MSYS_NO_CALLBACK, MapInvenPoolScreenMaskCallbackSecondary, MapInvenPoolScreenMaskCallbackScroll));
 	}
 
 	const SGPBox* const slot_box = &g_sector_inv_slot_box;
@@ -484,7 +468,7 @@ static void CreateMapInventoryPoolSlots(void)
 		UINT16        const w  = reg_box->w;
 		UINT16        const h  = reg_box->h;
 		MOUSE_REGION* const r  = &MapInventoryPoolSlots[i];
-		MSYS_DefineRegion(r, x, y, x + w - 1, y + h - 1, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MapInvenPoolSlotsMove, MouseCallbackPrimarySecondary<MOUSE_REGION>(MapInvenPoolSlotsPrimary, MapInvenPoolSlotsSecondary, MapInvenPoolSlotsScroll));
+		MSYS_DefineRegion(r, x, y, x + w - 1, y + h - 1, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MapInvenPoolSlotsMove, MouseCallbackPrimarySecondary(MapInvenPoolSlotsPrimary, MapInvenPoolSlotsSecondary, MapInvenPoolSlotsScroll));
 		MSYS_SetRegionUserData(r, 0, i);
 	}
 }
@@ -806,10 +790,7 @@ static BOOLEAN GetObjFromInventoryStashSlot(OBJECTTYPE* pInventorySlot, OBJECTTY
 		// find first unempty slot
 		pItemPtr->bStatus[0] = pInventorySlot->bStatus[0];
 		pItemPtr->ubNumberOfObjects = 1;
-		pItemPtr->ubWeight = CalculateObjectWeight( pItemPtr );
 		RemoveObjFrom( pInventorySlot, 0 );
-		pInventorySlot->ubWeight = CalculateObjectWeight( pInventorySlot );
-
 	}
 
 	return ( TRUE );
@@ -879,8 +860,8 @@ static BOOLEAN PlaceObjectInInventoryStash(OBJECTTYPE* pInventorySlot, OBJECTTYP
 			if (pItemPtr->usItem == MONEY)
 			{
 				// always allow money to be combined!
-				// average out the status values using a weighted average...
-				pInventorySlot->bStatus[0] = (INT8) ( ( (UINT32)pInventorySlot->bMoneyStatus * pInventorySlot->uiMoneyAmount + (UINT32)pItemPtr->bMoneyStatus * pItemPtr->uiMoneyAmount )/ (pInventorySlot->uiMoneyAmount + pItemPtr->uiMoneyAmount) );
+				// status of money is always 100
+				pInventorySlot->bMoneyStatus = 100;
 				pInventorySlot->uiMoneyAmount += pItemPtr->uiMoneyAmount;
 
 				DeleteObj( pItemPtr );
@@ -980,19 +961,12 @@ static void MapInventoryPoolDoneBtn(GUI_BUTTON* btn, UINT32 reason)
 static void DisplayPagesForMapInventoryPool(void)
 {
 	// get the current and last pages and display them
-	ST::string sString;
-	INT16 sX, sY;
-
 	SetFontAttributes(COMPFONT, 183);
 	SetFontDestBuffer(guiSAVEBUFFER);
 
-	// grab current and last pages
-	sString = ST::format("{} / {}", iCurrentInventoryPoolPage + 1, iLastInventoryPoolPage + 1);
-
-	// grab centered coords
-	const SGPBox* const box = &g_sector_inv_page_box;
-	FindFontCenterCoordinates(STD_SCREEN_X + box->x, STD_SCREEN_Y + box->y, box->w, box->h, sString, COMPFONT, &sX, &sY);
-	MPrint(sX, sY, sString);
+	MPrintCenteredInBox(STD_SCREEN_X, STD_SCREEN_Y,
+		ST::format("{} / {}", iCurrentInventoryPoolPage + 1, iLastInventoryPoolPage + 1),
+		g_sector_inv_page_box);
 
 	SetFontDestBuffer(FRAME_BUFFER);
 }
@@ -1033,26 +1007,14 @@ static size_t GetTotalNumberOfItems(void)
 }
 
 
-static void DrawNumberOfIventoryPoolItems(void)
+static void DrawNumberOfInventoryPoolItems()
 {
-	size_t numObjects = 0;
-	ST::string sString;
-	INT16 sX, sY;
-
-
-	numObjects = GetTotalNumberOfItemsInSectorStash( );
-
-	// get number of items
-	Assert(numObjects <= INT_MAX);
-	sString = ST::format("{}", numObjects);
-
 	SetFontAttributes(COMPFONT, 183);
 	SetFontDestBuffer(guiSAVEBUFFER);
 
-	// grab centered coords
-	const SGPBox* const box = &g_sector_inv_count_box;
-	FindFontCenterCoordinates(STD_SCREEN_X + box->x, STD_SCREEN_Y + box->y, box->w, box->h, sString, COMPFONT, &sX, &sY);
-	MPrint(sX, sY, sString);
+	MPrintCenteredInBox(STD_SCREEN_X, STD_SCREEN_Y,
+		ST::string::from_uint(GetTotalNumberOfItemsInSectorStash()),
+		g_sector_inv_count_box);
 
 	SetFontDestBuffer(FRAME_BUFFER);
 }
@@ -1075,19 +1037,13 @@ static void DestroyInventoryPoolDoneButton(void)
 static void DisplayCurrentSector(void)
 {
 	// grab current sector being displayed
-	ST::string sString;
-	INT16 sX, sY;
-
-
-	sString = ST::format("{}{}{}", pMapVertIndex[ sSelMap.y ], pMapHortIndex[ sSelMap.x ], pMapDepthIndex[ iCurrentMapSectorZ ]);
-
 	SetFontAttributes(COMPFONT, 183);
 	SetFontDestBuffer(guiSAVEBUFFER);
 
-	// grab centered coords
-	const SGPBox* const box = &g_sector_inv_loc_box;
-	FindFontCenterCoordinates(STD_SCREEN_X + box->x, STD_SCREEN_Y + box->y, box->w, box->h, sString, COMPFONT, &sX, &sY);
-	MPrint(sX, sY, sString);
+	MPrintCenteredInBox(STD_SCREEN_X, STD_SCREEN_Y,
+		ST::format("{}{}{}", pMapVertIndex[ sSelMap.y ],
+			pMapHortIndex[ sSelMap.x ], pMapDepthIndex[ iCurrentMapSectorZ ]),
+		g_sector_inv_loc_box);
 
 	SetFontDestBuffer(FRAME_BUFFER);
 }
@@ -1153,15 +1109,13 @@ void HandleButtonStatesWhileMapInventoryActive( void )
 
 static void DrawTextOnSectorInventory(void)
 {
+	// Prints "Sector Inventory" in the English localization.
+
 	SetFontDestBuffer(guiSAVEBUFFER);
 	SetFontAttributes(FONT14ARIAL, FONT_WHITE);
 
-	INT16 x;
-	INT16 y;
-	const SGPBox*  const box   = &g_sector_inv_title_box;
-	ST::string title = zMarksMapScreenText[11];
-	FindFontCenterCoordinates(STD_SCREEN_X + box->x, STD_SCREEN_Y + box->y, box->w, box->h, title, FONT14ARIAL, &x, &y);
-	MPrint(x, y, title);
+	MPrintCenteredInBox(STD_SCREEN_X, STD_SCREEN_Y,
+		zMarksMapScreenText[11], g_sector_inv_title_box);
 
 	SetFontDestBuffer(FRAME_BUFFER);
 }

@@ -1,25 +1,20 @@
 #pragma once
 
-#include <string_theory/string>
+#include "Json.h"
 
 #include <map>
 #include <stdint.h>
 #include <string_theory/string>
 
-
-class JsonObject;
-class JsonObjectReader;
-
 struct AmmoTypeModel
 {
-	AmmoTypeModel(uint16_t index, ST::string internalName);
+	AmmoTypeModel(uint16_t index, ST::string && internalName);
 
-	// This could be default in C++11
 	virtual ~AmmoTypeModel();
 
-	virtual void serializeTo(JsonObject &obj) const;
+	virtual JsonValue serialize() const;
 
-	static AmmoTypeModel* deserialize(JsonObjectReader &obj);
+	static AmmoTypeModel* deserialize(const JsonValue &json);
 
 	uint16_t index;
 	ST::string internalName;

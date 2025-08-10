@@ -2,15 +2,12 @@
 #include "Handle_Items.h"
 #include "Isometric_Utils.h"
 #include "JAScreens.h"
-#include "Local.h"
 #include "HImage.h"
 #include "MapScreen.h"
 #include "Soldier_Find.h"
 #include "TileDat.h"
 #include "Timer_Control.h"
-#include "SysUtil.h"
 #include "Overhead.h"
-#include "MouseSystem.h"
 #include "Button_System.h"
 #include "Interface.h"
 #include "VObject.h"
@@ -19,14 +16,12 @@
 #include "Handle_UI.h"
 #include "Animation_Data.h"
 #include "RenderWorld.h"
-#include "Cursors.h"
 #include "Radar_Screen.h"
 #include "WorldMan.h"
 #include "Font_Control.h"
 #include "Render_Dirty.h"
 #include "Interface_Cursors.h"
 #include "Interface_Panels.h"
-#include "PathAI.h"
 #include "VObject_Blitters.h"
 #include "Faces.h"
 #include "Interface_Control.h"
@@ -38,7 +33,6 @@
 #include "PopUpBox.h"
 #include "Assignments.h"
 #include "Spread_Burst.h"
-#include "Squads.h"
 #include "Line.h"
 #include "Map_Screen_Interface.h"
 #include "Civ_Quotes.h"
@@ -341,7 +335,7 @@ static void RenderRubberBanding(void)
 
 	if (l != r)
 	{
-		if (l > r) Swap(l, r);
+		if (l > r) std::swap(l, r);
 		LineDraw(TRUE, l, t, r, t, colour, pDestBuf);
 		RegisterBackgroundRectSingleFilled(l, t, r - l + 1, 1);
 		LineDraw(TRUE, l, b, r, b, colour, pDestBuf);
@@ -350,7 +344,7 @@ static void RenderRubberBanding(void)
 
 	if (t != b)
 	{
-		if (t > b) Swap(t, b);
+		if (t > b) std::swap(t, b);
 		LineDraw(TRUE, l, t, l, b, colour, pDestBuf);
 		RegisterBackgroundRectSingleFilled(l, t, 1, b - t + 1);
 		LineDraw(TRUE, r, t, r, b, colour, pDestBuf);
@@ -394,9 +388,6 @@ void RenderTopmostTacticalInterface()
 	{
 		RenderMovementMenu();
 	}
-
-	// Syncronize for upcoming soldier counters
-	SYNCTIMECOUNTER();
 
 	// Setup system for video overlay (text and blitting) Sets clipping rects, etc
 	StartViewportOverlays();

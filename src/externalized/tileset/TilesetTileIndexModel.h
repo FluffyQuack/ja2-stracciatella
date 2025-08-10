@@ -1,17 +1,18 @@
 #pragma once
 
 #include "TileDat.h"
-#include "JsonObject.h"
-
-#include <string_theory/string>
+#include "Json.h"
 
 class TilesetTileIndexModel {
 	public:
-		TilesetTileIndexModel(TileTypeDefines type, uint16_t subIndex);
+		constexpr TilesetTileIndexModel(TileTypeDefines type, uint16_t subIndexArg) noexcept
+			: tileType{ type }, subIndex{ subIndexArg }
+		{
+		}
 
 		TileTypeDefines tileType;
 		uint16_t subIndex;
 
-		static TilesetTileIndexModel deserialize(JsonObjectReader &obj);
-		JsonObject serialize(rapidjson::Document::AllocatorType& allocator) const;
+		static TilesetTileIndexModel deserialize(const JsonValue &json);
+		JsonValue serialize() const;
 };

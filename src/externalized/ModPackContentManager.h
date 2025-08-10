@@ -1,21 +1,23 @@
 #pragma once
 
-#include <string_theory/string>
-
+#include "DefaultContentManager.h"
+#include <stdint.h>
 #include <map>
 #include <vector>
+#include <string_theory/string>
 
-#include "DefaultContentManager.h"
 
 class ModPackContentManager : public DefaultContentManager
 {
 public:
 	ModPackContentManager(RustPointer<EngineOptions> engineOptions);
 
-	virtual ~ModPackContentManager() override;
+	~ModPackContentManager() override = default;
 
 	/** Load dialogue quote from file. */
-	virtual ST::string* loadDialogQuoteFromFile(const ST::string& filename, int quote_number) override;
+	ST::string loadDialogQuoteFromFile(const ST::string& filename, unsigned quote_number) override;
+
+	IEDT::uptr openEDT(std::string_view filename, IEDT::column_list columns) const override;
 
 protected:
 	void logConfiguration() const override;

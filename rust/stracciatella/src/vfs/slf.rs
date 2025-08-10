@@ -1,8 +1,8 @@
 //! This module contains a virtual filesystem backed by a SLF file.
 #![allow(dead_code)]
 
+use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;
@@ -59,13 +59,13 @@ impl SlfFs {
     /// Creates a new virtual filesystem.
     pub fn new(mut slf_file: Box<dyn VfsFile>) -> io::Result<Arc<SlfFs>> {
         let header = SlfHeader::from_input(&mut slf_file)?;
-        let prefix = Nfc::caseless_path(&header.library_path.trim_end_matches('/'));
+        let prefix = Nfc::caseless_path(header.library_path.trim_end_matches('/'));
         let entries: HashMap<_, _> = header
             .entries_from_input(&mut slf_file)?
             .into_iter()
             .filter(|x| x.state == SlfEntryState::Ok)
             .map(|x| {
-                let path = Nfc::caseless_path(&x.file_path.trim_start_matches('/'));
+                let path = Nfc::caseless_path(x.file_path.trim_start_matches('/'));
                 let full_path = prefix.clone() + &path;
                 let entry = SlfFsEntry {
                     path,
@@ -100,10 +100,28 @@ impl VfsLayer for SlfFs {
         }
     }
 
-    fn read_dir(&self, path: &Nfc) -> io::Result<HashSet<Nfc>> {
+    fn exists(&self, file_path: &Nfc) -> io::Result<bool> {
+        if matches!(self.entries.get(file_path), Some(_)) {
+            // A file exists for this path in the SLF
+            return Ok(true);
+        }
+        let file_path = file_path.trim_end_matches('/');
+        if file_path.is_empty() {
+            // Root path always exists in the SLF
+            return Ok(true);
+        }
+        Ok(self
+            .entries
+            .keys()
+            .filter(|x| x.starts_with(file_path))
+            .count()
+            > 0)
+    }
+
+    fn read_dir(&self, path: &Nfc) -> io::Result<BTreeSet<Nfc>> {
         // Remove trailing slashes from directories
         let path = path.trim_end_matches('/');
-        let entries: HashSet<Nfc> = self
+        let entries: BTreeSet<Nfc> = self
             .entries
             .keys()
             .flat_map(|x| {

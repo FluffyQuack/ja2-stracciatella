@@ -2,7 +2,7 @@
 #define __EDITOR_TASKBAR_UTILS_H
 
 #include <string_theory/string>
-
+#include "Types.h"
 
 //These are utilities that are used within the editor.  This function absorbs the expensive
 //compile time of the SGP dependencies, while allowing the other editor files to hook into it
@@ -63,8 +63,6 @@ void DrawEditorInfoBox(const ST::string& str, SGPFont, UINT16 x, UINT16 y, UINT1
 extern INT32	giEditMercDirectionIcons[2];
 extern SGPVObject* guiMercInventoryPanel;
 extern SGPVObject* guiOmertaMap;
-extern SGPVObject* guiExclamation;
-extern SGPVObject* guiKeyImage;
 extern SGPVSurface* guiMercInvPanelBuffers[9];
 extern SGPVSurface* guiMercTempBuffer;
 

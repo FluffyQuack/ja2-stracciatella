@@ -8,7 +8,6 @@
 #include "Dialogue_Control.h"
 #include "Directories.h"
 #include "Faces.h"
-#include "FileMan.h"
 #include "Font_Control.h"
 #include "Game_Clock.h"
 #include "GameInstance.h"
@@ -23,24 +22,26 @@
 #include "Message.h"
 #include "OppList.h"
 #include "Overhead.h"
-#include "Quests.h"
 #include "QuestText.h"
+#include "Quests.h"
 #include "Render_Fun.h"
 #include "Scheduling.h"
 #include "SkillCheck.h"
 #include "Soldier_Add.h"
 #include "Soldier_Macros.h"
 #include "Soldier_Tile.h"
+#include "StrategicMap.h"
 #include "Strategic_Town_Loyalty.h"
 #include "Tactical_Save.h"
 #include "Text.h"
 #include "Timer_Control.h"
 #include "WeaponModels.h"
+#include "Weapons.h"
 #include <memory>
 #include <string_theory/format>
 #include <string_theory/string>
 
-#define NUM_NPC_QUOTE_RECORDS  50
+
 #define NUM_CIVQUOTE_SECTORS   20
 #define MINERS_CIV_QUOTE_INDEX 16
 
@@ -77,28 +78,9 @@ static const SGPSector gsCivQuoteSector[NUM_CIVQUOTE_SECTORS] =
 	{  0, 0         },
 };
 
-constexpr UINT8 NO_QUEST              = 255;
-constexpr UINT8 QUEST_NOT_STARTED_NUM = 100;
-constexpr UINT8 QUEST_DONE_NUM        = 200;
-constexpr UINT8 NO_QUOTE              = 255;
-constexpr UINT8 IRRELEVANT            = 255;
-constexpr UINT8 MUST_BE_NEW_DAY       = 254;
-#define NO_MOVE                 65535
 #define INITIATING_FACTOR       30
 
-#define QUOTE_FLAG_SAID               0x0001
-#define QUOTE_FLAG_ERASE_ONCE_SAID    0x0002
-#define QUOTE_FLAG_SAY_ONCE_PER_CONVO 0x0004
-
-#define TURN_UI_OFF         65000
-#define TURN_UI_ON          65001
-#define SPECIAL_TURN_UI_OFF 65002
-#define SPECIAL_TURN_UI_ON  65003
-
 #define LARGE_AMOUNT_MONEY 1000
-
-#define ACCEPT_ANY_ITEM 1000
-#define ANY_RIFLE       1001
 
 #define NUM_REAL_APPROACHES APPROACH_RECRUIT
 
@@ -118,41 +100,6 @@ enum StandardQuoteIDs
 };
 
 
-struct NPCQuoteInfo
-{
-	UINT32  ubIdentifier;
-
-	UINT16  fFlags;
-
-	// conditions
-	union
-	{
-		INT16 sRequiredItem;      // item NPC must have to say quote
-		INT16 sRequiredGridno;    // location for NPC req'd to say quote
-	};
-	UINT16  usFactMustBeTrue;   // ...before saying quote
-	UINT16  usFactMustBeFalse;  // ...before saying quote
-	UINT8   ubQuest;            // quest must be current to say quote
-	UINT8   ubFirstDay;         // first day quote can be said
-	UINT8   ubLastDay;          // last day quote can be said
-	UINT8   ubApproachRequired; // must use this approach to generate quote
-	UINT8   ubOpinionRequired;  // opinion needed for this quote
-
-	// quote to say (if any)
-	UINT8   ubQuoteNum;         // this is the quote to say
-	UINT8   ubNumQuotes;        // total # of quotes to say
-
-	// actions
-	UINT8   ubStartQuest;
-	UINT8   ubEndQuest;
-	UINT8   ubTriggerNPC;
-	UINT8   ubTriggerNPCRec;
-	UINT16  usSetFactTrue;
-	UINT16  usGiftItem;         // item NPC gives to merc after saying quote
-	UINT16  usGoToGridno;
-	INT16   sActionData;        // special action value
-};
-
 static NPCQuoteInfo* gpNPCQuoteInfoArray[NUM_PROFILES];
 static NPCQuoteInfo* gpBackupNPCQuoteInfoArray[NUM_PROFILES];
 static NPCQuoteInfo* gpCivQuoteInfoArray[NUM_CIVQUOTE_SECTORS];
@@ -162,11 +109,7 @@ static BOOLEAN gfTriedToLoadQuoteInfoArray[NUM_PROFILES];
 
 INT8 const gbFirstApproachFlags[] = { 0x01, 0x02, 0x04, 0x08 };
 
-
-static UINT8 const gubAlternateNPCFileNumsForQueenMeanwhiles[]  = { 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176 };
-static UINT8 const gubAlternateNPCFileNumsForElliotMeanwhiles[] = { 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196 };
-
-static NPCQuoteInfo* ExtractNPCQuoteInfoArrayFromFile(HWFILE const f)
+std::unique_ptr<NPCQuoteInfo []> ExtractNPCQuoteInfoArrayFromFile(HWFILE const f)
 {
 	auto buf = std::make_unique<NPCQuoteInfo[]>(NUM_NPC_QUOTE_RECORDS);
 	for (NPCQuoteInfo* i = &buf[0]; i != &buf[NUM_NPC_QUOTE_RECORDS]; ++i)
@@ -211,7 +154,7 @@ static NPCQuoteInfo* ExtractNPCQuoteInfoArrayFromFile(HWFILE const f)
 		}
 		Assert(d.getConsumed() == lengthof(data));
 	}
-	return buf.release();
+	return buf;
 }
 
 
@@ -221,7 +164,7 @@ static void ConditionalExtractNPCQuoteInfoArrayFromFile(HWFILE const f, NPCQuote
 	f->read(&present, sizeof(present));
 	FreeNullArray(q);
 	if (!present) return;
-	q = ExtractNPCQuoteInfoArrayFromFile(f);
+	q = ExtractNPCQuoteInfoArrayFromFile(f).release();
 }
 
 
@@ -281,52 +224,29 @@ static void ConditionalInjectNPCQuoteInfoArrayIntoFile(HWFILE const f, NPCQuoteI
 
 
 static NPCQuoteInfo* LoadQuoteFile(UINT8 ubNPC)
-try
 {
-	ST::string  zFileName;
-	MercProfile profile(ubNPC);
+	const NPCQuoteInfo* m_arr;
 
-	if ( ubNPC == PETER || ubNPC == ALBERTO || ubNPC == CARLO )
-	{
-		// use a copy of Herve's data file instead!
-		zFileName = ST::format("{}/{03d}.npc", NPCDATADIR, HERVE);
-	}
-	else if (profile.isPlayerMerc() || (profile.isRPC() && profile.isRecruited()))
-	{
-		zFileName = ST::format("{}/000.npc", NPCDATADIR);
-	}
-	else
-	{
-		zFileName = ST::format("{}/{03d}.npc", NPCDATADIR, ubNPC);
-	}
-
-	// ATE: Put some stuff i here to use a different NPC file if we are in a meanwhile.....
 	if ( AreInMeanwhile( ) )
 	{
-		// If we are the queen....
-		if ( ubNPC == QUEEN )
+		if ( ubNPC == QUEEN || ubNPC == ELLIOT)
 		{
-			zFileName = ST::format("{}/{03d}.npc", NPCDATADIR, gubAlternateNPCFileNumsForQueenMeanwhiles[GetMeanwhileID()]);
+			m_arr = GCM->getScriptRecords(ubNPC, GetMeanwhileID());
 		}
-
-		// If we are elliot....
-		if ( ubNPC == ELLIOT )
+		else
 		{
-			zFileName = ST::format("{}/{03d}.npc", NPCDATADIR, gubAlternateNPCFileNumsForElliotMeanwhiles[GetMeanwhileID()]);
+			m_arr = GCM->getScriptRecords(ubNPC);
 		}
-
 	}
+	else m_arr = GCM->getScriptRecords(ubNPC);
 
-	AutoSGPFile f(GCM->openGameResForReading(zFileName));
-	return ExtractNPCQuoteInfoArrayFromFile(f);
+	if (m_arr != nullptr) {
+		NPCQuoteInfo* arr_copy{ new NPCQuoteInfo[NUM_NPC_QUOTE_RECORDS] };
+		std::copy(m_arr, m_arr + NUM_NPC_QUOTE_RECORDS, arr_copy);
+		return arr_copy;
+	}
+	else return nullptr;
 }
-catch (const std::exception& e)
-{
-	SLOGE("caught exception: {}", e.what());
-	return 0;
-}
-catch (...) { return 0; }
-
 
 static void RevertToOriginalQuoteFile(UINT8 ubNPC)
 {
@@ -344,7 +264,6 @@ static void BackupOriginalQuoteFile(UINT8 ubNPC)
 	gpBackupNPCQuoteInfoArray[ ubNPC ] = gpNPCQuoteInfoArray[ ubNPC ];
 	gpNPCQuoteInfoArray[ubNPC] = NULL;
 }
-
 
 static NPCQuoteInfo* EnsureQuoteFileLoaded(UINT8 const ubNPC)
 {
@@ -449,19 +368,17 @@ static void RefreshNPCScriptRecord(UINT8 const ubNPC, UINT8 const record)
 
 static NPCQuoteInfo* LoadCivQuoteFile(UINT8 const idx)
 {
-	char const* filename;
-	char        buf[255];
+	ST::string filename;
 	if (idx == MINERS_CIV_QUOTE_INDEX)
 	{
 		filename = NPCDATADIR "/miners.npc";
 	}
 	else
 	{
-		sprintf(buf, NPCDATADIR "/%s.npc", gsCivQuoteSector[idx].AsShortString().c_str());
-		filename = buf;
+		filename = ST::format(NPCDATADIR "/{}.npc", gsCivQuoteSector[idx].AsShortString());
 	}
 	AutoSGPFile f(GCM->openGameResForReading(filename));
-	return ExtractNPCQuoteInfoArrayFromFile(f);
+	return ExtractNPCQuoteInfoArrayFromFile(f).release();
 }
 
 
@@ -1912,14 +1829,13 @@ void ConverseFull(UINT8 const ubNPC, UINT8 const ubMerc, Approach bApproach, UIN
 				}
 				else if ( pQuotePtr->usGoToGridno == NO_MOVE && pQuotePtr->sActionData > 0 )
 				{
-					SOLDIERTYPE* const pSoldier = FindSoldierByProfileID(ubNPC);
-					if (pSoldier)
+					if (pNPC)
 					{
-						ZEROTIMECOUNTER( pSoldier->AICounter );
-						if (pSoldier->bNextAction == AI_ACTION_WAIT)
+						ZEROTIMECOUNTER(pNPC->AICounter);
+						if (pNPC->bNextAction == AI_ACTION_WAIT)
 						{
-							pSoldier->bNextAction = AI_ACTION_NONE;
-							pSoldier->usNextActionData = 0;
+							pNPC->bNextAction = AI_ACTION_NONE;
+							pNPC->usNextActionData = 0;
 						}
 					}
 					NPCDoAction( ubNPC, (UINT16) (pQuotePtr->sActionData), ubRecordNum );
@@ -1928,40 +1844,47 @@ void ConverseFull(UINT8 const ubNPC, UINT8 const ubMerc, Approach bApproach, UIN
 				// Movement?
 				if ( pQuotePtr->usGoToGridno != NO_MOVE )
 				{
-					SOLDIERTYPE* const pSoldier = FindSoldierByProfileID(ubNPC);
-
 					// stupid hack CC
-					if (pSoldier && ubNPC == KYLE)
+					if (pNPC && ubNPC == KYLE)
 					{
 						// make sure he has keys
-						pSoldier->bHasKeys = TRUE;
+						pNPC->bHasKeys = TRUE;
 					}
-					if (pSoldier && pSoldier->sGridNo == pQuotePtr->usGoToGridno )
+					if (pNPC && pNPC->sGridNo == pQuotePtr->usGoToGridno )
 					{
 						// search for quotes to trigger immediately!
-						pSoldier->ubQuoteRecord = ubRecordNum + 1; // add 1 so that the value is guaranteed nonzero
-						NPCReachedDestination( pSoldier, TRUE );
+						pNPC->ubQuoteRecord = ubRecordNum + 1; // add 1 so that the value is guaranteed nonzero
+						NPCReachedDestination(pNPC, TRUE);
 					}
 					else
 					{
 						// turn off cowering
-						if ( pNPC->uiStatusFlags & SOLDIER_COWERING)
+						if (pNPC)
 						{
-							//pNPC->uiStatusFlags &= ~SOLDIER_COWERING;
-							EVENT_InitNewSoldierAnim( pNPC, STANDING, 0 , FALSE );
+							if (pNPC->uiStatusFlags & SOLDIER_COWERING)
+							{
+								//pNPC->uiStatusFlags &= ~SOLDIER_COWERING;
+								EVENT_InitNewSoldierAnim(pNPC, STANDING, 0 , FALSE);
+							}
+
+							pNPC->ubQuoteRecord = ubRecordNum + 1; // add 1 so that the value is guaranteed nonzero
 						}
 
-						pSoldier->ubQuoteRecord = ubRecordNum + 1; // add 1 so that the value is guaranteed nonzero
-
-						if (pQuotePtr->sActionData == NPC_ACTION_TELEPORT_NPC)
+						if (pNPC && pQuotePtr->sActionData == NPC_ACTION_TELEPORT_NPC)
 						{
 							BumpAnyExistingMerc( pQuotePtr->usGoToGridno );
-							TeleportSoldier(*pSoldier, pQuotePtr->usGoToGridno, false);
+							TeleportSoldier(*pNPC, pQuotePtr->usGoToGridno, false);
 							// search for quotes to trigger immediately!
-							NPCReachedDestination( pSoldier, FALSE );
+							NPCReachedDestination(pNPC, FALSE);
 						}
 						else
 						{
+							// This check prevents NPCs from forever lingering if the player unloads the sector
+							// before an NPC chosen for removal reaches their destination (issue #750).
+							if (pQuotePtr->sActionData == NPC_ACTION_REMOVE_NPC)
+							{
+								p.sSector = SGPSector();
+							}
 							NPCGotoGridNo( ubNPC, pQuotePtr->usGoToGridno, ubRecordNum );
 						}
 					}

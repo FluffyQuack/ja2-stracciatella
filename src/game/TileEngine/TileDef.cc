@@ -1,16 +1,17 @@
+#include <optional>
 #include <stdexcept>
 
 #include "HImage.h"
-#include "Structure.h"
+#include "Structure_Internals.h"
 #include "TileDef.h"
 #include "VObject.h"
 #include "WorldDef.h"
 #include "Debug.h"
 #include "WorldMan.h"
-#include "Edit_Sys.h"
 #include "PathAI.h"
 #include "Tile_Surface.h"
 #include "Logger.h"
+#include "Structure.h"
 
 // GLobals
 TILE_ELEMENT		gTileDatabase[ NUMBEROFTILES ];
@@ -63,22 +64,21 @@ void CreateTileDatabase()
 		UINT32 cnt2;
 		for (cnt2 = 0; cnt2 < NumRegions; ++cnt2)
 		{
-			TILE_ELEMENT TileElement;
-			TileElement = TILE_ELEMENT{};
+			TILE_ELEMENT TileElement{};
 			TileElement.usRegionIndex = (UINT16)cnt2;
 			TileElement.hTileSurface	= TileSurf->vo;
 			TileElement.sBuddyNum			= -1;
 
 			// Check for multi-z stuff
-			ZStripInfo* const* const zsi = TileSurf->vo->ppZStripInfo;
+			auto const& zsi = TileSurf->vo->ppZStripInfo;
 			if (zsi && zsi[cnt2]) TileElement.uiFlags |= MULTI_Z_TILE;
 
 			// Structure database stuff!
-			STRUCTURE_FILE_REF const* const sfr = TileSurf->pStructureFileRef;
-			if (sfr && sfr->pubStructureData /* XXX testing wrong attribute? */)
+			auto const& sfr{ TileSurf->pStructureFileRef };
+			if (sfr && !sfr->pubStructureData.empty())
 			{
-				DB_STRUCTURE_REF* const sr = &sfr->pDBStructureRef[cnt2];
-				if (sr->pDBStructure) TileElement.pDBStructureRef	= sr;
+				auto & sr = sfr->pDBStructureRef[cnt2];
+				if (sr.pDBStructure) TileElement.pDBStructureRef = &sr;
 			}
 
 			TileElement.fType             = (UINT16)TileSurf->fType;
@@ -117,15 +117,48 @@ void CreateTileDatabase()
 			}
 
 			SetSpecificDatabaseValues(cnt1, gTileDatabaseSize, TileElement, TileSurf->bRaisedObjectType);
-
+			// fix incorrect double door flags. in vanilla it only affects DOOR3 in PALACE! tileset and DOOR1 in QUEEN'S TROPICAL
+			if ((gTileSurfaceName[cnt1] == "DOOR1" || gTileSurfaceName[cnt1] == "DOOR2" || gTileSurfaceName[cnt1] == "DOOR3" || gTileSurfaceName[cnt1] == "DOOR4")
+				&& TileElement.pDBStructureRef != nullptr)
+			{
+				if (TileElement.usRegionIndex == 0 && (TileElement.pDBStructureRef->pDBStructure->fFlags & (STRUCTURE_DDOOR_RIGHT|STRUCTURE_DDOOR_LEFT)))
+				{
+					// if a door in an open state takes up 1 tile and is flagged as outside-oriented...
+					if (TileElement.usWallOrientation == OUTSIDE_TOP_RIGHT && TileElement.pDBStructureRef[4].pDBStructure->ubNumberOfTiles == 1)
+					{
+						// ... we found our problematic tile surface to be fixed
+						TileElement.usWallOrientation = INSIDE_TOP_RIGHT;
+						TileElement.pDBStructureRef->pDBStructure->ubWallOrientation = INSIDE_TOP_RIGHT;
+						TileElement.pDBStructureRef[4].pDBStructure->ubWallOrientation = INSIDE_TOP_RIGHT;
+						TileElement.pDBStructureRef[4].pDBStructure->ubArmour = MATERIAL_PLYWOOD_WALL;
+						TileElement.pDBStructureRef[5].pDBStructure->ubWallOrientation = INSIDE_TOP_LEFT;
+						TileElement.pDBStructureRef[9].pDBStructure->ubWallOrientation = INSIDE_TOP_LEFT;
+						// between subindices 0-4 and 10-14 there can only be 1 right part of a double door
+						TileElement.pDBStructureRef[10].pDBStructure->fFlags &= ~STRUCTURE_DDOOR_RIGHT;
+						TileElement.pDBStructureRef[10].pDBStructure->fFlags |= STRUCTURE_DDOOR_LEFT;
+						TileElement.pDBStructureRef[14].pDBStructure->fFlags &= ~STRUCTURE_DDOOR_RIGHT;
+						TileElement.pDBStructureRef[14].pDBStructure->fFlags |= STRUCTURE_DDOOR_LEFT;
+						// between subindices 5-9 and 15-19 there can only be 1 left part of a double door
+						TileElement.pDBStructureRef[15].pDBStructure->fFlags &= ~STRUCTURE_DDOOR_LEFT;
+						TileElement.pDBStructureRef[15].pDBStructure->fFlags |= STRUCTURE_DDOOR_RIGHT;
+						TileElement.pDBStructureRef[19].pDBStructure->fFlags &= ~STRUCTURE_DDOOR_LEFT;
+						TileElement.pDBStructureRef[19].pDBStructure->fFlags |= STRUCTURE_DDOOR_RIGHT;
+					}
+				}
+				// fix garage doors not having a flag of their own separate from sliding doors
+				if (TileElement.pDBStructureRef->pDBStructure->fFlags & STRUCTURE_SLIDINGDOOR && TileElement.pDBStructureRef[0].pDBStructure->ubNumberOfTiles == 2)
+				{
+					TileElement.pDBStructureRef->pDBStructure->fFlags &= ~STRUCTURE_SLIDINGDOOR;
+					TileElement.pDBStructureRef->pDBStructure->fFlags |= STRUCTURE_GARAGEDOOR;
+				}
+			}			
 			gTileDatabase[gTileDatabaseSize++] = TileElement;
 		}
 
 		// Handle underflow
 		for (; cnt2 < gNumTilesPerType[cnt1]; ++cnt2)
 		{
-			TILE_ELEMENT TileElement;
-			TileElement = TILE_ELEMENT{};
+			TILE_ELEMENT TileElement{};
 			TileElement.usRegionIndex  = 0;
 			TileElement.hTileSurface   = TileSurf->vo;
 			TileElement.fType          = (UINT16)TileSurf->fType;
@@ -228,6 +261,15 @@ UINT32 GetTileType(const UINT16 usIndex)
 {
 	Assert(usIndex < lengthof(gTileDatabase));
 	return gTileDatabase[usIndex].fType;
+}
+
+std::optional<UINT32> GetTileTypeSafe(UINT16 tileIndex)
+{
+	if (tileIndex < std::size(gTileDatabase))
+	{
+		return { gTileDatabase[tileIndex].fType };
+	}
+	return std::nullopt;
 }
 
 

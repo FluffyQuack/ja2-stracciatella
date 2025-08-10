@@ -1,44 +1,31 @@
 #include "HImage.h"
 #include "Init.h"
-#include "Local.h"
 #include "Screens.h"
 #include "Strategic_Movement_Costs.h"
 #include "Sys_Globals.h"
 #include "VObject.h"
 #include "RenderWorld.h"
-#include "MouseSystem.h"
 #include "WorldDef.h"
 #include "Animation_Data.h"
 #include "Overhead.h"
-#include "Font_Control.h"
-#include "Timer_Control.h"
-#include "Radar_Screen.h"
-#include "Render_Dirty.h"
 #include "Sound_Control.h"
 #include "Lighting.h"
 #include "Cursor_Control.h"
 #include "Video.h"
-#include "Interface_Items.h"
 #include "Dialogue_Control.h"
-#include "Text.h"
 #include "Laptop.h"
-#include "NPC.h"
-#include "MercTextBox.h"
 #include "Tile_Cache.h"
 #include "StrategicMap.h"
 #include "Map_Information.h"
-#include "Exit_Grids.h"
 #include "Summary_Info.h"
 #include "GameSettings.h"
 #include "Game_Init.h"
-#include "Strategic_Movement.h"
 #include "Vehicles.h"
 #include "Shading.h"
 #include "VSurface.h"
 #include "GameMode.h"
 
 #include "EditScreen.h"
-#include "JAScreens.h"
 #include "Logger.h"
 
 #include <string_theory/string>
@@ -87,8 +74,6 @@ try
 	InitializeWorld();
 
 	InitTileCache( );
-
-	InitMercPopupBox( );
 
 	if(GameMode::getInstance()->isEditorMode())
 	{
@@ -168,10 +153,6 @@ void ShutdownJA2(void)
 	DeinitializeWorld( );
 
 	DeleteTileCache( );
-
-	ShutdownJA2Clock( );
-
-	ShutdownFonts();
 
 	ShutdownJA2Sound( );
 

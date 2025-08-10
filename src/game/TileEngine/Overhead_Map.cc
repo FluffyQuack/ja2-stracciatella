@@ -23,6 +23,7 @@
 #include "Line.h"
 #include "Map_Information.h"
 #include "MouseSystem.h"
+#include "Object_Cache.h"
 #include "Overhead.h"
 #include "Overhead_Types.h"
 #include "Radar_Screen.h"
@@ -58,7 +59,9 @@ extern SOLDIERINITNODE *gpSelected;
 #define NORMAL_MAP_SCREEN_BY		2400
 #define NORMAL_MAP_SCREEN_TY		860
 
-#define FASTMAPROWCOLTOPOS( r, c )	( (r) * WORLD_COLS + (c) )
+namespace {
+cache_key_t const uiOVERMAP{ INTERFACEDIR "/map_bord.sti" };
+cache_key_t const uiPERSONS{ INTERFACEDIR "/persons.sti" };
 
 
 struct SMALL_TILE_SURF
@@ -71,7 +74,7 @@ struct SMALL_TILE_DB
 	HVOBJECT	vo;
 	UINT16		usSubIndex;
 };
-
+}
 
 static SMALL_TILE_SURF gSmTileSurf[NUMBEROFTILETYPES];
 static SMALL_TILE_DB   gSmTileDB[NUMBEROFTILES];
@@ -79,8 +82,6 @@ static TileSetID       gubSmTileNum                   = TILESET_INVALID;
 static BOOLEAN         gfInOverheadMap = FALSE;
 static MOUSE_REGION    OverheadRegion;
 static MOUSE_REGION    OverheadBackgroundRegion;
-static SGPVObject*     uiOVERMAP;
-static SGPVObject*     uiPERSONS;
 BOOLEAN                gfOverheadMapDirty             = FALSE;
 extern BOOLEAN		gfRadarCurrentGuyFlash;
 static INT16           gsStartRestrictedX;
@@ -102,13 +103,13 @@ void InitNewOverheadDB(TileSetID const ubTilesetID)
 		SGPVObject* vo;
 		try
 		{
-			vo = AddVideoObjectFromFile(res.resourceFileName.c_str());
+			vo = AddVideoObjectFromFile(res.resourceFileName);
 		}
 		catch (std::exception &e)
 		{
 			SLOGD("{}", e.what());
 			// Load one we know about
-			vo = AddVideoObjectFromFile(GCM->getTilesetResourceName(GetDefaultTileset(), ST::string("t/") + "grass.sti").c_str());
+			vo = AddVideoObjectFromFile(GCM->getTilesetResourceName(GetDefaultTileset(), "t/grass.sti"));
 		}
 
 		gSmTileSurf[i].vo = vo;
@@ -364,8 +365,6 @@ void HandleOverheadMap(void)
 	RenderButtons();
 	SaveBackgroundRects();
 	RenderFastHelp();
-	ExecuteBaseDirtyRectQueue();
-	EndFrameBufferRender();
 	fInterfacePanelDirty = DIRTYLEVEL0;
 }
 
@@ -386,16 +385,10 @@ void GoIntoOverheadMap( )
 
 	MSYS_DefineRegion(&OverheadBackgroundRegion, STD_SCREEN_X, STD_SCREEN_Y, STD_SCREEN_X + 640, STD_SCREEN_Y + 360, MSYS_PRIORITY_HIGH, CURSOR_NORMAL, MSYS_NO_CALLBACK, MSYS_NO_CALLBACK);
 
-	MSYS_DefineRegion(&OverheadRegion, STD_SCREEN_X, STD_SCREEN_Y, STD_SCREEN_X + 640, STD_SCREEN_Y + 320, MSYS_PRIORITY_HIGH, CURSOR_NORMAL, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(ClickOverheadRegionCallbackPrimary, ClickOverheadRegionCallbackSecondary));
-
-	// LOAD CLOSE ANIM
-	uiOVERMAP = AddVideoObjectFromFile(INTERFACEDIR "/map_bord.sti");
-
-	// LOAD PERSONS
-	uiPERSONS = AddVideoObjectFromFile(INTERFACEDIR "/persons.sti");
+	MSYS_DefineRegion(&OverheadRegion, STD_SCREEN_X, STD_SCREEN_Y, STD_SCREEN_X + 640, STD_SCREEN_Y + 320, MSYS_PRIORITY_HIGH, CURSOR_NORMAL, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(ClickOverheadRegionCallbackPrimary, ClickOverheadRegionCallbackSecondary));
 
 	// Add shades to persons....
-	SGPVObject*            const vo  = uiPERSONS;
+	SGPVObject*            const vo  = GetVObject(uiPERSONS);
 	SGPPaletteEntry const* const pal = vo->Palette();
 	vo->pShades[0] = Create16BPPPaletteShaded(pal, 256, 256, 256, FALSE);
 	vo->pShades[1] = Create16BPPPaletteShaded(pal, 310, 310, 310, FALSE);
@@ -458,8 +451,8 @@ void KillOverheadMap()
 	MSYS_RemoveRegion(&OverheadRegion );
 	MSYS_RemoveRegion(&OverheadBackgroundRegion );
 
-	DeleteVideoObject(uiOVERMAP);
-	DeleteVideoObject(uiPERSONS);
+	RemoveVObject(uiOVERMAP);
+	RemoveVObject(uiPERSONS);
 
 	HandleTacticalPanelSwitch( );
 	DisableTacticalTeamPanelButtons( FALSE );
@@ -748,7 +741,7 @@ static void RenderOverheadOverlays(void)
 	UINT32  const uiDestPitchBYTES = l.Pitch();
 
 	// Soldier overlay
-	SGPVObject*        const marker = uiPERSONS;
+	SGPVObject*        const marker = GetVObject(uiPERSONS);
 	SOLDIERTYPE const* const sel    = gfTacticalPlacementGUIActive || !gfRadarCurrentGuyFlash ? 0 : GetSelectedMan();
 	UINT16             const end    = gfTacticalPlacementGUIActive ? gTacticalStatus.Team[OUR_TEAM].bLastID : MAX_NUM_SOLDIERS;
 	for (UINT32 i = 0; i < end; ++i)

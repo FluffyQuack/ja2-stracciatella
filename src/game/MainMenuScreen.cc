@@ -5,18 +5,18 @@
 #include "English.h"
 #include "Font.h"
 #include "Font_Control.h"
+#include "GameRes.h"
 #include "GameSettings.h"
 #include "GameLoop.h"
 #include "GameVersion.h"
 #include "Input.h"
 #include "JA2_Splash.h"
 #include "JAScreens.h"
-#include "Local.h"
 #include "MainMenuScreen.h"
 #include "MessageBoxScreen.h"
-#include "Multi_Language_Graphic_Utils.h"
 #include "Music_Control.h"
 #include "ContentMusic.h"
+#include "Object_Cache.h"
 #include "Options_Screen.h"
 #include "Render_Dirty.h"
 #include "SGP.h"
@@ -33,7 +33,6 @@
 #include <string_theory/format>
 
 
-//#define TESTFOREIGNFONTS
 
 // MENU ITEMS
 enum
@@ -46,20 +45,17 @@ enum
 	NUM_MENU_ITEMS
 };
 
-#if defined TESTFOREIGNFONTS
-#	define MAINMENU_Y         0
-#	define MAINMENU_Y_SPACE  18
-#else
-#	define MAINMENU_Y       277
-#	define MAINMENU_Y_SPACE  37
-#endif
+#define MAINMENU_Y       277
+#define MAINMENU_Y_SPACE  37
 
 
 static BUTTON_PICS* iMenuImages[NUM_MENU_ITEMS];
 static GUIButtonRef iMenuButtons[NUM_MENU_ITEMS];
 
-static SGPVObject* guiMainMenuBackGroundImage;
-static SGPVObject* guiJa2LogoImage;
+namespace {
+cache_key_t const guiMainMenuBackGroundImage{ LOADSCREENSDIR "/mainmenubackground.sti" };
+cache_key_t const guiJa2LogoImage{ LOADSCREENSDIR "/ja2logo.sti" };
+}
 
 static INT8    gbHandledMainMenu = 0;
 static BOOLEAN fInitialRender    = FALSE;
@@ -79,12 +75,11 @@ static void HandleMainMenuScreen(void);
 static void RenderMainMenu(void);
 static void RenderGameVersion(void);
 static void RenderCopyright(void);
-static void RestoreButtonBackGrounds(void);
 
 
 ScreenID MainMenuScreenHandle(void)
 {
-	if (guiSplashStartTime + 4000 > GetJA2Clock())
+	if (guiSplashStartTime + INTRO_SPLASH_DURATION > GetJA2Clock())
 	{
 		SetCurrentCursorFromDatabase(VIDEO_NO_CURSOR);
 		SetMusicMode(MUSIC_NONE);
@@ -133,17 +128,7 @@ ScreenID MainMenuScreenHandle(void)
 		fInitialRender = FALSE;
 	}
 
-	RestoreButtonBackGrounds();
-
-	// Render buttons
-	for (UINT32 cnt = 0; cnt < NUM_MENU_ITEMS; ++cnt)
-	{
-		MarkAButtonDirty(iMenuButtons[cnt]);
-	}
-
 	RenderButtons();
-
-	EndFrameBufferRender();
 
 	HandleMainMenuInput();
 	HandleMainMenuScreen();
@@ -205,11 +190,6 @@ void InitMainMenu(void)
 {
 	CreateDestroyMainMenuButtons(TRUE);
 
-#	define GFX_DIR LOADSCREENSDIR
-	guiMainMenuBackGroundImage = AddVideoObjectFromFile(GFX_DIR "/mainmenubackground.sti");
-	guiJa2LogoImage            = AddVideoObjectFromFile(GFX_DIR "/ja2logo.sti");
-#undef GFX_DIR
-
 	// If there are no saved games, disable the button
 	if (!AreThereAnySavedGameFiles()) DisableButton(iMenuButtons[LOAD_GAME]);
 
@@ -221,15 +201,15 @@ void InitMainMenu(void)
 
 	InitGameOptions();
 
-	DequeueAllKeyBoardEvents();
+	DequeueAllInputEvents();
 }
 
 
 static void ExitMainMenu(void)
 {
 	CreateDestroyMainMenuButtons(FALSE);
-	DeleteVideoObject(guiMainMenuBackGroundImage);
-	DeleteVideoObject(guiJa2LogoImage);
+	RemoveVObject(guiMainMenuBackGroundImage);
+	RemoveVObject(guiJa2LogoImage);
 	gMsgBox.uiExitScreen = MAINMENU_SCREEN;
 }
 
@@ -261,9 +241,8 @@ static void HandleMainMenuInput(void)
 		{
 			switch (InputEvent.usParam)
 			{
-/*
+				case 'q': if (_KeyDown(CTRL)) gbHandledMainMenu = QUIT; break;					
 				case SDLK_ESCAPE: gbHandledMainMenu = QUIT; break;
-*/
 
 				case 'c':
 					if (_KeyDown(ALT)) gfLoadGameUponEntry = TRUE;
@@ -351,7 +330,6 @@ static void RenderMainMenu(void)
 {
 	BltVideoObject(FRAME_BUFFER, guiMainMenuBackGroundImage, 0, STD_SCREEN_X,       STD_SCREEN_Y     );
 	BltVideoObject(FRAME_BUFFER, guiJa2LogoImage,            0, STD_SCREEN_X + 188, STD_SCREEN_Y + 15);
-	BltVideoSurface(guiSAVEBUFFER, FRAME_BUFFER, 0, 0, NULL);
 }
 
 void RenderGameVersion() {
@@ -361,15 +339,4 @@ void RenderGameVersion() {
 
 void RenderCopyright() {
 	DrawTextToScreen(gzCopyrightText, 0, SCREEN_HEIGHT - 15, SCREEN_WIDTH, FONT10ARIAL, FONT_MCOLOR_WHITE, FONT_MCOLOR_BLACK, CENTER_JUSTIFIED);
-}
-
-static void RestoreButtonBackGrounds(void)
-{
-#ifndef TESTFOREIGNFONTS
-	for (UINT32 cnt = 0; cnt < NUM_MENU_ITEMS; ++cnt)
-	{
-		GUI_BUTTON const& b = *iMenuButtons[cnt];
-		RestoreExternBackgroundRect(b.X(), b.Y(), b.W() + 1, b.H() + 1);
-	}
-#endif
 }

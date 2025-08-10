@@ -1,8 +1,9 @@
 #include "Directories.h"
+#include "EditScreen.h"
 #include "HImage.h"
+#include "ItemModel.h"
 #include "LoadSaveBasicSoldierCreateStruct.h"
 #include "LoadSaveSoldierCreate.h"
-#include "Local.h"
 #include "Font.h"
 #include "Overhead_Map.h"
 #include "Types.h"
@@ -21,17 +22,11 @@
 #include "MouseSystem.h"
 #include "StrategicMap.h"
 #include "FileMan.h"
-#include "Exit_Grids.h"
 #include "Map_Information.h"
 #include "Summary_Info.h"
 #include "Animated_ProgressBar.h"
-#include "WorldDef.h"
 #include "WorldDat.h"
-#include "EditorDefines.h"
-#include "EditScreen.h"
-#include "English.h"
 #include "World_Items.h"
-#include "Text.h"
 #include "Debug.h"
 #include "Soldier_Create.h"
 #include "Video.h"
@@ -266,7 +261,7 @@ void CreateSummaryWindow()
 	gfDeniedSummaryCreation = FALSE;
 	gfRenderSummary = TRUE;
 	//Create all of the buttons here
-	iSummaryButton[SUMMARY_BACKGROUND] = CreateLabel(ST::null, 0, 0, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT - EDITOR_TASKBAR_HEIGHT, MSYS_PRIORITY_HIGH - 1);
+	iSummaryButton[SUMMARY_BACKGROUND] = CreateLabel({}, 0, 0, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT - EDITOR_TASKBAR_HEIGHT, MSYS_PRIORITY_HIGH - 1);
 
 	iSummaryButton[SUMMARY_OKAY] = CreateTextButton("Okay", FONT12POINT1, FONT_BLACK, FONT_BLACK, 585, 325, 50, 30, MSYS_PRIORITY_HIGH, SummaryOkayCallback);
 
@@ -317,7 +312,7 @@ void CreateSummaryWindow()
 	//Init the textinput field.
 	InitTextInputModeWithScheme( DEFAULT_SCHEME );
 	AddUserInputField( NULL );  //just so we can use short cut keys while not typing.
-	AddTextInputField(MAP_LEFT + 112, MAP_BOTTOM + 75, 100, 18, MSYS_PRIORITY_HIGH, ST::null, 20, INPUTTYPE_DOSFILENAME);
+	AddTextInputField(MAP_LEFT + 112, MAP_BOTTOM + 75, 100, 18, MSYS_PRIORITY_HIGH, {}, 20, INPUTTYPE_DOSFILENAME);
 
 	for( i = 1; i < NUM_SUMMARY_BUTTONS; i++ )
 		iSummaryButton[i]->Hide();
@@ -588,7 +583,6 @@ static void RenderItemDetails(void)
 {
 	FLOAT dAvgExistChance, dAvgStatus;
 	OBJECTTYPE *pItem;
-	INT32 index, i;
 	UINT32 uiQuantity, uiExistChance, uiStatus;
 	UINT32 xp, yp;
 	INT8 bFreqIndex;
@@ -604,13 +598,14 @@ static void RenderItemDetails(void)
 		UINT32 uiActionQuantity[8] {};
 		UINT32 uiTriggerExistChance[8] {};
 		UINT32 uiActionExistChance[8] {};
-		for( index = 1; index < MAXITEMS; index++ )
+		for (auto item : GCM->getItems())
 		{
+			const auto index = item->getItemIndex();
 			uiQuantity = 0;
 			uiExistChance = 0;
 			uiStatus = 0;
 			Assert(gpWorldItemsSummaryArray.size() <= INT32_MAX);
-			for (i = 0; i < static_cast<INT32>(gpWorldItemsSummaryArray.size()); i++)
+			for (INT32 i = 0; i < static_cast<INT32>(gpWorldItemsSummaryArray.size()); i++)
 			{
 				if( index == SWITCH || index == ACTION_ITEM )
 				{
@@ -674,7 +669,7 @@ static void RenderItemDetails(void)
 				dAvgExistChance = (FLOAT)(uiExistChance / 100.0);
 				dAvgStatus = uiStatus / (FLOAT)uiQuantity;
 				//Display stats.
-				MPrint(xp, yp, GCM->getItem(index)->getShortName());
+				MPrint(xp, yp, item->getShortName());
 				MPrint( xp + 85, yp, ST::format("{3.02f}", dAvgExistChance) );
 				MPrint( xp + 110, yp, ST::format("@ {3.02f}%", dAvgStatus) );
 				yp += 10;
@@ -692,7 +687,7 @@ static void RenderItemDetails(void)
 			}
 		}
 		//Now list the number of actions/triggers of each type
-		for( i = 0; i < 8; i++ )
+		for(INT32 i = 0; i < 8; i++ )
 		{
 			if( uiTriggerQuantity[i] || uiActionQuantity[i] )
 			{
@@ -754,12 +749,14 @@ static void RenderItemDetails(void)
 			MPrint(xp, yp, "None");
 			yp += 10;
 		}
-		else for( index = 1; index < MAXITEMS; index++ )
+		else for (auto item : GCM->getItems())
 		{
+			const auto index = item->getItemIndex();
+
 			uiQuantity = 0;
 			uiExistChance = 0;
 			uiStatus = 0;
-			for( i = 0; i < gusPEnemyItemsSummaryArraySize; i++ )
+			for(INT32 i = 0; i < gusPEnemyItemsSummaryArraySize; i++ )
 			{
 				if( gpPEnemyItemsSummaryArray[ i ].usItem == index )
 				{
@@ -779,7 +776,7 @@ static void RenderItemDetails(void)
 				dAvgExistChance = (FLOAT)(uiExistChance / 100.0);
 				dAvgStatus = uiStatus / (FLOAT)uiQuantity;
 				//Display stats.
-				MPrint(xp, yp, GCM->getItem(index)->getShortName());
+				MPrint(xp, yp, item->getShortName());
 				MPrint( xp + 85, yp, ST::format("{3.02f}", dAvgExistChance) );
 				MPrint( xp + 110, yp, ST::format("@ {3.02f}%", dAvgStatus) );
 				yp += 10;
@@ -821,12 +818,14 @@ static void RenderItemDetails(void)
 			MPrint(xp, yp, "None");
 			yp += 10;
 		}
-		for( index = 1; index < MAXITEMS; index++ )
+		for (auto item : GCM->getItems())
 		{
+			const auto index = item->getItemIndex();
+
 			uiQuantity = 0;
 			uiExistChance = 0;
 			uiStatus = 0;
-			for( i = 0; i < gusNEnemyItemsSummaryArraySize; i++ )
+			for(INT32 i = 0; i < gusNEnemyItemsSummaryArraySize; i++ )
 			{
 				if( gpNEnemyItemsSummaryArray[ i ].usItem == index )
 				{
@@ -846,7 +845,7 @@ static void RenderItemDetails(void)
 				dAvgExistChance = (FLOAT)(uiExistChance / 100.0);
 				dAvgStatus = uiStatus / (FLOAT)uiQuantity;
 				//Display stats.
-				MPrint(xp, yp, GCM->getItem(index)->getShortName());
+				MPrint(xp, yp, item->getShortName());
 				MPrint( xp + 85, yp, ST::format("{3.02f}", dAvgExistChance) );
 				MPrint( xp + 110, yp, ST::format("@ {3.02f}%", dAvgStatus) );
 				yp += 10;
@@ -879,7 +878,7 @@ void RenderSummaryWindow()
 	if( (GetActiveFieldID() == 1 ) != gfTempFile )
 	{
 		gfTempFile ^= 1;
-		SetInputFieldString( 1, ST::null );
+		SetInputFieldString( 1, {} );
 		gfRenderSummary = TRUE;
 	}
 	if( gfTempFile ) //constantly extract the temp filename for updating purposes.
@@ -1509,7 +1508,7 @@ void UpdateSectorSummary(const ST::string& gszFilename, BOOLEAN fUpdate)
 		else
 			szCoord = szCoord.left(2);
 		gusNumEntriesWithOutdatedOrNoSummaryInfo++;
-		EvaluateWorld( szCoord.c_str(), (UINT8)giCurrLevel );
+		EvaluateWorld(szCoord, (UINT8)giCurrLevel);
 
 		RemoveProgressBar( 0 );
 	}
@@ -2003,14 +2002,10 @@ static void CalculateOverrideStatus(void)
 
 static BOOLEAN LoadSummary(const SGPSector& sMap, const UINT8 level, const char* const suffix)
 {
-	char summary_filename[40];
-	sprintf(summary_filename, DEVINFO_DIR "/%s%s.sum", sMap.AsShortString().c_str(), suffix);
-
+	ST::string summary_filename = ST::format(DEVINFO_DIR "/{}{}.sum", sMap.AsShortString(), suffix);
 	FLOAT dMajorMapVersion;
 	{
-		char filename[40];
-		sprintf(filename, "%s%s.dat", sMap.AsShortString().c_str(), suffix);
-
+		ST::string filename = ST::format("{}{}.dat", sMap.AsShortString(), suffix);
 		AutoSGPFile f_map;
 		try
 		{
@@ -2153,22 +2148,21 @@ static void UpdateMasterProgress(void)
 		MasterEnd = (gusCurrent / (double)gusTotal) * 100.0;
 		if( gfMajorUpdate )
 		{
-			SetRelativeStartAndEndPercentage( 2, (UINT16)MasterStart, (UINT16)MasterEnd, ST::null );
+			SetRelativeStartAndEndPercentage( 2, (UINT16)MasterStart, (UINT16)MasterEnd, {} );
 			RenderProgressBar( 2, 0 );
 		}
 		else
-			SetRelativeStartAndEndPercentage( 1, (UINT16)MasterStart, (UINT16)MasterEnd, ST::null );
+			SetRelativeStartAndEndPercentage( 1, (UINT16)MasterStart, (UINT16)MasterEnd, {} );
 	}
 }
 
 
-static void ReportError(const char* pSector, UINT8 ubLevel)
+static void ReportError(const ST::string& pSector, UINT8 ubLevel)
 {
 	static INT32 yp = 180;
-	ST::string str;
 
 	//Make sure the file exists... if not, then return false
-	str = ST::format("{}", pSector);
+	ST::string str = pSector;
 	if( ubLevel % 4  )
 	{
 		str += ST::format("_b{}.dat", ubLevel % 4);
@@ -2199,8 +2193,7 @@ static void RegenerateSummaryInfoForAllOutdatedMaps(void)
 	for (sMap.y = 1; sMap.y <= 16; sMap.y++) for(sMap.x = 1; sMap.x <= 16; sMap.x++)
 	{
 		INT32 x = sMap.x - 1, y = sMap.y - 1;
-		char str[40];
-		sprintf(str, "%s", sMap.AsShortString().c_str());
+		const ST::string str = sMap.AsShortString();
 		if( gbSectorLevels[x][y] & GROUND_LEVEL_MASK )
 		{
 			pSF = gpSectorSummary[x][y][0];
@@ -2279,7 +2272,7 @@ static void SummaryUpdateCallback(GUI_BUTTON* btn, UINT32 reason)
 			gpCurrentSectorSummary = NULL;
 		}
 
-		EvaluateWorld(gsSelSector.AsShortString().c_str(), (UINT8) giCurrLevel);
+		EvaluateWorld(gsSelSector.AsShortString(), (UINT8) giCurrLevel);
 
 		gpSectorSummary[gsSelSector.x][gsSelSector.y][ giCurrLevel ] = gpCurrentSectorSummary;
 
@@ -2309,7 +2302,7 @@ void ApologizeOverrideAndForceUpdateEverything()
 	SUMMARYFILE *pSF;
 	//Create one huge assed button
 	gfMajorUpdate = TRUE;
-	iSummaryButton[SUMMARY_BACKGROUND] = CreateLabel(ST::null, 0, 0, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, MSYS_PRIORITY_HIGH - 1);
+	iSummaryButton[SUMMARY_BACKGROUND] = CreateLabel({}, 0, 0, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, MSYS_PRIORITY_HIGH - 1);
 	//Draw it
 	iSummaryButton[SUMMARY_BACKGROUND]->Draw();
 	InvalidateScreen();
@@ -2335,8 +2328,7 @@ void ApologizeOverrideAndForceUpdateEverything()
 	for (sMap.y = 1; sMap.y <= 16; sMap.y++) for(sMap.x = 1; sMap.x <= 16; sMap.x++)
 	{
 		INT32 x = sMap.x - 1, y = sMap.y - 1;
-		char name[50];
-		sprintf(name, "%s", sMap.AsShortString().c_str());
+		const ST::string name = sMap.AsShortString();
 		if( gbSectorLevels[x][y] & GROUND_LEVEL_MASK )
 		{
 			pSF = gpSectorSummary[x][y][0];

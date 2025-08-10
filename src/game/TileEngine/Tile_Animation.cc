@@ -1,16 +1,15 @@
 #include <stdexcept>
 
+#include "ItemModel.h"
 #include "Physics.h"
 #include "Soldier_Find.h"
 #include "TileDef.h"
 #include "Timer_Control.h"
 #include "WorldDef.h"
 #include "Debug.h"
-#include "Smooth.h"
 #include "WorldMan.h"
 #include "RenderWorld.h"
 #include "Overhead.h"
-#include "AI.h"
 #include "Isometric_Utils.h"
 #include "Tile_Animation.h"
 #include "Tile_Cache.h"
@@ -23,7 +22,6 @@
 
 #include "ContentManager.h"
 #include "GameInstance.h"
-#include "Logger.h"
 
 static ANITILE* pAniTileHead = NULL;
 
@@ -315,18 +313,27 @@ void UpdateAniTiles( )
 								Assert(pNode->uiFlags & ANITILE_EXPLOSION);
 								const EXPLOSIONTYPE* const e    = pNode->v.explosion;
 								const UINT16               item = e->usItem;
-								const UINT8 ubExpType = Explosive[GCM->getItem(item)->getClassIndex()].ubType;
+								auto explosive = GCM->getExplosive(item);
+								auto smokeEffect = explosive->getSmokeEffect();
+								auto blastEffect = explosive->getBlastEffect();
+								auto stunEffect = explosive->getStunEffect();
 
-								if ( ubExpType == EXPLOSV_TEARGAS || ubExpType == EXPLOSV_MUSTGAS ||
-									ubExpType == EXPLOSV_SMOKE )
+								if ( smokeEffect )
 								{
 									// Do sound....
 									// PlayLocationJA2Sample(pNode->sGridNo, AIR_ESCAPING_1, HIGHVOLUME, 1);
 									NewSmokeEffect(pNode->sGridNo, item, e->bLevel, e->owner);
 								}
-								else
+								if (blastEffect || stunEffect)
 								{
-									SpreadEffect(pNode->sGridNo, Explosive[GCM->getItem(item)->getClassIndex()].ubRadius, item, e->owner, FALSE, e->bLevel, NULL);
+									auto radius = 0;
+									if (blastEffect) {
+										radius = blastEffect->radius;
+									}
+									if (stunEffect && radius < stunEffect->radius) {
+										radius = stunEffect->radius;
+									}
+									SpreadEffect(pNode->sGridNo, radius, item, e->owner, FALSE, e->bLevel, NULL);
 								}
 								// Forfait any other animations this frame....
 								return;
@@ -342,14 +349,6 @@ void UpdateAniTiles( )
 					if ( pNode->uiFlags & ANITILE_LOOPING )
 					{
 						pNode->sCurrentFrame = SetFrameByDir(pNode->sStartFrame, pNode);
-					}
-					else if ( pNode->uiFlags & ANITILE_REVERSE_LOOPING )
-					{
-						// Turn off backwards flag
-						pNode->uiFlags &= (~ANITILE_FORWARD );
-
-						// Turn onn forwards flag
-						pNode->uiFlags |= ANITILE_BACKWARD;
 					}
 					else
 					{
@@ -409,14 +408,6 @@ void UpdateAniTiles( )
 					else if ( pNode->uiFlags & ANITILE_LOOPING )
 					{
 						pNode->sCurrentFrame = SetFrameByDir(pNode->sStartFrame, pNode);
-					}
-					else if ( pNode->uiFlags & ANITILE_REVERSE_LOOPING )
-					{
-						// Turn off backwards flag
-						pNode->uiFlags &= (~ANITILE_BACKWARD );
-
-						// Turn onn forwards flag
-						pNode->uiFlags |= ANITILE_FORWARD;
 					}
 					else
 					{

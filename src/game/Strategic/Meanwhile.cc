@@ -1,6 +1,5 @@
 #include "Meanwhile.h"
 
-#include "Assignments.h"
 #include "Campaign_Types.h"
 #include "ContentManager.h"
 #include "ContentMusic.h"
@@ -300,7 +299,7 @@ static void StartMeanwhile(void)
 	{
 		gsOldSector = gWorldSector;
 	}
-	gsOldSelectedSector = SGPSector(sSelMap.x, sSelMap.y, iCurrentMapSectorZ);
+	gsOldSelectedSector = sSelMap;
 
 	gfInMeanwhile = TRUE;
 
@@ -440,7 +439,7 @@ bool AreInMeanwhile()
 
 static void ProcessImplicationsOfMeanwhile()
 {
-	auto samList = GCM->getSamSites();
+	auto && samList{ GCM->getSamSites() };
 	switch( gCurrentMeanwhileDef.ubMeanwhileID )
 	{
 		case END_OF_PLAYERS_FIRST_BATTLE:

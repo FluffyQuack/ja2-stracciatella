@@ -25,7 +25,6 @@
 #include "Debug.h"
 #include "Font_Control.h"
 #include "Text.h"
-#include "Soldier_Profile_Type.h"
 
 #include <string_theory/string>
 
@@ -488,53 +487,18 @@ void ResetCharacterStats( void )
 	iAttitude = 0;
 
 	// names
-	pFullName = ST::null;
-	pNickName = ST::null;
+	pFullName.clear();
+	pNickName.clear();
 }
 
 
 static void LoadImpGraphics(void)
 {
-	// load all graphics needed for IMP
+	// preload some graphics needed for multiple IMP screens.
 
-	LoadProfileBackGround( );
-	LoadIMPSymbol( );
-	LoadBeginIndent( );
-	LoadActivationIndent( );
-	LoadFrontPageIndent( );
 	LoadAnalyse( );
 	LoadAttributeGraph( );
-
-	LoadNameIndent( );
-	LoadGenderIndent( );
-	LoadNickNameIndent( );
-
-	//LoadSmallFrame( );
-
 	LoadSmallSilhouette( );
-	LoadLargeSilhouette( );
-
-	LoadAttributeFrame( );
-	LoadSliderBar( );
-
-	LoadButton2Image( );
-	LoadButton4Image( );
-
-	LoadPortraitFrame( );
-	LoadMainIndentFrame( );
-
-	LoadQtnLongIndentFrame( );
-	LoadQtnShortIndentFrame( );
-	LoadQtnLongIndentHighFrame( );
-	LoadQtnShortIndentHighFrame( );
-	LoadQtnShort2IndentFrame( );
-	LoadQtnShort2IndentHighFrame( );
-
-	LoadQtnIndentFrame( );
-	LoadAttrib1IndentFrame( );
-	LoadAttrib2IndentFrame( );
-	LoadAvgMercIndentFrame( );
-	LoadAboutUsIndentFrame( );
 }
 
 

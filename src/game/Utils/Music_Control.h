@@ -1,13 +1,11 @@
 #ifndef _MUSIC_CONTROL_H_
 #define _MUSIC_CONTROL_H_
 
+#include "ContentMusic.h"
+#include "Types.h"
 #include <string_theory/string>
 
-#include "SoundMan.h"
-#include "ContentMusic.h"
-
 extern MusicMode gubMusicMode;
-extern BOOLEAN	gfForceMusicToTense;
 
 
 void SetMusicMode(MusicMode ubMusicMode);

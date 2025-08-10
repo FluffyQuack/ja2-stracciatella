@@ -5,11 +5,12 @@
 #include "ContentManager.h"
 #include "GameInstance.h"
 #include "ItemModel.h"
+#include <algorithm>
 
 
 static void ReplaceInvalidItem(UINT16 & usItem)
 {
-	const ItemModel* item = GCM->getItem(usItem);
+	auto * item{ GCM->getItem(usItem, ItemSystem::nothrow) };
 	if (!item)
 	{
 		SLOGW("Item (index {}) is not defined and will be ignored. Maybe the file was saved for a different game version", usItem);
@@ -40,23 +41,20 @@ void ExtractObject(DataReader& d, OBJECTTYPE* const o)
 			EXTR_SKIP(d, 1)
 			EXTR_U16(d, o->usGunAmmoItem)
 			EXTR_I8(d, o->bGunAmmoStatus)
-			EXTR_U8A(d, o->ubGunUnused, lengthof(o->ubGunUnused))
-			EXTR_SKIP(d, 3)
+			EXTR_SKIP(d, 5)
 			break;
 
 		case IC_KEY:
 			EXTR_I8A(d, o->bKeyStatus, lengthof(o->bKeyStatus))
 			EXTR_U8(d, o->ubKeyID)
-			EXTR_U8A(d, o->ubKeyUnused, lengthof(o->ubKeyUnused))
-			EXTR_SKIP(d, 4)
+			EXTR_SKIP(d, 5)
 			break;
 
 		case IC_MONEY:
 			EXTR_I8(d, o->bMoneyStatus)
 			EXTR_SKIP(d, 3)
 			EXTR_U32(d, o->uiMoneyAmount)
-			EXTR_U8A(d, o->ubMoneyUnused, lengthof(o->ubMoneyUnused))
-			EXTR_SKIP(d, 1)
+			EXTR_SKIP(d, 4)
 			break;
 
 		case IC_MISC:
@@ -76,8 +74,7 @@ void ExtractObject(DataReader& d, OBJECTTYPE* const o)
 				case OWNERSHIP:
 					EXTR_U8(d, o->ubOwnerProfile)
 					EXTR_U8(d, o->ubOwnerCivGroup)
-					EXTR_U8A(d, o->ubOwnershipUnused, lengthof(o->ubOwnershipUnused))
-					EXTR_SKIP(d, 4)
+					EXTR_SKIP(d, 10)
 					break;
 
 				case SWITCH:
@@ -140,23 +137,20 @@ void InjectObject(DataWriter& d, const OBJECTTYPE* o)
 			INJ_SKIP(d, 1)
 			INJ_U16(d, o->usGunAmmoItem)
 			INJ_I8(d, o->bGunAmmoStatus)
-			INJ_U8A(d, o->ubGunUnused, lengthof(o->ubGunUnused))
-			INJ_SKIP(d, 3)
+			INJ_SKIP(d, 5)
 			break;
 
 		case IC_KEY:
 			INJ_I8A(d, o->bKeyStatus, lengthof(o->bKeyStatus))
 			INJ_U8(d, o->ubKeyID)
-			INJ_U8A(d, o->ubKeyUnused, lengthof(o->ubKeyUnused))
-			INJ_SKIP(d, 4)
+			INJ_SKIP(d, 5)
 			break;
 
 		case IC_MONEY:
 			INJ_I8(d, o->bMoneyStatus)
 			INJ_SKIP(d, 3)
 			INJ_U32(d, o->uiMoneyAmount)
-			INJ_U8A(d, o->ubMoneyUnused, lengthof(o->ubMoneyUnused))
-			INJ_SKIP(d, 1)
+			INJ_SKIP(d, 4)
 			break;
 
 		case IC_MISC:
@@ -176,8 +170,7 @@ void InjectObject(DataWriter& d, const OBJECTTYPE* o)
 				case OWNERSHIP:
 					INJ_U8(d, o->ubOwnerProfile)
 					INJ_U8(d, o->ubOwnerCivGroup)
-					INJ_U8A(d, o->ubOwnershipUnused, lengthof(o->ubOwnershipUnused))
-					INJ_SKIP(d, 4)
+					INJ_SKIP(d, 10)
 					break;
 
 				case SWITCH:
@@ -207,7 +200,7 @@ inject_status:
 	INJ_U8(d, o->ubMission)
 	INJ_I8(d, o->bTrap)
 	INJ_U8(d, o->ubImprintID)
-	INJ_U8(d, o->ubWeight)
+	d.writeU8(static_cast<UINT8>(std::clamp(Weight(*o), 1, 255)));
 	INJ_U8(d, o->fUsed)
 	INJ_SKIP(d, 2)
 	Assert(d.getConsumed() == start + 36);

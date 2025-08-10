@@ -37,7 +37,6 @@ BOOLEAN SaveSoldiersToMap( HWFILE fp );
 //the only way we can do this properly is to save the soldier ID from the list and reconnect the
 //soldier pointer whenever we load the game.
 void SaveSoldierInitListLinks(HWFILE);
-void LoadSoldierInitListLinks(HWFILE);
 void NewWayOfLoadingEnemySoldierInitListLinks(HWFILE);
 void NewWayOfLoadingCivilianInitListLinks(HWFILE);
 
@@ -45,7 +44,7 @@ void InitSoldierInitList(void);
 void KillSoldierInitList(void);
 SOLDIERINITNODE* AddBasicPlacementToSoldierInitList(BASIC_SOLDIERCREATE_STRUCT const&);
 void RemoveSoldierNodeFromInitList( SOLDIERINITNODE *pNode );
-SOLDIERINITNODE* FindSoldierInitNodeWithID( UINT16 usID );
+SOLDIERINITNODE* FindSoldierInitNodeWithID(SoldierID soldierID);
 SOLDIERINITNODE* FindSoldierInitNodeBySoldier(SOLDIERTYPE const&);
 
 void AddSoldierInitListTeamToWorld(INT8 team);

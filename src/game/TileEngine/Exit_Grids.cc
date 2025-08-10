@@ -1,13 +1,10 @@
-#include "FileMan.h"
 #include "Debug.h"
 #include "Isometric_Utils.h"
 #include "TileDat.h"
 #include "Types.h"
 #include "WorldDef.h"
 #include "WorldMan.h"
-#include "Smooth.h"
 #include "Exit_Grids.h"
-#include "Editor_Undo.h"
 #include "StrategicMap.h"
 #include "Strategic_Movement.h"
 #include "Message.h"
@@ -16,7 +13,6 @@
 #include "Overhead.h"
 #include "Animation_Control.h"
 #include "Sys_Globals.h"
-#include "Quests.h"
 #include "SaveLoadMap.h"
 #include "Text.h"
 
@@ -190,8 +186,7 @@ void AttemptToChangeFloorLevel(INT8 const relative_z_level)
 		gfOverrideInsertionWithExitGrid = TRUE;
 		/* change all current mercs in the loaded sector, and move them to the new
 		 * sector. */
-		SGPSector adjustedSector = gWorldSector;
-		gWorldSector.z = look_for_level;
+		SGPSector const adjustedSector(gWorldSector.x, gWorldSector.y, look_for_level);
 		MoveAllGroupsInCurrentSectorToSector(adjustedSector);
 		if (look_for_level)
 		{
@@ -203,6 +198,7 @@ void AttemptToChangeFloorLevel(INT8 const relative_z_level)
 		}
 		SetCurrentWorldSector(adjustedSector);
 		gfOverrideInsertionWithExitGrid = FALSE;
+		break;
 	}
 }
 
@@ -215,9 +211,7 @@ UINT16 FindGridNoFromSweetSpotCloseToExitGrid(const SOLDIERTYPE* const pSoldier,
 	INT16		sGridNo;
 	INT32		uiRange, uiLowestRange = 999999;
 	INT32					leftmost;
-	SOLDIERTYPE soldier;
-	UINT8 ubSaveNPCAPBudget;
-	UINT8 ubSaveNPCDistLimit;
+	SOLDIERTYPE soldier{};
 	EXITGRID	ExitGrid;
 	SGPSector ubGotoSector;
 
@@ -226,14 +220,10 @@ UINT16 FindGridNoFromSweetSpotCloseToExitGrid(const SOLDIERTYPE* const pSoldier,
 
 	//Save AI pathing vars.  changing the distlimit restricts how
 	//far away the pathing will consider.
-	ubSaveNPCAPBudget = gubNPCAPBudget;
-	ubSaveNPCDistLimit = gubNPCDistLimit;
-	gubNPCAPBudget = 0;
-	gubNPCDistLimit = ubRadius;
+	SaveNPCBudgetAndDistLimit const savePathAIvars(0, ubRadius);
 
 	//create dummy soldier, and use the pathing to determine which nearby slots are
 	//reachable.
-	soldier = SOLDIERTYPE{};
 	soldier.bLevel = 0;
 	soldier.bTeam = 1;
 	soldier.sGridNo = pSoldier->sGridNo;
@@ -306,8 +296,6 @@ UINT16 FindGridNoFromSweetSpotCloseToExitGrid(const SOLDIERTYPE* const pSoldier,
 			}
 		}
 	}
-	gubNPCAPBudget = ubSaveNPCAPBudget;
-	gubNPCDistLimit = ubSaveNPCDistLimit;
 
 	gfPlotPathToExitGrid = FALSE;
 

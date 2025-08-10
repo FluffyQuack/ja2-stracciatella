@@ -1,10 +1,7 @@
 #ifndef __INTERFACE_UTILS_H
 #define __INTERFACE_UTILS_H
 
-#include "Types.h"
-class SGPVSurface;
-struct OBJECTTYPE;
-struct SOLDIERTYPE;
+#include "JA2Types.h"
 
 
 #define DRAW_ITEM_STATUS_ATTACHMENT1	200
@@ -18,13 +15,9 @@ void DrawItemUIBarEx(OBJECTTYPE const&, UINT8 ubStatus, INT16 sXPos, INT16 sYPos
 
 void RenderSoldierFace(SOLDIERTYPE const&, INT16 sFaceX, INT16 sFaceY);
 
-// load portraits for cars
-void LoadCarPortraitValues(void);
-
 // get rid of the loaded portraits for cars
 void UnLoadCarPortraits( void );
 
-void LoadInterfaceUtilsGraphics();
 void DeleteInterfaceUtilsGraphics();
 
 #endif

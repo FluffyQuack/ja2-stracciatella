@@ -1,14 +1,15 @@
+#include "Assignments.h"
 #include "Directories.h"
-#include "FileMan.h"
 #include "Font.h"
 #include "Handle_Items.h"
 #include "Isometric_Utils.h"
+#include "Item_Types.h"
 #include "LoadSaveData.h"
 #include "LoadSaveObjectType.h"
-#include "Local.h"
 #include "HImage.h"
 #include "Map_Screen_Interface_Bottom.h"
-#include "Text_Utils.h"
+#include "Object_Cache.h"
+#include "Soldier_Macros.h"
 #include "TileDef.h"
 #include "Timer_Control.h"
 #include "VObject.h"
@@ -22,7 +23,6 @@
 #include "Handle_UI.h"
 #include "RenderWorld.h"
 #include "Cursors.h"
-#include "Radar_Screen.h"
 #include "Font_Control.h"
 #include "Render_Dirty.h"
 #include "Interface_Panels.h"
@@ -50,9 +50,6 @@
 #include "Dialogue_Control.h"
 #include "English.h"
 #include "Keys.h"
-#include "StrategicMap.h"
-#include "Arms_Dealer_Init.h"
-#include "Soldier_Macros.h"
 #include "Game_Clock.h"
 #include "Squads.h"
 #include "LaptopSave.h"
@@ -61,10 +58,8 @@
 #include "Map_Screen_Interface_Map_Inventory.h"
 #include "Quests.h"
 #include "Map_Screen_Interface.h"
-#include "Campaign_Types.h"
 #include "OppList.h"
 #include "LOS.h"
-#include "Map_Screen_Interface_Map.h"
 #include "JAScreens.h"
 #include "ScreenIDs.h"
 #include "Video.h"
@@ -161,7 +156,7 @@ static const SGPBox g_map_itemdesc_item_status_box = { 18,  54,   2, 42 };
 #define ITEM_FONT					TINYFONT1
 
 #define EXCEPTIONAL_DAMAGE				30
-#define EXCEPTIONAL_WEIGHT				20
+constexpr grams EXCEPTIONAL_WEIGHT = 2000;
 #define EXCEPTIONAL_RANGE				300
 #define EXCEPTIONAL_MAGAZINE				30
 #define EXCEPTIONAL_AP_COST				7
@@ -208,13 +203,17 @@ static BOOLEAN gfBadThrowItemCTGH;
 BOOLEAN gfDontChargeAPsToPickup = FALSE;
 static BOOLEAN gbItemPointerLocateGood = FALSE;
 
+namespace {
 // ITEM DESCRIPTION BOX STUFF
-static SGPVObject *guiItemDescBox;
-static SGPVObject *guiMapItemDescBox;
+cache_key_t const guiItemDescBox{ INTERFACEDIR "/infobox.sti" };
+cache_key_t const guiMapItemDescBox{ INTERFACEDIR "/iteminfoc.sti" };
+
+cache_key_t const guiBullet{ INTERFACEDIR "/bullet.sti" };
+cache_key_t const guiMoneyGraphicsForDescBox{ INTERFACEDIR "/info_bil.sti" };
+cache_key_t const guiGoldKeyVO{ INTERFACEDIR "/gold_key_button.sti" };
+}
 static SGPVObject *guiItemGraphic;
 static UINT8 guiItemGraphicIndex;
-static SGPVObject *guiMoneyGraphicsForDescBox;
-static SGPVObject *guiBullet;
 BOOLEAN gfInItemDescBox = FALSE;
 static UINT32 guiCurrentItemDescriptionScreen=0;
 OBJECTTYPE *gpItemDescObject = NULL;
@@ -277,10 +276,6 @@ SOLDIERTYPE *gpItemPopupSoldier;
 
 // inventory description done button for mapscreen
 GUIButtonRef giMapInvDescButton;
-
-
-static BOOLEAN gfItemPopupRegionCallbackEndFix = FALSE;
-
 
 struct INV_DESC_STATS
 {
@@ -421,7 +416,7 @@ static INT8 gbCompatibleAmmo[NUM_INV_SLOTS];
 INT8 gbInvalidPlacementSlot[ NUM_INV_SLOTS ];
 static UINT16 us16BPPItemCyclePlacedItemColors[20];
 static SGPVObject* guiBodyInvVO[4][2];
-static SGPVObject* guiGoldKeyVO;
+
 INT8 gbCompatibleApplyItem = FALSE;
 
 
@@ -465,17 +460,10 @@ static void GenerateProsString(ST::string& zItemPros, const OBJECTTYPE& o, UINT3
 	UINT32 uiStringLength = 0;
 	ST::string zTemp;
 	UINT16 usItem = o.usItem;
-	UINT8 ubWeight;
 
-	zItemPros = ST::null;
+	zItemPros.clear();
 
-	ubWeight = GCM->getItem(usItem)->getWeight();
-	if (GCM->getItem(usItem)->getItemClass() == IC_GUN)
-	{
-		ubWeight += GCM->getItem(o.usGunAmmoItem)->getWeight();
-	}
-
-	if (GCM->getItem(usItem)->getWeight() <= EXCEPTIONAL_WEIGHT)
+	if (GCM->getItem(usItem)->getWeight() * 100 <= EXCEPTIONAL_WEIGHT)
 	{
 		zTemp = g_langRes->Message[STR_LIGHT];
 		if ( ! AttemptToAddSubstring( zItemPros, zTemp, &uiStringLength, uiPixLimit ) )
@@ -574,7 +562,7 @@ static void GenerateConsString(ST::string& zItemCons, const OBJECTTYPE& o, UINT3
 	UINT8 ubWeight;
 	UINT16 usItem = o.usItem;
 
-	zItemCons = ST::null;
+	zItemCons.clear();
 
 	// calculate the weight of the item plus ammunition but not including any attachments
 	ubWeight = GCM->getItem(usItem)->getWeight();
@@ -667,7 +655,10 @@ static void GenerateConsString(ST::string& zItemCons, const OBJECTTYPE& o, UINT3
 }
 
 
-void InitInvSlotInterface(INV_REGION_DESC const* const pRegionDesc, INV_REGION_DESC const* const pCamoRegion, MOUSE_CALLBACK const INVMoveCallback, MOUSE_CALLBACK const INVClickCallback, MOUSE_CALLBACK const INVMoveCamoCallback, MOUSE_CALLBACK const INVClickCamoCallback)
+void InitInvSlotInterface(INV_REGION_DESC const* const pRegionDesc,
+	INV_REGION_DESC const* const pCamoRegion,
+	MOUSE_CALLBACK INVMoveCallback, MOUSE_CALLBACK INVClickCallback,
+	MOUSE_CALLBACK INVMoveCamoCallback, MOUSE_CALLBACK INVClickCamoCallback)
 {
 	// Load all four body type images
 	guiBodyInvVO[0][0] = AddVideoObjectFromFile(INTERFACEDIR "/inventory_normal_male.sti");
@@ -679,13 +670,12 @@ void InitInvSlotInterface(INV_REGION_DESC const* const pRegionDesc, INV_REGION_D
 	guiBodyInvVO[3][0] = AddVideoObjectFromFile(INTERFACEDIR "/inventory_figure_female.sti");
 	guiBodyInvVO[3][1] = AddVideoObjectFromFile(INTERFACEDIR "/inventory_figure_female_h.sti");
 
-	// Add gold key graphic
-	guiGoldKeyVO = AddVideoObjectFromFile(INTERFACEDIR "/gold_key_button.sti");
-
 	// Add camo region
 	UINT16 const x = pCamoRegion->uX;
 	UINT16 const y = pCamoRegion->uY;
-	MSYS_DefineRegion(&gSMInvCamoRegion, x, y, x + CAMO_REGION_WIDTH, y + CAMO_REGION_HEIGHT, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, INVMoveCamoCallback, INVClickCamoCallback);
+	MSYS_DefineRegion(&gSMInvCamoRegion, x, y, x + CAMO_REGION_WIDTH,
+		y + CAMO_REGION_HEIGHT,	MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR,
+		std::move(INVMoveCamoCallback), std::move(INVClickCamoCallback));
 
 	// Add regions for inventory slots
 	for (INT32 i = 0; i != NUM_INV_SLOTS; ++i)
@@ -695,7 +685,9 @@ void InitInvSlotInterface(INV_REGION_DESC const* const pRegionDesc, INV_REGION_D
 		INT16       const  y = pRegionDesc[i].uY;
 		INV_REGIONS const& r = gSMInvData[i];
 		MOUSE_REGION&      m = gSMInvRegion[i];
-		MSYS_DefineRegion(&m, x, y, x + r.w, y + r.h, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, INVMoveCallback, INVClickCallback);
+		MSYS_DefineRegion(&m, x, y, x + r.w, y + r.h,
+			MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR,
+			INVMoveCallback, INVClickCallback);
 		MSYS_SetRegionUserData(&m, 0, i);
 	}
 
@@ -705,14 +697,20 @@ void InitInvSlotInterface(INV_REGION_DESC const* const pRegionDesc, INV_REGION_D
 
 void InitKeyRingInterface(MOUSE_CALLBACK KeyRingClickCallback)
 {
-	MSYS_DefineRegion(&gKeyRingPanel, KEYRING_X, KEYRING_Y, KEYRING_X + KEYRING_WIDTH, KEYRING_Y + KEYRING_HEIGHT, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, KeyRingClickCallback);
+	MSYS_DefineRegion(&gKeyRingPanel, KEYRING_X, KEYRING_Y,
+		KEYRING_X + KEYRING_WIDTH, KEYRING_Y + KEYRING_HEIGHT,
+		MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK,
+		std::move(KeyRingClickCallback));
 	gKeyRingPanel.SetFastHelpText(TacticalStr[KEYRING_HELP_TEXT]);
 }
 
 
 void InitMapKeyRingInterface( MOUSE_CALLBACK KeyRingClickCallback )
 {
-	MSYS_DefineRegion(&gKeyRingPanel, MAP_KEYRING_X, MAP_KEYRING_Y, MAP_KEYRING_X + KEYRING_WIDTH, MAP_KEYRING_Y + KEYRING_HEIGHT, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, KeyRingClickCallback);
+	MSYS_DefineRegion(&gKeyRingPanel, MAP_KEYRING_X, MAP_KEYRING_Y,
+		MAP_KEYRING_X + KEYRING_WIDTH, MAP_KEYRING_Y + KEYRING_HEIGHT,
+		MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK,
+		std::move(KeyRingClickCallback));
 	gKeyRingPanel.SetFastHelpText(TacticalStr[KEYRING_HELP_TEXT]);
 }
 
@@ -775,7 +773,7 @@ void ShutdownInvSlotInterface()
 		FOR_EACH(SGPVObject*, k, *i) DeleteVideoObject(*k);
 	}
 
-	DeleteVideoObject(guiGoldKeyVO);
+	RemoveVObject(guiGoldKeyVO);
 
 	FOR_EACH(MOUSE_REGION, i, gSMInvRegion)
 	{
@@ -1697,34 +1695,37 @@ BOOLEAN InItemDescriptionBox( )
 
 void CycleItemDescriptionItem( )
 {
-	INT16 usOldItem;
-
 	// Delete old box...
 	DeleteItemDescriptionBox( );
 
 	// Make new item....
-	usOldItem = gpItemDescSoldier->inv[ HANDPOS ].usItem;
+	const auto oldItemIndex = gpItemDescSoldier->inv[HANDPOS].usItem;
+	auto items = GCM->getItems();
+	auto it = std::find_if(items.begin(), items.end(), [oldItemIndex](const ItemModel* item) -> bool {
+		return item->getItemIndex() == oldItemIndex;
+	});
+	if (it == items.end()) {
+		SLOGE("Failed to find current item {} for cycling", oldItemIndex);
+		return;
+	}
 
-	if ( _KeyDown( SHIFT ) )
+	if (_KeyDown(SDLK_END))
 	{
-		usOldItem--;
-
-		if ( usOldItem < 0 )
-		{
-			usOldItem = MAXITEMS-1;
-		}
+		// cycle backwards
+		it = it == items.begin() ? items.end() - 1 : it - 1;
 	}
 	else
 	{
-		usOldItem++;
-
-		if ( usOldItem > MAXITEMS )
-		{
-			usOldItem = 0;
+		// cycle forwards
+		it = it++;
+		if (it == items.end()) {
+			it = items.begin();
 		}
 	}
 
-	CreateItem( (UINT16)usOldItem, 100, &( gpItemDescSoldier->inv[ HANDPOS ] ) );
+	const auto newItemIndex = (*it)->getItemIndex();
+
+	CreateItem(newItemIndex, 100, &gpItemDescSoldier->inv[HANDPOS]);
 
 	InternalInitItemDescriptionBox( &( gpItemDescSoldier->inv[ HANDPOS ] ), INTERFACE_START_X + 214, (INT16)(INV_INTERFACE_START_Y + 1 ), gubItemDescStatusIndex, gpItemDescSoldier );
 }
@@ -1784,14 +1785,14 @@ void InternalInitItemDescriptionBox(OBJECTTYPE* const o, const INT16 sX, const I
 	gubItemDescStatusIndex = ubStatusIndex;
 	gpItemDescSoldier      = s;
 	fItemDescDelete        = FALSE;
-	MOUSE_CALLBACK itemDescCallback = MouseCallbackPrimarySecondary<MOUSE_REGION>(ItemDescCallbackPrimary, ItemDescCallbackSecondary);
+	MOUSE_CALLBACK itemDescCallback = MouseCallbackPrimarySecondary(ItemDescCallbackPrimary, ItemDescCallbackSecondary);
 
 	// Build a mouse region here that is over any others.....
 	if (in_map)
 	{
 		MSYS_DefineRegion(&gInvDesc, gsInvDescX, gsInvDescY, gsInvDescX + MAP_ITEMDESC_WIDTH, gsInvDescY + MAP_ITEMDESC_HEIGHT, MSYS_PRIORITY_HIGHEST - 2, CURSOR_NORMAL, MSYS_NO_CALLBACK, itemDescCallback);
 
-		giMapInvDescButton = QuickCreateButtonImg(INTERFACEDIR "/itemdescdonebutton.sti", 0, 1, gsInvDescX + 204, gsInvDescY + 107, MSYS_PRIORITY_HIGHEST, MouseCallbackPrimarySecondary<GUI_BUTTON>(ItemDescDoneButtonCallbackPrimary, ItemDescDoneButtonCallbackSecondary));
+		giMapInvDescButton = QuickCreateButtonImg(INTERFACEDIR "/itemdescdonebutton.sti", 0, 1, gsInvDescX + 204, gsInvDescY + 107, MSYS_PRIORITY_HIGHEST, ButtonCallbackPrimarySecondary(ItemDescDoneButtonCallbackPrimary, ItemDescDoneButtonCallbackSecondary));
 
 		fShowDescriptionFlag = TRUE;
 	}
@@ -1875,11 +1876,6 @@ void InternalInitItemDescriptionBox(OBJECTTYPE* const o, const INT16 sX, const I
 		}
 	}
 
-	// Load graphic
-	guiItemDescBox    = AddVideoObjectFromFile(INTERFACEDIR "/infobox.sti");
-	guiMapItemDescBox = AddVideoObjectFromFile(INTERFACEDIR "/iteminfoc.sti");
-	guiBullet         = AddVideoObjectFromFile(INTERFACEDIR "/bullet.sti");
-
 	if (o->usItem != MONEY)
 	{
 		const AttachmentGfxInfo* const agi = (in_map ? &g_map_attachment_info : &g_attachment_info);
@@ -1891,21 +1887,19 @@ void InternalInitItemDescriptionBox(OBJECTTYPE* const o, const INT16 sX, const I
 			const UINT16        w = agi->item_box.w;
 			const UINT16        h = agi->item_box.h;
 			MOUSE_REGION* const r = &gItemDescAttachmentRegions[i];
-			MSYS_DefineRegion(r, x, y, x + w, y + h, MSYS_PRIORITY_HIGHEST, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(ItemDescAttachmentsCallbackPrimary, ItemDescAttachmentsCallbackSecondary));
+			MSYS_DefineRegion(r, x, y, x + w, y + h, MSYS_PRIORITY_HIGHEST, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(ItemDescAttachmentsCallbackPrimary, ItemDescAttachmentsCallbackSecondary));
 			MSYS_SetRegionUserData(r, 0, i);
 		}
 		SetAttachmentTooltips();
 	}
 	else
 	{
-		GUI_CALLBACK btnMoneyButtonCallback = MouseCallbackPrimarySecondary<GUI_BUTTON>(BtnMoneyButtonCallbackPrimary, BtnMoneyButtonCallbackSecondary, BtnMoneyButtonCallbackOther);
+		GUI_CALLBACK btnMoneyButtonCallback = ButtonCallbackPrimarySecondary(BtnMoneyButtonCallbackPrimary, BtnMoneyButtonCallbackSecondary, BtnMoneyButtonCallbackOther);
 
 		gRemoveMoney = REMOVE_MONEY{};
 		gRemoveMoney.uiTotalAmount    = o->uiMoneyAmount;
 		gRemoveMoney.uiMoneyRemaining = o->uiMoneyAmount;
 		gRemoveMoney.uiMoneyRemoving  = 0;
-
-		guiMoneyGraphicsForDescBox = AddVideoObjectFromFile(INTERFACEDIR "/info_bil.sti");
 
 		// Create buttons for the money
 		guiMoneyButtonImage = LoadButtonImage(INTERFACEDIR "/info_bil.sti", 1, 2);
@@ -2203,7 +2197,7 @@ static void ItemDescAttachmentsCallbackSecondary(MOUSE_REGION* pRegion, UINT32 i
 
 static ST::string GetObjectImprint(OBJECTTYPE const& o)
 {
-	return !HasObjectImprint(o) ? ST::null :
+	return !HasObjectImprint(o) ? ST::string() :
 		o.ubImprintID == NO_PROFILE + 1 ? pwMiscSectorStrings[3] :
 		GetProfile(o.ubImprintID).zNickname;
 }
@@ -2228,7 +2222,7 @@ void RenderItemDescriptionBox(void)
 	INT16      const  dx     = gsInvDescX;
 	INT16      const  dy     = gsInvDescY;
 
-	SGPVObject const* const box_gfx = in_map ? guiMapItemDescBox : guiItemDescBox;
+	auto * const box_gfx = in_map ? guiMapItemDescBox : guiItemDescBox;
 	BltVideoObject(guiSAVEBUFFER, box_gfx, 0, dx, dy);
 
 	// Display the money 'separating' border
@@ -2356,7 +2350,7 @@ void RenderItemDescriptionBox(void)
 	{
 		{
 			const WeaponModel * w = GCM->getWeapon(obj.usItem);
-			if (w->calibre->index != NOAMMO)
+			if (w->calibre->index != CalibreModel::NOAMMO)
 			{
 				ST::string name = *w->calibre->getName();
 				pStr += ST::format("{} ", name);
@@ -2402,9 +2396,11 @@ void RenderItemDescriptionBox(void)
 	}
 
 	// Calculate total weight of item and attachments
-	float fWeight = CalculateObjectWeight(&obj) / 10.f;
-	if (!gGameSettings.fOptions[TOPTION_USE_METRIC_SYSTEM]) fWeight *= 2.2f;
-	if (fWeight < 0.1) fWeight = 0.1f;
+	grams const objectWeight = Weight(obj);
+	double const convertedWeight = objectWeight /
+		(gGameSettings.fOptions[TOPTION_USE_METRIC_SYSTEM]
+		? 1000.0      // Weight in kilograms
+		: 453.59237); // Weight in pounds
 
 	SetFontShadow(DEFAULT_SHADOW);
 
@@ -2445,8 +2441,8 @@ void RenderItemDescriptionBox(void)
 		MPrint(usX, usY, pStr);
 
 		//Weight
-		HighlightIf(fWeight <= EXCEPTIONAL_WEIGHT / 10);
-		pStr = ST::format("{1.1f}", fWeight);
+		HighlightIf(objectWeight <= EXCEPTIONAL_WEIGHT);
+		pStr = ST::format("{1.1f}", convertedWeight);
 		FindFontRightCoordinates(dx + ids[0].sX + ids[0].sValDx, dy + ids[0].sY, ITEM_STATS_WIDTH, ITEM_STATS_HEIGHT, pStr, BLOCKFONT2, &usX, &usY);
 		MPrint(usX, usY, pStr);
 
@@ -2598,7 +2594,7 @@ void RenderItemDescriptionBox(void)
 		}
 
 		//Weight
-		pStr = ST::format("{1.1f}", fWeight);
+		pStr = ST::format("{1.1f}", convertedWeight);
 		FindFontRightCoordinates(dx + ids[0].sX + ids[0].sValDx, dy + ids[0].sY, ITEM_STATS_WIDTH, ITEM_STATS_HEIGHT, pStr, BLOCKFONT2, &usX, &usY);
 		MPrint(usX, usY, pStr);
 
@@ -2716,9 +2712,9 @@ void DeleteItemDescriptionBox( )
 		}
 	}
 
-	DeleteVideoObject(guiItemDescBox);
-	DeleteVideoObject(guiMapItemDescBox);
-	DeleteVideoObject(guiBullet);
+	RemoveVObject(guiItemDescBox);
+	RemoveVObject(guiMapItemDescBox);
+	RemoveVObject(guiBullet);
 	DeleteVideoObject(guiItemGraphic);
 
 	gfInItemDescBox = FALSE;
@@ -3416,9 +3412,7 @@ BOOLEAN HandleItemPointerClick( UINT16 usMapPos )
 							// CHECK IF WE ARE AT THIS GRIDNO NOW
 							if ( gpItemPointerSoldier->sGridNo != sActionGridNo )
 							{
-								SoldierSP soldier = GetSoldier(gpItemPointerSoldier);
-
-								soldier->setPendingAction(MERC_RELOADROBOT);
+								Soldier{gpItemPointerSoldier}.setPendingAction(MERC_RELOADROBOT);
 
 								// WALK UP TO DEST FIRST
 								EVENT_InternalGetNewSoldierPath( gpItemPointerSoldier, sActionGridNo, gpItemPointerSoldier->usUIMovementMode, FALSE, FALSE );
@@ -3810,18 +3804,17 @@ void InitItemStackPopup(SOLDIERTYPE* const pSoldier, UINT8 const ubPosition, INT
 		UINT32 col = cnt % MAX_STACK_POPUP_WIDTH;
 
 		// Build a mouse region here that is over any others.....
-		MOUSE_CALLBACK itemPopupRegionCallback = MouseCallbackPrimarySecondary<MOUSE_REGION>(ItemPopupRegionCallbackPrimary, ItemPopupRegionCallbackSecondary, MSYS_NO_CALLBACK, true);
+		MOUSE_CALLBACK itemPopupRegionCallback = MouseCallbackPrimarySecondary(ItemPopupRegionCallbackPrimary, ItemPopupRegionCallbackSecondary, MSYS_NO_CALLBACK, true);
 		MSYS_DefineRegion(&gItemPopupRegions[cnt], sCenX + col * usPopupWidth, sCenY + row * usPopupHeight, sCenX + (col + 1) * usPopupWidth, sCenY + (row+1) * usPopupHeight, MSYS_PRIORITY_HIGHEST, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, itemPopupRegionCallback);
 		MSYS_SetRegionUserData( &gItemPopupRegions[cnt], 0, cnt );
 
 		//OK, for each item, set dirty text if applicable!
 		gItemPopupRegions[cnt].SetFastHelpText(GCM->getItem(pSoldier->inv[ubPosition].usItem)->getName());
-		gfItemPopupRegionCallbackEndFix = FALSE;
 	}
 
 
 	// Build a mouse region here that is over any others.....
-	MSYS_DefineRegion(&gItemPopupRegion, gsItemPopupInvX, gsItemPopupInvY, gsItemPopupInvX + gsItemPopupInvWidth, gsItemPopupInvY + gsItemPopupInvHeight, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(ItemPopupFullRegionCallbackPrimary, ItemPopupFullRegionCallbackSecondary));
+	MSYS_DefineRegion(&gItemPopupRegion, gsItemPopupInvX, gsItemPopupInvY, gsItemPopupInvX + gsItemPopupInvWidth, gsItemPopupInvY + gsItemPopupInvHeight, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(ItemPopupFullRegionCallbackPrimary, ItemPopupFullRegionCallbackSecondary));
 
 
 	//Disable all faces
@@ -3982,12 +3975,11 @@ void InitKeyRingPopup(SOLDIERTYPE* const pSoldier, INT16 const sInvX, INT16 cons
 			MSYS_NO_CURSOR, MSYS_NO_CALLBACK, KeyRingSlotInvClickCallback
 		);
 		MSYS_SetRegionUserData( &gKeyRingRegions[cnt], 0, cnt );
-		//gfItemPopupRegionCallbackEndFix = FALSE;
 	}
 
 
 	// Build a mouse region here that is over any others.....
-	MSYS_DefineRegion(&gItemPopupRegion, sInvX, sInvY, sInvX + sInvWidth, sInvY + sInvHeight, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(ItemPopupFullRegionCallbackPrimary, ItemPopupFullRegionCallbackSecondary));
+	MSYS_DefineRegion(&gItemPopupRegion, sInvX, sInvY, sInvX + sInvWidth, sInvY + sInvHeight, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(ItemPopupFullRegionCallbackPrimary, ItemPopupFullRegionCallbackSecondary));
 
 
 	//Disable all faces
@@ -4205,12 +4197,6 @@ static void ItemDescDoneButtonCallbackSecondary(GUI_BUTTON *btn, UINT32 reason)
 
 static void ItemPopupRegionCallbackPrimary(MOUSE_REGION* pRegion, UINT32 iReason)
 {
-	// TO ALLOW ME TO DELETE REGIONS IN CALLBACKS!
-	if ( gfItemPopupRegionCallbackEndFix )
-	{
-		return;
-	}
-
 	UINT32 uiItemPos = MSYS_GetRegionUserData( pRegion, 0 );
 
 	//If one in our hand, place it
@@ -4291,19 +4277,7 @@ static void ItemPopupRegionCallbackPrimary(MOUSE_REGION* pRegion, UINT32 iReason
 
 static void ItemPopupRegionCallbackSecondary(MOUSE_REGION* pRegion, UINT32 iReason)
 {
-	// TO ALLOW ME TO DELETE REGIONS IN CALLBACKS!
-	if ( gfItemPopupRegionCallbackEndFix )
-	{
-		return;
-	}
-
 	UINT32 uiItemPos = MSYS_GetRegionUserData( pRegion, 0 );
-
-	// Get Description....
-	// Some global stuff here - for esc, etc
-	//Remove
-	gfItemPopupRegionCallbackEndFix = TRUE;
-
 
 	DeleteItemStackPopup( );
 
@@ -4611,7 +4585,7 @@ static void SetupPickupPage(INT8 bPage)
 	// Clear help text!
 	for ( cnt = 0; cnt < NUM_PICKUP_SLOTS; cnt++ )
 	{
-		gItemPickupMenu.Regions[cnt].SetFastHelpText(ST::null);
+		gItemPickupMenu.Regions[cnt].SetFastHelpText({});
 	}
 
 	for ( cnt = 0; cnt < iEnd; )
@@ -4635,7 +4609,7 @@ static void SetupPickupPage(INT8 bPage)
 			ST::string pStr;
 			if (GCM->getItem(o.usItem)->isAmmo() || GCM->getItem(o.usItem)->isKey())
 			{
-				pStr = ST::null;
+				pStr.clear();
 			}
 			else
 			{
@@ -5213,7 +5187,7 @@ ST::string GetHelpTextForItem(const OBJECTTYPE& obj)
 	}
 	else if (usItem == NOTHING)
 	{
-		dst = ST::null;
+		dst.clear();
 	}
 	else
 	{
@@ -5384,7 +5358,7 @@ void LoadInterfaceItemsGraphics()
 		auto path = item.to_lower();
 		if (allInventoryGraphics.find(path) == allInventoryGraphics.end()) {
 			try {
-				auto vObject = AddVideoObjectFromFile(item.c_str());
+				auto vObject = AddVideoObjectFromFile(item);
 				allInventoryGraphics.insert_or_assign(path, vObject);
 			} catch (const std::runtime_error &ex) {
 				SLOGE("Error loading small inventory graphic `{}`: {}", item, ex.what());

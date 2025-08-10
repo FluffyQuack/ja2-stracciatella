@@ -7,13 +7,11 @@
 #include "Editor_Modes.h"
 #include "EditorBuildings.h"
 #include "EditorMercs.h"
-#include "EditScreen.h"
 #include "Item_Statistics.h"
 #include "Cursor_Modes.h"
 #include "PopupMenu.h"
 #include "Simple_Render_Utils.h"
 #include "Soldier_Init_List.h"
-#include "Overhead.h"
 #include "Scheduling.h"
 #include "Input.h"
 #include "Map_Information.h"
@@ -612,21 +610,6 @@ void BtnNewCavesCallback(GUI_BUTTON *btn,UINT32 reason)
 	}
 }
 
-void BtnSaveCallback(GUI_BUTTON *btn,UINT32 reason)
-{
-	if(reason & MSYS_CALLBACK_REASON_POINTER_UP)
-	{
-		iEditorToolbarState = TBAR_MODE_SAVE;
-	}
-}
-
-void BtnLoadCallback(GUI_BUTTON *btn,UINT32 reason)
-{
-	if(reason & MSYS_CALLBACK_REASON_POINTER_UP)
-	{
-		iEditorToolbarState = TBAR_MODE_LOAD;
-	}
-}
 
 void BtnChangeTilesetCallback(GUI_BUTTON *btn,UINT32 reason)
 {
@@ -634,22 +617,6 @@ void BtnChangeTilesetCallback(GUI_BUTTON *btn,UINT32 reason)
 	{
 		btn->uiFlags |= BUTTON_CLICKED_ON;
 		iEditorToolbarState = TBAR_MODE_CHANGE_TILESET;
-	}
-}
-
-void BtnCancelCallback(GUI_BUTTON *btn,UINT32 reason)
-{
-	if(reason&MSYS_CALLBACK_REASON_POINTER_UP)
-	{
-		iEditorToolbarState = TBAR_MODE_EXIT_EDIT;
-	}
-}
-
-void BtnQuitCallback( GUI_BUTTON *btn, UINT32 reason )
-{
-	if( reason & MSYS_CALLBACK_REASON_POINTER_UP )
-	{
-		iEditorToolbarState = TBAR_MODE_QUIT_GAME;
 	}
 }
 

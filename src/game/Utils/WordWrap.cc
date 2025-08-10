@@ -29,20 +29,12 @@ inline void SkipSpace(const char32_t** codepoints)
 	}
 }
 
-static WRAPPED_STRING* AllocWrappedString(const char32_t* data, size_t size)
-{
-	WRAPPED_STRING* const ws = new WRAPPED_STRING{};
-	ws->codepoints = ST::utf32_buffer(data, size);
-	return ws;
-}
 
-
-WRAPPED_STRING* LineWrap(SGPFont font, UINT16 usLineWidthPixels, const ST::utf32_buffer& codepoints)
+WrappedString LineWrap(SGPFont font, UINT16 usLineWidthPixels, const ST::utf32_buffer& codepoints)
 {
 	size_t const max_w = usLineWidthPixels;
 
-	WRAPPED_STRING*  head   = 0;
-	WRAPPED_STRING** anchor = &head;
+	WrappedString result;
 
 	const char32_t* i = codepoints.data();
 	while (*i == U' ') ++i; // Skip leading spaces
@@ -68,10 +60,9 @@ WRAPPED_STRING* LineWrap(SGPFont font, UINT16 usLineWidthPixels, const ST::utf32
 		{
 			if (line_start != i) // Append last line
 			{
-				WRAPPED_STRING* const ws = AllocWrappedString(line_start, i - line_start);
-				*anchor = ws;
+				result.emplace_back(line_start, i - line_start);
 			}
-			return head;
+			return result;
 		}
 		size_t const w = GetCharWidth(font, *i);
 		word_w += w;
@@ -84,9 +75,7 @@ WRAPPED_STRING* LineWrap(SGPFont font, UINT16 usLineWidthPixels, const ST::utf32
 				word_start = i;
 				word_w     = 0;
 			}
-			WRAPPED_STRING* const ws = AllocWrappedString(line_start, line_end - line_start);
-			*anchor    = ws;
-			anchor     = &ws->pNextWrappedString;
+			result.emplace_back(line_start, line_end - line_start);
 			line_start = word_start;
 			line_end   = word_start;
 			line_w     = word_w;
@@ -114,12 +103,9 @@ UINT16 DisplayWrappedString(UINT16 x, UINT16 y, UINT16 w, UINT8 gap, SGPFont fon
 {
 	UINT16       total_h = 0;
 	UINT16 const h       = GetFontHeight(font) + gap;
-	for (WRAPPED_STRING* i = LineWrap(font, w, codepoints); i;)
+	for (auto const& codepoints : LineWrap(font, w, codepoints))
 	{
-		DrawTextToScreen(i->codepoints, x, y, w, font, foreground, background, flags);
-		WRAPPED_STRING* const del = i;
-		i = i->pNextWrappedString;
-		delete del;
+		DrawTextToScreen(codepoints, x, y, w, font, foreground, background, flags);
 		total_h += h;
 		y       += h;
 	}
@@ -226,7 +212,7 @@ UINT16 IanDisplayWrappedString(UINT16 sx, UINT16 sy, UINT16 max_w, UINT8 gap, SG
 				}
 
 				// reset the line
-				line_buf = ST::null;
+				line_buf.clear();
 				line_w   = 0;
 
 				SkipSpace(&i);
@@ -240,7 +226,7 @@ UINT16 IanDisplayWrappedString(UINT16 sx, UINT16 sy, UINT16 max_w, UINT8 gap, SG
 				y += h;
 
 				// reset the line
-				line_buf = ST::null;
+				line_buf.clear();
 				line_w   = 0;
 
 				// reset width
@@ -270,7 +256,7 @@ UINT16 IanDisplayWrappedString(UINT16 sx, UINT16 sy, UINT16 max_w, UINT8 gap, SG
 				h = GetFontHeight(cur_font) + gap;
 
 				// erase line string
-				line_buf = ST::null;
+				line_buf.clear();
 
 				SkipSpace(&i);
 				break;
@@ -292,7 +278,7 @@ UINT16 IanDisplayWrappedString(UINT16 sx, UINT16 sy, UINT16 max_w, UINT8 gap, SG
 				cur_max_w -= line_w;
 
 				// erase line string
-				line_buf = ST::null;
+				line_buf.clear();
 
 				SkipSpace(&i);
 				break;
@@ -307,7 +293,7 @@ UINT16 IanDisplayWrappedString(UINT16 sx, UINT16 sy, UINT16 max_w, UINT8 gap, SG
 				cur_max_w -= line_w;
 
 				// erase line string
-				line_buf = ST::null;
+				line_buf.clear();
 
 				// change color back to default color
 				cur_foreground = foreground;
@@ -341,7 +327,7 @@ UINT16 IanDisplayWrappedString(UINT16 sx, UINT16 sy, UINT16 max_w, UINT8 gap, SG
 					y += h;
 
 					// start off next line string with the word we couldn't fit
-					line_buf = ST::null;
+					line_buf.clear();
 					line_w   = 0;
 
 					// reset width
@@ -554,11 +540,13 @@ ST::string ReduceStringLength(const ST::utf32_buffer& codepoints, UINT32 widthTo
 		UINT32 charWidth = GetCharWidth(font, c);
 		if (width + charWidth + dotsWidth > widthToFitIn) break;
 		buf += c;
+		width += charWidth;
 	}
 	for (size_t i = 0; i < numDots; ++i)
 	{
 		if (width + dotWidth > widthToFitIn) break;
 		buf += dot;
+		width += dotWidth;
 	}
 	return buf;
 }

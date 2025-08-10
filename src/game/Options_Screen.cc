@@ -2,7 +2,6 @@
 #include "Font.h"
 #include "GameScreen.h"
 #include "Handle_Items.h"
-#include "Local.h"
 #include "MessageBoxScreen.h"
 #include "Timer_Control.h"
 #include "Types.h"
@@ -24,15 +23,12 @@
 #include "WorldDef.h"
 #include "GameSettings.h"
 #include "Game_Init.h"
-#include "English.h"
-#include "Overhead.h"
 #include "Gap.h"
 #include "Cursors.h"
 #include "SysUtil.h"
-#include "Exit_Grids.h"
 #include "Text.h"
 #include "Message.h"
-#include "Multi_Language_Graphic_Utils.h"
+#include "GameRes.h"
 #include "Map_Information.h"
 #include "SmokeEffects.h"
 #include "Button_System.h"
@@ -208,10 +204,6 @@ ScreenID OptionsScreenHandle()
 	RenderFastHelp();
 
 
-	ExecuteBaseDirtyRectQueue();
-	EndFrameBufferRender();
-
-
 	if( gfOptionsScreenExit )
 	{
 		ExitOptionsScreen();
@@ -267,8 +259,7 @@ static void EnterOptionsScreen(void)
 	guiOptionBackGroundImage = AddVideoObjectFromFile(INTERFACEDIR "/optionscreenbase.sti");
 
 	// load button, title graphic and add it
-	const char* const ImageFile = GetMLGFilename(MLG_OPTIONHEADER);
-	guiOptionsAddOnImages = AddVideoObjectFromFile(ImageFile);
+	guiOptionsAddOnImages = AddVideoObjectFromFile(MLG_OPTIONHEADER);
 
 	giOptionsButtonImages = LoadButtonImage(INTERFACEDIR "/optionscreenaddons.sti", 2, 3);
 
@@ -513,9 +504,6 @@ static void SetOptionsExitScreen(ScreenID);
 
 static void GetOptionsScreenUserInput(void)
 {
-	SGPPoint MousePos;
-	GetMousePos(&MousePos);
-
 	InputAtom Event;
 	while( DequeueSpecificEvent(&Event, KEYBOARD_EVENTS) )
 	{

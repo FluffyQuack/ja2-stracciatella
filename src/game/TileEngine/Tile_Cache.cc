@@ -1,6 +1,5 @@
 #include "Tile_Cache.h"
 #include "ContentManager.h"
-#include "Directories.h"
 #include "FileMan.h"
 #include "GameInstance.h"
 #include "HImage.h"
@@ -11,7 +10,6 @@
 #include "WorldDef.h"
 #include <stdexcept>
 #include <vector>
-struct AuxObjectData;
 
 
 struct TILE_CACHE_STRUCT
@@ -49,9 +47,9 @@ void InitTileCache(void)
 	{
 		TILE_CACHE_STRUCT tc;
 		tc.rootName = FileMan::getFileNameWithoutExt(file);
-		tc.pStructureFileRef = LoadStructureFile(file.c_str());
+		tc.pStructureFileRef = LoadStructureFile(file);
 
-		if (strcasecmp(tc.rootName.c_str(), "l_dead1") == 0)
+		if (tc.rootName.compare_i("l_dead1") == 0)
 		{
 			giDefaultStructIndex = (INT32)gpTileCacheStructInfo.size();
 		}
@@ -85,7 +83,7 @@ void DeleteTileCache( )
 }
 
 
-INT32 GetCachedTile(const char* const filename)
+INT32 GetCachedTile(ST::string const& filename)
 {
 	INT32 idx = -1;
 
@@ -144,7 +142,7 @@ INT32 GetCachedTile(const char* const filename)
 	tce->sHits = 1;
 
 	ST::string root_name(FileMan::getFileNameWithoutExt(filename));
-	STRUCTURE_FILE_REF* const sfr = GetCachedTileStructureRefFromFilename(root_name.c_str());
+	STRUCTURE_FILE_REF* const sfr = GetCachedTileStructureRefFromFilename(root_name);
 	tce->struct_file_ref = sfr;
 	if (sfr) AddZStripInfoToVObject(tce->pImagery->vo, sfr, TRUE, 0);
 
@@ -180,13 +178,13 @@ static STRUCTURE_FILE_REF* GetCachedTileStructureRef(INT32 const idx)
 }
 
 
-STRUCTURE_FILE_REF* GetCachedTileStructureRefFromFilename(char const* const filename)
+STRUCTURE_FILE_REF* GetCachedTileStructureRefFromFilename(ST::string const& filename)
 {
 	size_t const n = gpTileCacheStructInfo.size();
 	for (size_t i = 0; i != n; ++i)
 	{
 		TILE_CACHE_STRUCT& t = gpTileCacheStructInfo[i];
-		if (strcasecmp(t.rootName.c_str(), filename) == 0) return t.pStructureFileRef;
+		if (t.rootName.compare_i(filename) == 0) return t.pStructureFileRef;
 	}
 	return 0;
 }

@@ -1,10 +1,10 @@
 #include "Debug.h"
 #include "LoadSaveSoldierCreate.h"
-#include "FileMan.h"
 #include "LoadSaveData.h"
 #include "LoadSaveObjectType.h"
-
 #include "Logger.h"
+#include "SGPFile.h"
+#include "Soldier_Control.h"
 
 #include <string_theory/string>
 
@@ -81,14 +81,7 @@ static void ExtractSoldierCreate(const BYTE* const data, SOLDIERCREATE_STRUCT* c
 	EXTR_I16A(d, c->sPatrolGrid, lengthof(c->sPatrolGrid))
 	EXTR_I8(d, c->bPatrolCnt)
 	EXTR_BOOL(d, c->fVisible);
-	if(stracLinuxFormat)
-	{
-		c->name = d.readUTF32(SOLDIERTYPE_NAME_LENGTH);
-	}
-	else
-	{
-		c->name = d.readUTF16(SOLDIERTYPE_NAME_LENGTH);
-	}
+	c->name = d.readString(SOLDIERTYPE_NAME_LENGTH, stracLinuxFormat);
 	EXTR_U8(d, c->ubSoldierClass)
 	EXTR_BOOL(d, c->fOnRoof)
 	EXTR_I8(d, c->sSector.z)

@@ -1,15 +1,12 @@
-#include "Font_Control.h"
 #include "Morale.h"
 #include "Overhead.h"
 #include "Soldier_Profile.h"
 #include "Dialogue_Control.h"
-#include "Message.h"
 #include "Assignments.h"
 #include "Strategic_Movement.h"
 #include "Strategic_Status.h"
 #include "SkillCheck.h"
 #include "Drugs_And_Alcohol.h"
-#include "StrategicMap.h"
 #include "Debug.h"
 #include "Squads.h"
 #include "AI.h"
@@ -169,9 +166,9 @@ void DecayTacticalMoraleModifiers(void)
 				if (s->bMorale < 50)
 				{
 					BOOLEAN handle_nervous;
-					if (s->ubGroupID != 0 && PlayerIDGroupInMotion(s->ubGroupID))
+					if (s->ubGroupID != 0 && s->bAssignment <= SQUAD_20 && PlayerIDGroupInMotion(s->ubGroupID))
 					{
-						handle_nervous = NumberOfPeopleInSquad(s->ubGroupID) == 1;
+						handle_nervous = NumberOfPeopleInSquad(s->bAssignment) == 1;
 					}
 					else if (s->bInSector)
 					{
@@ -577,7 +574,7 @@ void HandleMoraleEvent(SOLDIERTYPE *pSoldier, INT8 bMoraleEvent, const SGPSector
 				if (other.ubProfile == NO_PROFILE) continue;
 
 				// We hate 'em anyways
-				if (WhichHated(other.ubProfile, pSoldier->ubProfile) != -1) continue;
+				if (WhichHated(other.ubProfile, pSoldier->ubProfile) != HATED_NOT_FOUND) continue;
 
 				MERCPROFILESTRUCT const& p = GetProfile(other.ubProfile);
 				if (p.bSex == FEMALE)
@@ -720,15 +717,15 @@ void HourlyMoraleUpdate()
 			INT8 opinion = p.bMercOpinion[other->ubProfile];
 			if (opinion == HATED_OPINION)
 			{
-				INT8 const hated = WhichHated(s->ubProfile, other->ubProfile);
+				HatedSlot const hated = WhichHated(s->ubProfile, other->ubProfile);
 				INT8 hated_time = 0;
-				if (hated > 2)
+				if (hated >= LEARNED_TO_HATE_SLOT)
 				{
 					// Learn to hate which has become full-blown hatred, full strength
 					found_hated = true;
 					break;
 				}
-				else if (hated >= 0)
+				else if (hated >= HATED_SLOT1)
 				{
 					hated_time = p.bHatedTime[hated];
 					if (p.bHatedCount[hated] <= hated_time)

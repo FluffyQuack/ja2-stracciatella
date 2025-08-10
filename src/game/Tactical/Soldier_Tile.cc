@@ -2,42 +2,27 @@
 #include "Overhead.h"
 #include "TileDef.h"
 #include "Timer_Control.h"
-#include "Render_Fun.h"
-#include "Debug.h"
 #include "Overhead_Types.h"
 #include "Soldier_Control.h"
-#include "Animation_Cache.h"
-#include "Animation_Data.h"
 #include "Animation_Control.h"
 #include "PathAI.h"
-#include "Random.h"
 #include "WorldMan.h"
 #include "Isometric_Utils.h"
-#include "Render_Dirty.h"
 #include "RenderWorld.h"
 #include "Points.h"
 #include "Lighting.h"
-#include "Weapons.h"
-#include "Handle_UI.h"
-#include "Soldier_Ani.h"
 #include "OppList.h"
 #include "AI.h"
-#include "Faces.h"
-#include "Soldier_Profile.h"
-#include "Campaign.h"
-#include "Structure_Wrap.h"
-#include "Items.h"
-#include "SoundMan.h"
+#include "Soldier_Macros.h"
 #include "Soldier_Tile.h"
 #include "Soldier_Add.h"
 #include "FOV.h"
 #include "Message.h"
 #include "Text.h"
 #include "NPC.h"
-#include "Logger.h"
 #include <algorithm>
 
-#define NEXT_TILE_CHECK_DELAY 700
+constexpr milliseconds NEXT_TILE_CHECK_DELAY = 700ms;
 
 void SetDelayedTileWaiting( SOLDIERTYPE *pSoldier, INT16 sCauseGridNo, INT8 bValue )
 {
@@ -403,8 +388,6 @@ void HandleNextTileWaiting(SOLDIERTYPE* const pSoldier)
 	{
 		if ( TIMECOUNTERDONE( pSoldier->NextTileCounter, NEXT_TILE_CHECK_DELAY ) )
 		{
-			RESETTIMECOUNTER( pSoldier->NextTileCounter, NEXT_TILE_CHECK_DELAY );
-
 			// Get direction from gridno...
 			const UINT8 bCauseDirection = GetDirectionToGridNoFromGridNo(pSoldier->sGridNo, pSoldier->sDelayedMovementCauseGridNo);
 			bBlocked = TileIsClear( pSoldier, bCauseDirection, pSoldier->sDelayedMovementCauseGridNo, pSoldier->bLevel );
@@ -497,7 +480,7 @@ void HandleNextTileWaiting(SOLDIERTYPE* const pSoldier)
 				if ( sCost > 0 )
 				{
 					// Is the next tile blocked too?
-					sNewGridNo = NewGridNo( (UINT16)pSoldier->sGridNo, DirectionInc( guiPathingData[ 0 ] ) );
+					sNewGridNo = NewGridNo(pSoldier->sGridNo, DirectionInc(guiPathingData[0]));
 
 					bPathBlocked = TileIsClear( pSoldier, guiPathingData[ 0 ], sNewGridNo, pSoldier->bLevel );
 
@@ -510,12 +493,12 @@ void HandleNextTileWaiting(SOLDIERTYPE* const pSoldier)
 							gfPlotPathToExitGrid = TRUE;
 						}
 
-						sCost = (INT16) FindBestPath( pSoldier, sCheckGridNo, pSoldier->bLevel, pSoldier->usUIMovementMode, NO_COPYROUTE, PATH_IGNORE_PERSON_AT_DEST );
+						FindBestPath(pSoldier, sCheckGridNo, pSoldier->bLevel, pSoldier->usUIMovementMode, NO_COPYROUTE, PATH_IGNORE_PERSON_AT_DEST);
 
 						gfPlotPathToExitGrid = FALSE;
 
 						// Is the next tile in this new path blocked too?
-						sNewGridNo = NewGridNo( (UINT16)pSoldier->sGridNo, DirectionInc( guiPathingData[ 0 ] ) );
+						sNewGridNo = NewGridNo(pSoldier->sGridNo, DirectionInc(guiPathingData[0]));
 
 						bPathBlocked = TileIsClear( pSoldier, guiPathingData[ 0 ], sNewGridNo, pSoldier->bLevel );
 
@@ -600,7 +583,10 @@ void HandleNextTileWaiting(SOLDIERTYPE* const pSoldier)
 								// check to see if we're there now!
 								if (pSoldier->sGridNo == pSoldier->sAbsoluteFinalDestination)
 								{
-									NPCReachedDestination(pSoldier, FALSE);
+									if (pSoldier->ubProfile != NO_PROFILE)
+									{
+										NPCReachedDestination(pSoldier, FALSE);
+									}
 									pSoldier->bNextAction = AI_ACTION_WAIT;
 									pSoldier->usNextActionData = 500;
 									return;
@@ -700,6 +686,12 @@ BOOLEAN CanExchangePlaces( SOLDIERTYPE *pSoldier1, SOLDIERTYPE *pSoldier2, BOOLE
 			if ( ( gAnimControl[ pSoldier1->usAnimState ].uiFlags & ANIM_MOVING ) && !(gTacticalStatus.uiFlags & INCOMBAT) )
 			{
 				return( FALSE );
+			}
+
+			if (!InternalIsValidStance(pSoldier1, pSoldier2->bDirection, GetStance(*pSoldier2)) ||
+			    !InternalIsValidStance(pSoldier2, pSoldier1->bDirection, GetStance(*pSoldier1)))
+			{
+				return false;
 			}
 
 			if ( pSoldier2->bSide == 0 )

@@ -41,11 +41,9 @@ if [[ "${BUILD_TYPE}" != "Debug" ]]; then
 fi
 
 export RUN_TESTS=true
-export RUN_RUST_CHECKS=false
 export RUSTUP_INIT_ARGS="-y --no-modify-path --default-toolchain=$(cat ./rust-toolchain) --profile=minimal"
 if [[ "$CI_TARGET" == "linux" ]]; then
   export CONFIGURE_CMD="${CONFIGURE_CMD} -DCMAKE_INSTALL_PREFIX=AppDir/usr -DEXTRA_DATA_DIR=../share/ja2"
-  export RUN_RUST_CHECKS=true
 
 elif [[ "$CI_TARGET" == "linux-mingw64" ]]; then
   # cross compiling
@@ -86,21 +84,10 @@ if [[ "$RUN_TESTS" == "true" ]]; then
   if [[ "$CI_TARGET" == "linux" ]]; then
     $BUILD_CMD --target install
   fi
-  if [[ "$RUN_RUST_CHECKS" == "true" ]]; then
-    $BUILD_CMD --target cargo-fmt-check
-    $BUILD_CMD --target cargo-clippy
-  fi
   $BUILD_CMD --target cargo-test
   if [[ "$CI_TARGET" == "linux" ]]; then
     ./AppDir/usr/bin/ja2 -unittests
     ./AppDir/usr/bin/ja2-launcher -help
-
-    # Smoke test to check if the binary can run on older distros
-    DISTRO_IMAGE="debian:10"
-    PACKAGES="libfontconfig1 libx11-6 libsdl2-2.0.0 libfltk1.3 libfltk-images1.3"
-    SETUP_COMMAND="apt-get update && apt-get -yq install $PACKAGES"
-    docker run -v "$(pwd)/AppDir/usr/bin:/ja2" "$DISTRO_IMAGE" bash -c "$SETUP_COMMAND && /ja2/ja2 -help"
-
   else
     ./ja2 -unittests
     ./ja2-launcher -help

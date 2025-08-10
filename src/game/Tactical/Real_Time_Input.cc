@@ -2,37 +2,21 @@
 #include "Real_Time_Input.h"
 #include "Soldier_Find.h"
 #include "Turn_Based_Input.h"
-#include "PathAI.h"
 #include "Soldier_Control.h"
 #include "Animation_Control.h"
-#include "Animation_Data.h"
 #include "Timer_Control.h"
 #include "Handle_UI.h"
 #include "Isometric_Utils.h"
 #include "Input.h"
 #include "Overhead.h"
 #include "Interface.h"
-#include "Cursor_Control.h"
-#include "Points.h"
 #include "Interactive_Tiles.h"
 #include "Interface_Cursors.h"
-#include "Environment.h"
-#include "OppList.h"
 #include "Spread_Burst.h"
-#include "Overhead_Map.h"
-#include "World_Items.h"
-#include "Game_Clock.h"
 #include "Interface_Items.h"
 #include "UI_Cursors.h"
-#include "StrategicMap.h"
-#include "Soldier_Profile.h"
-#include "Soldier_Create.h"
-#include "Soldier_Add.h"
 #include "Dialogue_Control.h"
 #include "Interface_Dialogue.h"
-#include "Tile_Animation.h"
-#include "Merc_Entering.h"
-#include "Explosion_Control.h"
 #include "Message.h"
 #include "Strategic_Exit_GUI.h"
 #include "Assignments.h"
@@ -96,7 +80,7 @@ static void QueryRTMiddleButton(UIEventKind* const puiNewEvent)
 		}
 		else
 		{
-			if ( fMiddleButtonDown )
+			if ( fMiddleButtonDown && !_KeyDown(SHIFT) )
 			{
 				// OK , FOR DOUBLE CLICKS - TAKE TIME STAMP & RECORD EVENT
 				if ( ( GetJA2Clock() - uiSingleClickTime ) < 300 )
@@ -406,7 +390,7 @@ static void QueryRTLeftButton(UIEventKind* const puiNewEvent)
 						}
 
 						// CHECK IF WE CLICKED-HELD
-						if ( COUNTERDONE( LMOUSECLICK_DELAY_COUNTER ) && gpItemPointer != NULL )
+						if (COUNTERDONE(LMOUSECLICK_DELAY_COUNTER, false))
 						{
 							// LEFT CLICK-HOLD EVENT
 							// Switch on UI mode
@@ -888,7 +872,7 @@ static void QueryRTRightButton(UIEventKind* const puiNewEvent)
 			else
 			{
 				// IF HERE, DO A CLICK-HOLD IF IN INTERVAL
-				if ( COUNTERDONE( RMOUSECLICK_DELAY_COUNTER ) && !fClickHoldIntercepted )
+				if (COUNTERDONE(RMOUSECLICK_DELAY_COUNTER, false) && !fClickHoldIntercepted)
 				{
 					if ( gpItemPointer == NULL )
 					{
@@ -1383,6 +1367,9 @@ void TacticalViewPortTouchCallbackRT(MOUSE_REGION* region, UINT32 reason) {
 					gfPlotNewMovement = TRUE;
 					guiPendingOverrideEvent = A_CHANGE_TO_MOVE;
 					break;
+				case CONFIRM_ACTION_MODE:
+					gfPlotNewMovement = TRUE;
+					guiPendingOverrideEvent = M_CHANGE_TO_ACTION;
 				default:
 					break;
 			}
@@ -1392,11 +1379,27 @@ void TacticalViewPortTouchCallbackRT(MOUSE_REGION* region, UINT32 reason) {
 			{
 				case MOVE_MODE:
 				case CONFIRM_MOVE_MODE:
-					guiPendingOverrideEvent = P_PANMODE;
+					TogglePanMode();
 					break;
 				default:
 					break;
 			}
+		}
+	} else if (reason & MSYS_CALLBACK_REASON_MBUTTON_DWN) {
+		if (_KeyDown(SHIFT) && gpItemPointer == NULL) {
+			switch( gCurrentUIMode )
+			{
+				case MOVE_MODE:
+				case CONFIRM_MOVE_MODE:
+					TogglePanMode();
+					break;
+				default:
+					break;
+			}
+		}
+	} else if (reason & MSYS_CALLBACK_REASON_MBUTTON_UP) {
+		if (gCurrentUIMode == PAN_MODE) {
+			TogglePanMode();
 		}
 	} else if (reason & MSYS_CALLBACK_REASON_TFINGER_UP) {
 		auto selected = GetSelectedMan();
@@ -1416,8 +1419,6 @@ void TacticalViewPortTouchCallbackRT(MOUSE_REGION* region, UINT32 reason) {
 			{
 				case MOVE_MODE:
 				case CONFIRM_MOVE_MODE:
-				case ACTION_MODE:
-				case CONFIRM_ACTION_MODE:
 				case LOOKCURSOR_MODE:
 				case HANDCURSOR_MODE:
 				case TALKCURSOR_MODE:
@@ -1436,12 +1437,17 @@ void TacticalViewPortTouchCallbackRT(MOUSE_REGION* region, UINT32 reason) {
 						}
 					}
 					break;
+				case ACTION_MODE:
+				case CONFIRM_ACTION_MODE:
+					// If we went up in action mode, change to confirm action mode
+					gfPlotNewMovement = TRUE;
+					guiPendingOverrideEvent = CA_ON_TERRAIN;
+					break;
 				case ADJUST_STANCE_MODE:
 					guiPendingOverrideEvent = PADJ_ADJUST_STANCE;
 					break;
 				case PAN_MODE:
-					// If we are in pan mode, end pan mode
-					guiPendingOverrideEvent = A_CHANGE_TO_MOVE;
+					TogglePanMode();
 					break;
 				default:
 					break;

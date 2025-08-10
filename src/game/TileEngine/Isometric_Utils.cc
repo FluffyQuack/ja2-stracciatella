@@ -7,7 +7,6 @@
 #include "math.h"
 #include "WorldMan.h"
 #include "Structure_Wrap.h"
-#include "Sys_Globals.h"
 #include "Overhead.h"
 #include "Random.h"
 #include "PathAI.h"
@@ -15,18 +14,6 @@
 
 
 // GLOBALS
-const INT16 DirIncrementer[8] =
-{
-	-MAPWIDTH,        //N
-	1-MAPWIDTH,       //NE
-	1,                //E
-	1+MAPWIDTH,       //SE
-	MAPWIDTH,         //S
-	MAPWIDTH-1,       //SW
-	-1,               //W
-	-MAPWIDTH-1       //NW
-};
-
 
 // DIRECTION FACING    DIRECTION WE WANT TO GOTO
 UINT8 const gPurpendicularDirection[NUM_WORLD_DIRECTIONS][NUM_WORLD_DIRECTIONS] =
@@ -184,8 +171,7 @@ BOOLEAN GetMouseWorldCoords( INT16 *psMouseX, INT16 *psMouseY )
 		return( FALSE );
 	}
 
-	SGPPoint cursorPosition;
-	GetCursorPos(cursorPosition);
+	auto const cursorPosition{ GetCursorPos() };
 	sOffsetX = cursorPosition.iX - ( g_ui.m_tacticalMapCenterX ); // + gsRenderWorldOffsetX;
 	sOffsetY = cursorPosition.iY - ( g_ui.m_tacticalMapCenterY ) + 10;// + gsRenderWorldOffsetY;
 
@@ -204,7 +190,7 @@ BOOLEAN GetMouseWorldCoords( INT16 *psMouseX, INT16 *psMouseY )
 
 
 	// check if we are out of bounds..
-	if ( sStartPointX_W < 0 || sStartPointX_W >= WORLD_COORD_ROWS || sStartPointY_W < 0 || sStartPointY_W >= WORLD_COORD_COLS )
+	if (sStartPointX_W < 0 || sStartPointX_W >= WORLD_COORD_COLS || sStartPointY_W < 0 || sStartPointY_W >= WORLD_COORD_ROWS)
 	{
 		*psMouseX = 0;
 		*psMouseY = 0;

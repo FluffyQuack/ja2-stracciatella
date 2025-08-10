@@ -1,6 +1,7 @@
 #include "Directories.h"
 #include "Font_Control.h"
 #include "Handle_Items.h"
+#include "ItemModel.h"
 #include "LoadSaveData.h"
 #include "Soldier_Profile.h"
 #include "Types.h"
@@ -34,7 +35,6 @@
 #include "Game_Clock.h"
 #include "Handle_Doors.h"
 #include "Map_Screen_Interface.h"
-#include "FileMan.h"
 
 #include "ContentManager.h"
 #include "GameInstance.h"
@@ -645,7 +645,7 @@ BOOLEAN AttemptToBlowUpLock( SOLDIERTYPE * pSoldier, DOOR * pDoor )
 
 		// Not sure if this makes sense, but the explosive is small.
 		// Double the damage here as we are damaging a lock rather than a person
-		if (pDoor->damageLock(Explosive[GCM->getItem(SHAPED_CHARGE)->getClassIndex()].ubDamage * 2))
+		if (pDoor->damageLock(GCM->getExplosive(SHAPED_CHARGE)->getBlastEffect()->damage * 2))
 		{
 			// Lock destroyed, award experience points?
 			return( TRUE );

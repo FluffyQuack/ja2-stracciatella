@@ -7,6 +7,7 @@ set(STRACCIATELLA_BIN_ja2-resource-pack "${STRACCIATELLA_DIR}/bin/ja2-resource-p
 
 # find cargo and rustc
 file(READ "${CMAKE_SOURCE_DIR}/rust-toolchain" MIN_RUST_VERSION)
+string(STRIP "${MIN_RUST_VERSION}" MIN_RUST_VERSION)
 find_package(Cargo ${MIN_RUST_VERSION} REQUIRED)
 find_package(Rustc ${MIN_RUST_VERSION} REQUIRED)
 if (MINGW)
@@ -65,7 +66,14 @@ configure_file(
 )
 
 # build
-set(OUT_PROFILE "$<$<CONFIG:Debug>:debug>$<$<NOT:$<CONFIG:Debug>>:release>") # XXX only use this where generator expressions are supported
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(OUT_PROFILE "debug")
+elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    set(OUT_PROFILE "release-with-debug")
+else()
+    set(OUT_PROFILE "release")
+endif()
+
 set(OUT_DIR "${CARGO_BUILD_TARGET_DIR}/${CARGO_BUILD_TARGET}/${OUT_PROFILE}")
 set(OUT_LIB "${OUT_DIR}/${RUSTC_STATICLIB_PREFIX}stracciatella_c_api${RUSTC_STATICLIB_SUFFIX}")
 set(OUT_BIN_ja2-resource-pack "${OUT_DIR}/ja2-resource-pack${RUSTC_BIN_SUFFIX}")
@@ -107,7 +115,7 @@ if (UNIX AND NOT MINGW AND NOT ANDROID)
         set(ADDITIONAL_LIBS dl pthread)
     endif()
 elseif(MINGW)
-    set(ADDITIONAL_LIBS bcrypt ws2_32 shell32 advapi32 userenv gcc_eh pthread)
+    set(ADDITIONAL_LIBS bcrypt ws2_32 shell32 advapi32 userenv gcc_eh pthread ntdll)
 elseif(MSVC)
     set(ADDITIONAL_LIBS bcrypt ws2_32 shell32 advapi32 userenv)
 else()
@@ -137,14 +145,31 @@ function (add_cargo_target target command)
         message(FATAL_ERROR "not a cargo command: ${command}")
     endif()
 endfunction()
+# Clippy does not work well with RUSTC_WRAPPER so we need to remove it for this target
+function (add_cargo_clippy_target target command)
+    if ("${command}" MATCHES "^cargo clippy (.*)$")
+        string(REPLACE " " ";" args "${CMAKE_MATCH_1}") # FIXME this only works when no argument has spaces
+        set(CLIPPY_ENV ${CARGO_ENV})
+        list(FILTER CLIPPY_ENV EXCLUDE REGEX "^RUSTC_WRAPPER")
+        add_custom_target(${target}
+            COMMAND ${CMAKE_COMMAND} -E env ${CLIPPY_ENV} ${CARGO_EXECUTABLE} clippy ${args}
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/rust"
+            COMMENT "${command}"
+            VERBATIM
+        )
+    else()
+        message(FATAL_ERROR "not a cargo command: ${command}")
+    endif()
+endfunction()
 add_cargo_target(cargo-build-debug "cargo build --verbose ${CARGO_WORKSPACE_FLAGS}")
 add_cargo_target(cargo-build-release "cargo build --verbose --release ${CARGO_WORKSPACE_FLAGS}")
+add_cargo_target(cargo-build-release-with-debug "cargo build --verbose --profile release-with-debug ${CARGO_WORKSPACE_FLAGS}")
 add_cargo_target(cargo-fmt "cargo fmt --verbose")
 add_cargo_target(cargo-test-debug "cargo test --verbose")
 add_cargo_target(cargo-test-release "cargo test --verbose --release")
 add_cargo_target(cargo-fmt-check "cargo fmt --verbose -- --check")
-add_cargo_target(cargo-clippy-debug "cargo clippy --all-targets --all-features --verbose -- -D warnings")
-add_cargo_target(cargo-clippy-release "cargo clippy --all-targets --all-features --verbose --release -- -D warnings")
+add_cargo_clippy_target(cargo-clippy-debug "cargo clippy --all-targets --all-features --verbose -- -D warnings")
+add_cargo_clippy_target(cargo-clippy-release "cargo clippy --all-targets --all-features --verbose --release -- -D warnings")
 add_custom_target(cargo-test COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}" --target "cargo-test-${OUT_PROFILE}")
 add_custom_target(cargo-build COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}" --target "cargo-build-${OUT_PROFILE}")
 add_custom_target(cargo-clippy COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}" --target "cargo-clippy-${OUT_PROFILE}")

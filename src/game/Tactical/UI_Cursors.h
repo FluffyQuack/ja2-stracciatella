@@ -1,14 +1,10 @@
 #ifndef __UI_CURSORS_H
 #define __UI_CURSORS_H
 
+#include "Handle_UI.h"
 #include "Interface_Cursors.h"
-
-
-#define REFINE_PUNCH_1 0
-#define REFINE_PUNCH_2 6
-
-#define REFINE_KNIFE_1 0
-#define REFINE_KNIFE_2 6
+#include "Item_Types.h"
+#include "JA2Types.h"
 
 
 UICursorID GetProperItemCursor(SOLDIERTYPE*, GridNo map_pos, BOOLEAN activated);

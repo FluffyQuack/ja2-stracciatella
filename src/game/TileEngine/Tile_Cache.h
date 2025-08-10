@@ -1,12 +1,8 @@
 #ifndef __TILE_CACHE_H
 #define __TILE_CACHE_H
 
-
-#include "Types.h"
+#include "JA2Types.h"
 #include <string_theory/string>
-struct LEVELNODE;
-struct STRUCTURE_FILE_REF;
-struct TILE_IMAGERY;
 
 
 #define TILE_CACHE_START_INDEX 36000
@@ -27,10 +23,10 @@ extern TILE_CACHE_ELEMENT* gpTileCache;
 void InitTileCache(void);
 void DeleteTileCache(void);
 
-INT32 GetCachedTile(const char* cFilename);
+INT32 GetCachedTile(ST::string const& filename);
 void  RemoveCachedTile(INT32 cached_tile);
 
-STRUCTURE_FILE_REF* GetCachedTileStructureRefFromFilename(const char* cFilename);
+STRUCTURE_FILE_REF* GetCachedTileStructureRefFromFilename(ST::string const& filename);
 
 void CheckForAndAddTileCacheStructInfo( LEVELNODE *pNode, INT16 sGridNo, UINT16 usIndex, UINT16 usSubIndex );
 void CheckForAndDeleteTileCacheStructInfo( LEVELNODE *pNode, UINT16 usIndex );

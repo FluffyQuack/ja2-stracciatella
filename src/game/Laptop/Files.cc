@@ -3,21 +3,19 @@
 #include "HImage.h"
 #include "Laptop.h"
 #include "Files.h"
-#include "Game_Clock.h"
 #include "LoadSaveData.h"
 #include "MercPortrait.h"
+#include "Object_Cache.h"
 #include "Soldier_Control.h"
 #include "Soldier_Profile.h"
 #include "VObject.h"
 #include "Debug.h"
 #include "WordWrap.h"
-#include "Render_Dirty.h"
 #include "Cursors.h"
 #include "Text.h"
 #include "Button_System.h"
 #include "VSurface.h"
 #include "Font_Control.h"
-#include "FileMan.h"
 
 #include "ContentManager.h"
 #include "GameInstance.h"
@@ -95,7 +93,7 @@ enum
 
 
 // the highlighted line
-static INT32 iHighLightFileLine = -1;
+static INT32 iHighLightFileLine;
 
 
 // the files record list
@@ -113,10 +111,10 @@ static BOOLEAN fWaitAFrame = FALSE;
 // are there any new files
 BOOLEAN fNewFilesInFileViewer = FALSE;
 
+namespace {
 // graphics handles
-static SGPVObject* guiTITLE;
-static SGPVObject* guiTOP;
-
+cache_key_t const guiTOP{ LAPTOPDIR "/fileviewer.sti" };
+}
 
 // currewnt page of multipage files we are on
 static INT32 giFilesPage = 0;
@@ -145,16 +143,10 @@ static FileInfo const g_file_info[] =
 
 
 // buttons for next and previous pages
+// (previous button at index 0, next button at index 1)
 static GUIButtonRef giFilesPageButtons[2];
 static MOUSE_REGION g_scroll_region;
 
-
-// the previous and next pages buttons
-
-enum{
-	PREVIOUS_FILES_PAGE_BUTTON=0,
-	NEXT_FILES_PAGE_BUTTON,
-};
 // mouse regions
 static MOUSE_REGION pFilesRegions[MAX_FILES_PAGE];
 
@@ -193,6 +185,7 @@ void GameInitFiles(void)
 {
 	GCM->tempFiles()->deleteFile(FILES_DATA_FILE);
 	ClearFilesList( );
+	iHighLightFileLine = -1;
 
 	// add background check by RIS
 	AddFilesToPlayersLog(ENRICO_BACKGROUND);
@@ -202,15 +195,11 @@ void GameInitFiles(void)
 static void CreateButtonsForFilesPage(void);
 static void HandleFileViewerButtonStates(void);
 static void InitializeFilesMouseRegions(void);
-static void LoadFiles(void);
 static void OpenFirstUnreadFile(void);
 
 
 void EnterFiles(void)
 {
-	// load grpahics for files system
-	LoadFiles( );
-
 	// in files mode now, set the fact
 	fInFilesMode=TRUE;
 
@@ -298,7 +287,7 @@ void RenderFiles(void)
 static void RenderFilesBackGround(void)
 {
 	// render generic background for file system
-	BltVideoObject(FRAME_BUFFER, guiTITLE, 0, TOP_X, TOP_Y -  2);
+	BltVideoObject(FRAME_BUFFER, guiTITLEBARLAPTOP, 0, TOP_X, TOP_Y - 2);
 	BltVideoObject(FRAME_BUFFER, guiTOP,   0, TOP_X, TOP_Y + 22);
 }
 
@@ -311,23 +300,10 @@ static void DrawFilesTitleText(void)
 }
 
 
-static void LoadFiles(void)
-{
-	// load files video objects into memory
-
-	// title bar
-	guiTITLE = AddVideoObjectFromFile(LAPTOPDIR "/programtitlebar.sti");
-
-	// top portion of the screen background
-	guiTOP = AddVideoObjectFromFile(LAPTOPDIR "/fileviewer.sti");
-}
-
-
 static void RemoveFiles(void)
 {
 	// delete files video objects from memory
-	DeleteVideoObject(guiTOP);
-	DeleteVideoObject(guiTITLE);
+	RemoveVObject(guiTOP);
 }
 
 
@@ -527,9 +503,18 @@ static void DisplayFormattedText(void)
 
 	// Get the file that was highlighted
 	FilesUnit* fu = pFilesListHead;
-	for (INT32 n = iHighLightFileLine; n != 0; --n)
+	for (INT32 n = iHighLightFileLine; n != 0 && fu != nullptr; --n)
 	{
 		fu = fu->Next;
+	}
+
+	if (fu == nullptr)
+	{
+		// iHighLiftFileLine can be stale if one quits out of a game where the
+		// terrorist files were available and then loads a game where they are
+		// not. Reset state to initial in this case.
+		iHighLightFileLine = -1;
+		return;
 	}
 
 	fu->fRead = TRUE;

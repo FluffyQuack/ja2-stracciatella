@@ -1,3 +1,4 @@
+#include "Campaign_Types.h"
 #include "Directories.h"
 #include "Interface_Control.h"
 #include "Interface_Panels.h"
@@ -8,16 +9,9 @@
 #include "math.h"
 #include "WorldDef.h"
 #include "Soldier_Control.h"
-#include "Animation_Data.h"
 #include "Render_Fun.h"
-#include "Render_Dirty.h"
-#include "MouseSystem.h"
 #include "Interface.h"
-#include "SysUtil.h"
-#include "FileMan.h"
-#include "Points.h"
 #include "Random.h"
-#include "AI.h"
 #include "Soldier_Ani.h"
 #include "Overhead.h"
 #include "Soldier_Profile.h"
@@ -30,9 +24,7 @@
 #include "Weapons.h"
 #include "Strategic_Town_Loyalty.h"
 #include "Squads.h"
-#include "Tactical_Save.h"
 #include "Quests.h"
-#include "AIM.h"
 #include "Interface_Dialogue.h"
 #include "GameSettings.h"
 #include "Interface_Utils.h"
@@ -41,7 +33,6 @@
 #include "Map_Information.h"
 #include "History.h"
 #include "Personnel.h"
-#include "Environment.h"
 #include "Items.h"
 #include "GameRes.h"
 #include "Faces.h"
@@ -52,6 +43,7 @@
 #include "content/ContentMercs.h"
 #include "WeaponModels.h"
 #include "MercProfile.h"
+#include "Strategic.h"
 
 extern BOOLEAN gfProfileDataLoaded;
 
@@ -128,8 +120,8 @@ static void StartSomeMercsOnAssignment(void);
 
 void LoadMercProfiles()
 {
-	{ AutoSGPFile f(GCM->openGameResForReading(BINARYDATADIR "/prof.dat"));
-		LoadRawMercProfiles(f, NUM_PROFILES, gMercProfiles, getDataFilesEncodingCorrector());
+	{
+		GCM->resetMercProfileStructs();
 		for (UINT32 i = 0; i != NUM_PROFILES; ++i)
 		{
 			MERCPROFILESTRUCT& p = gMercProfiles[i];
@@ -216,8 +208,6 @@ void LoadMercProfiles()
 
 	// no better place..heh?.. will load faces for profiles that are 'extern'.....won't have soldiertype instances
 	PreloadExternalNPCFaces();
-
-	LoadCarPortraitValues();
 }
 
 
@@ -810,23 +800,12 @@ BOOLEAN UnRecruitEPC(ProfileID const pid)
 	p.ubMiscFlags &= ~PROFILE_MISC_FLAG_EPCACTIVE;
 
 	// update sector values to current
+	p.sSector = s->sSector;
 
-	// check to see if this person should disappear from the map after this
-	if ((pid == JOHN || pid == MARY) &&
-			s->sSector.x == 13            &&
-			s->sSector.y == MAP_ROW_B     &&
-			s->sSector.z == 0)
-	{
-		p.sSector = SGPSector();
-	}
-	else
-	{
-		p.sSector = s->sSector;
-	}
-
-	// how do we decide whether or not to set this?
-	p.fUseProfileInsertionInfo  = TRUE;
-	p.ubMiscFlags3             |= PROFILE_MISC_FLAG3_PERMANENT_INSERTION_CODE;
+	p.ubMiscFlags3 |= PROFILE_MISC_FLAG3_PERMANENT_INSERTION_CODE;
+	p.ubStrategicInsertionCode = INSERTION_CODE_GRIDNO;
+	p.usStrategicInsertionData = s->sGridNo;
+	p.fUseProfileInsertionInfo = TRUE;
 
 	ChangeSoldierTeam(s, CIV_TEAM);
 	UpdateTeamPanelAssignments();
@@ -834,52 +813,52 @@ BOOLEAN UnRecruitEPC(ProfileID const pid)
 }
 
 
-INT8 WhichBuddy( UINT8 ubCharNum, UINT8 ubBuddy )
+BuddySlot WhichBuddy( UINT8 ubCharNum, UINT8 ubBuddy )
 {
 	if (ubCharNum == NO_PROFILE)
 	{
-		return -1;
+		return BUDDY_NOT_FOUND;
 	}
 
 	MERCPROFILESTRUCT const& p = GetProfile(ubCharNum);
-	for (INT8 bLoop = 0; bLoop < 3; bLoop++)
+	for (INT8 bLoop = BUDDY_SLOT1; bLoop < NUM_BUDDY_SLOTS; bLoop++)
 	{
 		if (p.bBuddy[bLoop] == ubBuddy)
 		{
-			return( bLoop );
+			return static_cast<BuddySlot>(bLoop);
 		}
 	}
-	return( -1 );
+	return BUDDY_NOT_FOUND;
 }
 
-INT8 WhichHated( UINT8 ubCharNum, UINT8 ubHated )
+HatedSlot WhichHated( UINT8 ubCharNum, UINT8 ubHated )
 {
 	INT8								bLoop;
 
 	MERCPROFILESTRUCT const& p = GetProfile(ubCharNum);
 
-	for (bLoop = 0; bLoop < 3; bLoop++)
+	for (bLoop = HATED_SLOT1; bLoop < NUM_HATED_SLOTS; bLoop++)
 	{
 		if (p.bHated[bLoop] == ubHated)
 		{
-			return( bLoop );
+			return static_cast<HatedSlot>(bLoop);
 		}
 	}
-	return( -1 );
+	return HATED_NOT_FOUND;
 }
 
 
-INT8 GetFirstBuddyOnTeam(MERCPROFILESTRUCT const& p)
+BuddySlot GetFirstBuddyOnTeam(MERCPROFILESTRUCT const& p)
 {
-	for (INT i = 0; i != 3; ++i)
+	for (INT i = BUDDY_SLOT1; i < NUM_BUDDY_SLOTS; ++i)
 	{
 		INT8 const buddy = p.bBuddy[i];
 		if (buddy < 0)                     continue;
 		if (!IsMercOnTeam(buddy))          continue;
 		if (IsMercDead(GetProfile(buddy))) continue;
-		return buddy;
+		return static_cast<BuddySlot>(i);
 	}
-	return -1;
+	return BUDDY_NOT_FOUND;
 }
 
 
@@ -999,7 +978,7 @@ SOLDIERTYPE* SwapLarrysProfiles(SOLDIERTYPE* const s)
 */
 
 	memcpy(dst.bInvStatus, src.bInvStatus, sizeof(dst.bInvStatus));
-	memcpy(dst.bInvNumber, src.bInvStatus, sizeof(dst.bInvNumber));
+	memcpy(dst.bInvNumber, src.bInvNumber, sizeof(dst.bInvNumber));
 	memcpy(dst.inv,        src.inv,        sizeof(dst.inv));
 
 	DeleteSoldierFace(s);

@@ -1,12 +1,10 @@
 #include "LoadingScreenModel.h"
 
-#include "Campaign_Types.h"
-#include "Directories.h"
-#include "JsonObject.h"
 #include "Loading_Screen.h"
 
 #include <map>
 #include <stdexcept>
+#include <utility>
 
 const std::vector<LoadingScreen> PREDEFINED_SCREENS = {
 	LoadingScreen(LOADINGSCREEN_NOTHING,     "NOTHING",     "/ls_heli.sti"),
@@ -41,8 +39,8 @@ const std::vector<LoadingScreen> PREDEFINED_SCREENS = {
 	LoadingScreen(LOADINGSCREEN_NIGHTSAM,      "NIGHTSAM",      "/ls_nightsam.sti")
 };
 
-LoadingScreenModel::LoadingScreenModel(std::vector<LoadingScreen> screensList_, std::vector<LoadingScreenMapping> screensMapping_)
-	: screensList(screensList_), screensMapping(screensMapping_) {}
+LoadingScreenModel::LoadingScreenModel(std::vector<LoadingScreen>&& screensList_, std::vector<LoadingScreenMapping>&& screensMapping_)
+	: screensList(std::move(screensList_)), screensMapping(std::move(screensMapping_)) {}
 
 const LoadingScreen* LoadingScreenModel::getScreenForSector(uint8_t sectorId, uint8_t sectorLevel, bool isNight) const
 {
@@ -78,30 +76,28 @@ void LoadingScreenModel::validateData(ContentManager* cm) const
 	}
 }
 
-LoadingScreenModel* LoadingScreenModel::deserialize(const rapidjson::Value& screensList, const rapidjson::Value& screensMapping)
+LoadingScreenModel* LoadingScreenModel::deserialize(const JsonValue& screensList, const JsonValue& screensMapping)
 {
 	std::vector<LoadingScreen> screens = PREDEFINED_SCREENS;
 	size_t index = screens.size();
-	for (auto& item : screensList.GetArray())
+	for (auto& item : screensList.toVec())
 	{
-		JsonObjectReader r(item);
-		screens.push_back(
-			LoadingScreen(index++, r.GetString("internalName"), r.GetString("filename"))
-		);
+		auto r = item.toObject();
+		screens.emplace_back(static_cast<uint8_t>(index++), r.GetString("internalName"), r.GetString("filename"));
 	}
 
-	std::map<std::string, uint8_t> namesMapping;
+	std::map<ST::string, uint8_t> namesMapping;
 	for (index = 0; index < screens.size(); index++)
 	{
-		std::string name = screens[index].internalName.to_std_string();
+		ST::string const& name = screens[index].internalName;
 		namesMapping[name] = static_cast<uint8_t>(index);
 	}
 
 
 	std::vector<LoadingScreenMapping> mappings;
-	for (auto& item : screensMapping.GetArray())
+	for (auto& item : screensMapping.toVec())
 	{
-		JsonObjectReader r(item);
+		auto r = item.toObject();
 		uint8_t sectorId = SGPSector::FromShortString(r.GetString("sector")).AsByte();
 		mappings.push_back(LoadingScreenMapping{
 			sectorId,
@@ -111,7 +107,7 @@ LoadingScreenModel* LoadingScreenModel::deserialize(const rapidjson::Value& scre
 			});
 	}
 
-	return new LoadingScreenModel(screens, mappings);
+	return new LoadingScreenModel(std::move(screens), std::move(mappings));
 }
 
 

@@ -6,9 +6,7 @@
 * Derek Beland, May 28, 1997
 *********************************************************************************/
 
-#include "Buffer.h"
 #include "Debug.h"
-#include "FileMan.h"
 #include "Random.h"
 #include "SoundMan.h"
 #include "Timer.h"
@@ -557,7 +555,6 @@ static int SoundServiceBuffers(void *_ptr)
 			}
 			fBuffersNeedService = FALSE;
 		}
-		lk.unlock();
 	}
 }
 
@@ -1024,7 +1021,6 @@ static BOOLEAN SoundInitHardware(void)
 			}
 		}
 
-		fShutdownBufferServiceThread = FALSE;
 		bufferServiceThread = SDL_CreateThread(SoundServiceBuffers, "SoundManBufferServiceThread", (void *)NULL);
 		if (bufferServiceThread == NULL) {
 			throw std::runtime_error(ST::format("SDL_CreateThread for SoundManBufferServiceThread returned error: {}", SDL_GetError()).c_str());

@@ -1,5 +1,6 @@
 package io.github.ja2stracciatella
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -15,8 +16,6 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 import java.io.IOException
 
@@ -30,12 +29,12 @@ class LauncherActivity : AppCompatActivity() {
         prettyPrint = true
     }
     private val ja2JsonFilename = ".ja2/ja2.json"
-    private val gameDirKey = "game_dir"
-    private val saveGameDirKey = "save_game_dir"
+    private lateinit var configurationModel: ConfigurationModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        configurationModel = ViewModelProvider(this)[ConfigurationModel::class.java]
         binding = ActivityLauncherBinding.inflate(layoutInflater)
         val view = binding.root
 
@@ -107,13 +106,40 @@ class LauncherActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
+    fun getRecommendedResolution(): Resolution {
+        val screenWidth =
+            Integer.max(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels)
+        val screenHeight =
+            Integer.min(resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels)
+        val scalingX = screenWidth.toDouble() / Resolution.DEFAULT.width.toDouble()
+        val scalingY = screenHeight.toDouble() / Resolution.DEFAULT.height.toDouble()
+        val scaling = java.lang.Double.min(scalingX, scalingY)
+
+        if (configurationModel.scalingQuality.value == ScalingQuality.PERFECT) {
+            val scalingInt = scaling.toInt()
+            val width =
+                Resolution.DEFAULT.width + ((screenWidth - Resolution.DEFAULT.width.toInt() * scalingInt) / scalingInt).toUInt()
+            val height =
+                Resolution.DEFAULT.height + ((screenHeight - Resolution.DEFAULT.height.toInt() * scalingInt) / scalingInt).toUInt()
+            return Resolution(width - (width % 2u), height - (height % 2u))
+        }
+        val width =
+            Resolution.DEFAULT.width + ((screenWidth - Resolution.DEFAULT.width.toInt() * scaling) / scaling).toUInt()
+        return Resolution(width - (width % 2u), Resolution.DEFAULT.height)
+    }
+
     private fun startGame() {
         try {
             getPermissionsIfNecessaryForAction {
-                saveJA2Json()
-                NativeExceptionContainer.resetException()
-                val intent = Intent(this@LauncherActivity, StracciatellaActivity::class.java)
-                startActivity(intent)
+                GameDir.checkGameDirectoryForCommonMistakes(
+                    this,
+                    configurationModel.vanillaGameDir.value
+                ) {
+                    saveJA2Json()
+                    NativeExceptionContainer.resetException()
+                    val intent = Intent(this@LauncherActivity, StracciatellaActivity::class.java)
+                    startActivity(intent)
+                }
             }
         } catch (e: IOException) {
             val message = "Could not write ${ja2JsonPath}: ${e.message}"
@@ -128,52 +154,59 @@ class LauncherActivity : AppCompatActivity() {
         }
 
     private fun loadJA2Json() {
-        val configurationModel = ViewModelProvider(this)[ConfigurationModel::class.java]
         try {
-            val json = File(ja2JsonPath).readText()
-            // For some reason it is not possible to decode to Any, so we decode to JsonElement instead
-            val jsonMap: Map<String, JsonElement> = jsonFormat.decodeFromString(json)
+            val text = File(ja2JsonPath).readText()
+            val json: Ja2Json = jsonFormat.decodeFromString(text)
 
-            Log.i(activityLogTag, "Loaded ja2.json: $jsonMap")
+            configurationModel.setVanillaGameDir(json.vanillaGameDir)
+            configurationModel.setSaveGameDir(json.saveGameDir)
 
-            val vanillaGameDir = jsonMap[gameDirKey]
-            if (vanillaGameDir is JsonPrimitive && vanillaGameDir.isString) {
-                configurationModel.setVanillaGameDir(vanillaGameDir.content)
+            if (json.vanillaGameVersion != null) {
+                configurationModel.setVanillaGameVersion(json.vanillaGameVersion)
             } else {
-                throw SerializationException("$gameDirKey is not a string")
+                configurationModel.setVanillaGameVersion(VanillaVersion.DEFAULT)
             }
-            val saveGameDir = jsonMap[saveGameDirKey]
-            if (saveGameDir is JsonPrimitive && saveGameDir.isString) {
-                configurationModel.setSaveGameDir(saveGameDir.content)
+            if (json.scalingQuality != null) {
+                configurationModel.setScalingQuality(json.scalingQuality)
             } else {
-                throw SerializationException("$saveGameDirKey is not a string")
+                configurationModel.setScalingQuality(ScalingQuality.DEFAULT)
+            }
+            if (json.resolution != null) {
+                configurationModel.setResolution(json.resolution)
+            } else {
+                configurationModel.setResolution(getRecommendedResolution())
+            }
+            if (json.debug != null) {
+                configurationModel.setDebug(json.debug)
+            } else {
+                configurationModel.setDebug(false)
             }
         } catch (e: SerializationException) {
             Log.w(activityLogTag, "Could not decode ja2.json: ${e.message}")
+            configurationModel.setVanillaGameVersion(VanillaVersion.ENGLISH)
+            configurationModel.setScalingQuality(ScalingQuality.DEFAULT)
+            configurationModel.setResolution(getRecommendedResolution())
         } catch (e: IOException) {
             Log.w(activityLogTag, "Could not read $ja2JsonPath: ${e.message}")
+            configurationModel.setVanillaGameVersion(VanillaVersion.ENGLISH)
+            configurationModel.setScalingQuality(ScalingQuality.DEFAULT)
+            configurationModel.setResolution(getRecommendedResolution())
         }
     }
 
     private fun saveJA2Json() {
-        val configurationModel = ViewModelProvider(this)[ConfigurationModel::class.java]
-        var jsonMap: MutableMap<String, JsonElement> = mutableMapOf()
-        try {
-            val json = File(ja2JsonPath).readText()
-            // For some reason it is not possible to decode to Any, so we decode to JsonElement instead
-            jsonMap = jsonFormat.decodeFromString(json)
-        } catch (e: SerializationException) {
-            Log.w(activityLogTag, "Could not decode ja2.json: ${e.message}")
-        } catch (e: IOException) {
-            Log.w(activityLogTag, "Could not read ${ja2JsonPath}: ${e.message}")
-        }
-        jsonMap[gameDirKey] = JsonPrimitive(configurationModel.vanillaGameDir.value)
-        jsonMap[saveGameDirKey] = JsonPrimitive(configurationModel.saveGameDir.value)
-        Log.i(activityLogTag, "Starting with ja2.json: $jsonMap")
+        val json = Ja2Json(
+            configurationModel.vanillaGameDir.value,
+            configurationModel.vanillaGameVersion.value,
+            configurationModel.saveGameDir.value,
+            configurationModel.resolution.value,
+            configurationModel.scalingQuality.value,
+            configurationModel.debug.value
+        )
         val parentDir = File(ja2JsonPath).parentFile
         if (parentDir?.exists() != true) {
             parentDir?.mkdirs()
         }
-        File(ja2JsonPath).writeText(jsonFormat.encodeToString(jsonMap))
+        File(ja2JsonPath).writeText(jsonFormat.encodeToString(json))
     }
 }

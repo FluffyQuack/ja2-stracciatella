@@ -1,4 +1,3 @@
-#include "HImage.h"
 #include "Quantize.h"
 
 #include <algorithm>

@@ -8,10 +8,6 @@
 #include "Animation_Data.h"
 #include "Animation_Control.h"
 #include "Soldier_Control.h"
-#include "Sys_Globals.h"
-#include "WorldDef.h"
-#include "FileMan.h"
-
 #include "ContentManager.h"
 #include "GameInstance.h"
 #include "Logger.h"
@@ -549,11 +545,32 @@ void InitAnimationSystem()
 	{
 		for ( cnt2 = 0; cnt2 < NUM_STRUCT_IDS; cnt2++ )
 		{
-			const char* Filename = gAnimStructureDatabase[cnt1][cnt2].Filename;
+			ST::string const Filename{gAnimStructureDatabase[cnt1][cnt2].Filename};
 
 			if (GCM->doesGameResExists(Filename))
 			{
 				STRUCTURE_FILE_REF* pStructureFileRef = LoadStructureFile(Filename);
+
+				// fix non-base prone tiles by making them all passable (#2116)
+				if ((cnt1 >= REGMALE && cnt1 <= REGFEMALE) && cnt2 == P_STRUCT)
+				{
+					for (UINT8 dirIdx = 0; dirIdx < 8; dirIdx++)
+					{
+						DB_STRUCTURE_REF const* const pDBStructureRef = &pStructureFileRef->pDBStructureRef[dirIdx];
+						DB_STRUCTURE_TILE** ppTile = pDBStructureRef->ppTile;
+						UINT8 const n_tiles = pDBStructureRef->pDBStructure->ubNumberOfTiles;
+
+						for (UINT8 tileIdx = 0; tileIdx < n_tiles; tileIdx++)
+						{
+							// if not a base tile
+							if (ppTile[tileIdx]->sPosRelToBase != 0)
+							{
+								ppTile[tileIdx]->fFlags |= TILE_PASSABLE;
+							}
+						}
+					}
+				}
+
 				gAnimStructureDatabase[ cnt1 ][ cnt2 ].pStructureFileRef = pStructureFileRef;
 			}
 		}

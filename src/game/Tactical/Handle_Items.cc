@@ -1,10 +1,11 @@
 #include "Font.h"
+#include "ItemModel.h"
 #include "Items.h"
 #include "Action_Items.h"
 #include "Handle_Items.h"
-#include "Local.h"
 #include "MapScreen.h"
 #include "Overhead.h"
+#include "PathAI.h"
 #include "Soldier_Find.h"
 #include "Structure.h"
 #include "VObject.h"
@@ -32,10 +33,7 @@
 #include "AI.h"
 #include "Soldier_Macros.h"
 #include "Interface_Panels.h"
-#include "Strategic_Town_Loyalty.h"
 #include "Soldier_Functions.h"
-#include "Map_Screen_Helicopter.h"
-#include "PathAI.h"
 #include "FOV.h"
 #include "MessageBoxScreen.h"
 #include "Explosion_Control.h"
@@ -49,13 +47,10 @@
 #include "Arms_Dealer_Init.h"
 #include "Soldier_Add.h"
 #include "Sound_Control.h"
-#include "Squads.h"
-#include "Rotting_Corpses.h"
 #include "Soldier_Ani.h"
 #include "OppList.h"
 #include "QArray.h"
 #include "Render_Fun.h"
-#include "Environment.h"
 #include "Map_Information.h"
 #include "GameSettings.h"
 #include "StrategicMap.h"
@@ -192,22 +187,21 @@ static void StartBombMessageBox(SOLDIERTYPE* pSoldier, INT16 sGridNo);
 
 ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLevel, const UINT16 usHandItem, const BOOLEAN fFromUI)
 {
-	SoldierSP soldier = GetSoldier(s);
-
-	soldier->removePendingAction();
+	Soldier soldier{s};
+	soldier.removePendingAction();
 
 	// here is where we would set a different value if the weapon mode is on
 	// "attached weapon"
 	s->usAttackingWeapon = usHandItem;
 
 	// Find soldier flags depend on if it's our own merc firing or a NPC
-	INT16        sGridNo;
 	SOLDIERTYPE* tgt = WhoIsThere2(usGridNo, bLevel);
 	if (tgt != NULL && fFromUI)
 	{
 		// ATE: Check if we are targeting an interactive tile, and adjust gridno accordingly...
 		STRUCTURE* pStructure;
-		LEVELNODE* const pIntNode = GetCurInteractiveTileGridNoAndStructure(&sGridNo, &pStructure);
+		GridNo unused;
+		LEVELNODE* const pIntNode = GetCurInteractiveTileGridNoAndStructure(&unused, &pStructure);
 		if (pIntNode != NULL && tgt == s)
 		{
 			// Truncate target soldier
@@ -248,7 +242,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 		}
 		// buddies won't shoot each other
 		if (tgt->ubProfile != NO_PROFILE &&
-			WhichBuddy(s->ubProfile, tgt->ubProfile) != -1)
+			WhichBuddy(s->ubProfile, tgt->ubProfile) != BUDDY_NOT_FOUND)
 		{
 			TacticalCharacterDialogue(s, QUOTE_REFUSING_ORDER);
 			return ITEM_HANDLE_REFUSAL;
@@ -486,9 +480,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 		// CHECK IF WE ARE AT THIS GRIDNO NOW
 		if (s->sGridNo != sGotLocation && fGotAdjacent)
 		{
-			soldier->setPendingAction(MERC_PUNCH);
-			s->sPendingActionData2      = sAdjustedGridNo;
-			s->bPendingActionData3      = ubDirection;
+			soldier.setPendingAction(MERC_PUNCH, sAdjustedGridNo, ubDirection);
 
 			// WALK UP TO DEST FIRST
 			EVENT_InternalGetNewSoldierPath(s, sGotLocation, s->usUIMovementMode, FALSE, TRUE);
@@ -534,7 +526,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 		// CHECK IF WE ARE AT THIS GRIDNO NOW
 		if (s->sGridNo != sActionGridNo)
 		{
-			soldier->setPendingAction(MERC_GIVEAID);
+			soldier.setPendingAction(MERC_GIVEAID);
 			if      (fHadToUseCursorPos) s->sPendingActionData2 = usMapPos;
 			else if (tgt != NULL)        s->sPendingActionData2 = tgt->sGridNo;
 			else                         s->sPendingActionData2 = usGridNo;
@@ -568,9 +560,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 		// CHECK IF WE ARE AT THIS GRIDNO NOW
 		if (s->sGridNo != sActionGridNo)
 		{
-			soldier->setPendingAction(MERC_CUTFFENCE);
-			s->sPendingActionData2      = sAdjustedGridNo;
-			s->bPendingActionData3      = ubDirection;
+			soldier.setPendingAction(MERC_CUTFFENCE, sAdjustedGridNo, ubDirection);
 
 			// WALK UP TO DEST FIRST
 			EVENT_InternalGetNewSoldierPath(s, sActionGridNo, s->usUIMovementMode, FALSE, TRUE);
@@ -616,9 +606,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 		// CHECK IF WE ARE AT THIS GRIDNO NOW
 		if (s->sGridNo != sActionGridNo)
 		{
-			soldier->setPendingAction(MERC_REPAIR);
-			s->sPendingActionData2      = fVehicle ? sVehicleGridNo : sAdjustedGridNo;
-			s->bPendingActionData3      = ubDirection;
+			soldier.setPendingAction(MERC_REPAIR, fVehicle ? sVehicleGridNo : sAdjustedGridNo, ubDirection);
 
 			// WALK UP TO DEST FIRST
 			EVENT_InternalGetNewSoldierPath(s, sActionGridNo, s->usUIMovementMode, FALSE, TRUE);
@@ -662,10 +650,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 		// CHECK IF WE ARE AT THIS GRIDNO NOW
 		if (s->sGridNo != sActionGridNo)
 		{
-			soldier->setPendingAction(MERC_FUEL_VEHICLE);
-			s->sPendingActionData2  = sAdjustedGridNo;
-			s->sPendingActionData2  = sVehicleGridNo;
-			s->bPendingActionData3  = ubDirection;
+			soldier.setPendingAction(MERC_FUEL_VEHICLE, sVehicleGridNo, ubDirection);
 
 			// WALK UP TO DEST FIRST
 			EVENT_InternalGetNewSoldierPath(s, sActionGridNo, s->usUIMovementMode, FALSE, TRUE);
@@ -695,9 +680,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 		// CHECK IF WE ARE AT THIS GRIDNO NOW
 		if (s->sGridNo != sActionGridNo)
 		{
-			soldier->setPendingAction(MERC_TAKEBLOOD);
-			s->sPendingActionData2      = sAdjustedGridNo;
-			s->bPendingActionData3      = ubDirection;
+			soldier.setPendingAction(MERC_TAKEBLOOD, sAdjustedGridNo, ubDirection);
 
 			// WALK UP TO DEST FIRST
 			EVENT_InternalGetNewSoldierPath(s, sActionGridNo, s->usUIMovementMode, FALSE, TRUE);
@@ -733,9 +716,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 		// CHECK IF WE ARE AT THIS GRIDNO NOW
 		if (s->sGridNo != sActionGridNo)
 		{
-			soldier->setPendingAction(MERC_ATTACH_CAN);
-			s->sPendingActionData2      = usGridNo;
-			s->bPendingActionData3      = ubDirection;
+			soldier.setPendingAction(MERC_ATTACH_CAN, usGridNo, ubDirection);
 
 			// WALK UP TO DEST FIRST
 			EVENT_InternalGetNewSoldierPath(s, sActionGridNo, s->usUIMovementMode, FALSE, TRUE);
@@ -790,7 +771,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 
 		if (s->sGridNo != usGridNo)
 		{
-			soldier->setPendingAction(MERC_DROPBOMB);
+			soldier.setPendingAction(MERC_DROPBOMB);
 
 			// WALK UP TO DEST FIRST
 			EVENT_InternalGetNewSoldierPath(s, usGridNo, s->usUIMovementMode, FALSE, TRUE);
@@ -835,9 +816,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 		// CHECK IF WE ARE AT THIS GRIDNO NOW
 		if (s->sGridNo != sActionGridNo)
 		{
-			soldier->setPendingAction(MERC_KNIFEATTACK);
-			s->sPendingActionData2      = sAdjustedGridNo;
-			s->bPendingActionData3      = ubDirection;
+			soldier.setPendingAction(MERC_KNIFEATTACK, sAdjustedGridNo, ubDirection);
 
 			// WALK UP TO DEST FIRST
 			EVENT_InternalGetNewSoldierPath(s, sActionGridNo, s->usUIMovementMode, FALSE, TRUE);
@@ -864,7 +843,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 	{
 		gTacticalStatus.ubAttackBusyCount++;
 		SLOGD("Starting swipe attack, incrementing a.b.c in HandleItems to {}", gTacticalStatus.ubAttackBusyCount);
-		const INT16 sAPCost = CalcTotalAPsToAttack(s, sGridNo, FALSE, s->bAimTime);
+		const INT16 sAPCost = CalcTotalAPsToAttack(s, usGridNo, FALSE, s->bAimTime);
 		DeductPoints(s, sAPCost, 0);
 		EVENT_InitNewSoldierAnim(s, QUEEN_SWIPE, 0, FALSE);
 		s->bAction = AI_ACTION_KNIFE_STAB;
@@ -882,7 +861,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 		if (usHandItem == MORTAR)
 		{
 			const UINT8 ubDirection  = (UINT8)GetDirectionFromGridNo(sTargetGridNo, s);
-			const INT16 sCheckGridNo = NewGridNo((UINT16)s->sGridNo, DirectionInc(ubDirection));
+			const GridNo sCheckGridNo = NewGridNo(s->sGridNo, DirectionInc(ubDirection));
 			if (!OKFallDirection(s, sCheckGridNo, s->bLevel, ubDirection, s->usAnimState))
 			{
 				return ITEM_HANDLE_NOROOM;
@@ -890,7 +869,7 @@ ItemHandleResult HandleItem(SOLDIERTYPE* const s, INT16 usGridNo, const INT8 bLe
 
 			s->fDontChargeAPsForStanceChange = TRUE;
 		}
-		else if (usHandItem == GLAUNCHER || usHandItem == UNDER_GLAUNCHER)
+		else if (item->isLauncher())
 		{
 			BOOLEAN fAddingTurningCost  = FALSE;
 			BOOLEAN fAddingRaiseGunCost = FALSE;
@@ -1080,15 +1059,11 @@ void SoldierGiveItem( SOLDIERTYPE *pSoldier, SOLDIERTYPE *pTargetSoldier, OBJECT
 	INT16 sActionGridNo, sAdjustedGridNo;
 	UINT8 ubDirection;
 
-	SoldierSP soldier = GetSoldier(pSoldier);
-
-	soldier->removePendingAction();
-
 	// See if we can get there to stab
 	sActionGridNo =  FindAdjacentGridEx( pSoldier, pTargetSoldier->sGridNo, &ubDirection, &sAdjustedGridNo, TRUE, FALSE );
 	if ( sActionGridNo != -1 )
 	{
-		soldier->setPendingAction(MERC_GIVEITEM);
+		Soldier{pSoldier}.setPendingAction(MERC_GIVEITEM);
 
 		pSoldier->bPendingActionData5 = bInvPos;
 		// Copy temp object
@@ -1132,14 +1107,12 @@ void SoldierDropItem(SOLDIERTYPE* const pSoldier, OBJECTTYPE* const pObj)
 
 void SoldierPickupItem( SOLDIERTYPE *pSoldier, INT32 iItemIndex, INT16 sGridNo, INT8 bZLevel )
 {
-	INT16 sActionGridNo;
-	SoldierSP soldier = GetSoldier(pSoldier);
+	Soldier soldier{pSoldier};
+	soldier.removePendingAction();
 
-	soldier->removePendingAction();
+	GridNo const sActionGridNo = AdjustGridNoForItemPlacement( pSoldier, sGridNo );
 
-	sActionGridNo = AdjustGridNoForItemPlacement( pSoldier, sGridNo );
-
-	soldier->setPendingAction(MERC_PICKUPITEM);
+	soldier.setPendingAction(MERC_PICKUPITEM);
 	pSoldier->uiPendingActionData1 = iItemIndex;
 	pSoldier->sPendingActionData2  = sActionGridNo;
 	pSoldier->uiPendingActionData4 = sGridNo;
@@ -1330,7 +1303,7 @@ void SoldierGetItemFromWorld(SOLDIERTYPE* const s, const INT32 iItemIndex, const
 
 	gpTempSoldier = s;
 	gsTempGridno  = sGridNo;
-	SetCustomizableTimerCallbackAndDelay(1000, CheckForPickedOwnership, TRUE);
+	SetCustomizableTimerCallbackAndDelay(1s, CheckForPickedOwnership, true);
 }
 
 
@@ -2189,7 +2162,6 @@ void HandleFlashingItems()
 {
 	if (!COUNTERDONE(CYCLERENDERITEMCOLOR))
 		return;
-	RESETCOUNTER(CYCLERENDERITEMCOLOR);
 
 	for (ITEM_POOL_LOCATOR* l = FlashItemSlots; l != FlashItemSlots + guiNumFlashItemSlots; ++l)
 	{
@@ -2669,14 +2641,15 @@ static void BombMessageBoxCallBack(MessageBoxReturnValue const ubExitValue)
 static BOOLEAN HandItemWorks(SOLDIERTYPE* pSoldier, INT8 bSlot)
 {
 	BOOLEAN fItemJustBroke = FALSE, fItemWorks = TRUE;
-	OBJECTTYPE *pObj;
-
-	pObj = &( pSoldier->inv[ bSlot ] );
+	OBJECTTYPE *pObj = &( pSoldier->inv[ bSlot ] );
+	auto item = GCM->getItem(pObj->usItem);
+	auto explosive = item->asExplosive();
+	auto isPressureTriggeredExplosive = explosive && explosive->isPressureTriggered();
 
 	// if the item can be damaged, than we must check that it's in good enough
 	// shape to be usable, and doesn't break during use.
 	// Exception: land mines.  You can bury them broken, they just won't blow!
-	if ( (GCM->getItem(pObj->usItem)->getFlags() & ITEM_DAMAGEABLE) && (pObj->usItem != MINE) && (GCM->getItem(pObj->usItem)->getItemClass() != IC_MEDKIT) && pObj->usItem != GAS_CAN )
+	if ( (item->getFlags() & ITEM_DAMAGEABLE) && !isPressureTriggeredExplosive && (item->getItemClass() != IC_MEDKIT) && pObj->usItem != GAS_CAN )
 	{
 		// if it's still usable, check whether it breaks
 		if ( pObj->bStatus[0] >= USABLE)
@@ -2708,7 +2681,7 @@ static BOOLEAN HandItemWorks(SOLDIERTYPE* pSoldier, INT8 bSlot)
 		}
 	}
 
-	if ( fItemWorks && bSlot == HANDPOS && GCM->getItem(pObj->usItem)->getItemClass() == IC_GUN )
+	if ( fItemWorks && bSlot == HANDPOS && item->getItemClass() == IC_GUN )
 	{
 		// are we using two guns at once?
 		if ( GCM->getItem(pSoldier->inv[SECONDHANDPOS].usItem)->getItemClass() == IC_GUN &&
@@ -3446,20 +3419,14 @@ INT16 FindNearestAvailableGridNoForItem( INT16 sSweetGridNo, INT8 ubRadius )
 	INT16   sLowestGridNo=0;
 	INT32   leftmost;
 	BOOLEAN fFound = FALSE;
-	SOLDIERTYPE soldier;
-	UINT8   ubSaveNPCAPBudget;
-	UINT8   ubSaveNPCDistLimit;
+	SOLDIERTYPE soldier{};
 
 	//Save AI pathing vars.  changing the distlimit restricts how
 	//far away the pathing will consider.
-	ubSaveNPCAPBudget = gubNPCAPBudget;
-	ubSaveNPCDistLimit = gubNPCDistLimit;
-	gubNPCAPBudget = 0;
-	gubNPCDistLimit = ubRadius;
+	SaveNPCBudgetAndDistLimit const savePathAIvars(0, ubRadius);
 
 	//create dummy soldier, and use the pathing to determine which nearby slots are
 	//reachable.
-	soldier = SOLDIERTYPE{};
 	soldier.bTeam = 1;
 	soldier.sGridNo = sSweetGridNo;
 
@@ -3513,8 +3480,7 @@ INT16 FindNearestAvailableGridNoForItem( INT16 sSweetGridNo, INT8 ubRadius )
 			}
 		}
 	}
-	gubNPCAPBudget = ubSaveNPCAPBudget;
-	gubNPCDistLimit = ubSaveNPCDistLimit;
+
 	if ( fFound )
 	{
 		return sLowestGridNo;

@@ -1,6 +1,5 @@
 #include "Map_Screen_Helicopter.h"
 
-#include "Assignments.h"
 #include "ContentManager.h"
 #include "Debug.h"
 #include "Dialogue_Control.h"
@@ -15,16 +14,14 @@
 #include "MapScreen.h"
 #include "Map_Screen_Interface.h"
 #include "Map_Screen_Interface_Border.h"
+#include "Map_Screen_Interface_Map.h"
 #include "Meanwhile.h"
 #include "Message.h"
-#include "MessageBoxScreen.h"
-#include "Overhead.h"
-#include "Player_Command.h"
-#include "PreBattle_Interface.h"
 #include "Queen_Command.h"
 #include "Quests.h"
 #include "Random.h"
 #include "RenderWorld.h"
+#include "SAM_Sites.h"
 #include "SamSiteModel.h"
 #include "Scheduling.h"
 #include "Soldier_Create.h"
@@ -649,7 +646,6 @@ void SetUpHelicopterForPlayer(const SGPSector& sMap)
 		SetUpHelicopterForMovement( );
 		UpdateRefuelSiteAvailability( );
 		fSkyRiderSetUp = TRUE;
-		gMercProfiles[ SKYRIDER ].fUseProfileInsertionInfo = FALSE;
 	}
 }
 
@@ -763,7 +759,7 @@ static void HandleSkyRiderMonologueAboutDrassenSAMSite(UINT32 const uiSpecialCod
 			SkyriderDialogue(MENTION_DRASSEN_SAM_SITE);
 			SkyriderDialogueWithSpecialEvent(SKYRIDER_MONOLOGUE_EVENT_DRASSEN_SAM_SITE, 1);
 
-			auto samList = GCM->getSamSites();
+			auto && samList{ GCM->getSamSites() };
 			if (StrategicMap[SGPSector(samList[SAM_SITE_TWO]->sectorId).AsStrategicIndex()].fEnemyControlled)
 			{
 				SkyriderDialogue(SECOND_HALF_OF_MENTION_DRASSEN_SAM_SITE);
@@ -897,7 +893,7 @@ void HandleAnimationOfSectors( void )
 	static BOOLEAN fOldShowEstoniRefuelHighLight = FALSE;
 	static BOOLEAN fOldShowOtherSAMHighLight = FALSE;
 
-	auto samList = GCM->getSamSites();
+	auto && samList{ GCM->getSamSites() };
 
 	// find out which mode we are in and animate for that mode
 

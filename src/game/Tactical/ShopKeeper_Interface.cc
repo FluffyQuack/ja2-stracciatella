@@ -6,9 +6,11 @@
 #include "Isometric_Utils.h"
 #include "JAScreens.h"
 #include "Local.h"
+#include "Object_Cache.h"
 #include "Timer_Control.h"
 #include "Types.h"
 #include "MercPortrait.h"
+#include "MercProfile.h"
 #include "ShopKeeper_Interface.h"
 #include "Game_Clock.h"
 #include "Render_Dirty.h"
@@ -33,7 +35,6 @@
 #include "Input.h"
 #include "Arms_Dealer_Init.h"
 #include "English.h"
-#include "Soldier_Add.h"
 #include "Faces.h"
 #include "Dialogue_Control.h"
 #include "ShopKeeper_Quotes.h"
@@ -42,11 +43,8 @@
 #include "Random.h"
 #include "Squads.h"
 #include "Soldier_Profile.h"
-#include "Message.h"
 #include "LaptopSave.h"
 #include "Quests.h"
-#include "Weapons.h"
-#include "Line.h"
 #include "Drugs_And_Alcohol.h"
 #include "Map_Screen_Interface.h"
 #include "Soldier_Macros.h"
@@ -59,7 +57,6 @@
 #include "Debug.h"
 #include "Items.h"
 #include "UILayout.h"
-#include "CalibreModel.h"
 #include "ContentManager.h"
 #include "DealerModel.h"
 #include "GameInstance.h"
@@ -223,10 +220,8 @@
 
 #define REPAIR_DELAY_IN_HOURS				6
 
-#define FLO_DISCOUNT_PERCENTAGE			10
 
-
-static SGPVObject* guiMainTradeScreenImage;
+static cache_key_t const guiMainTradeScreenImage{ INTERFACEDIR "/tradescreen.sti" };
 static SGPVSurface* guiCornerWhereTacticalIsStillSeenImage; // This image is for where the corner of tactical is still seen through the shop keeper interface
 
 static BOOLEAN gfSKIScreenEntry = TRUE;
@@ -361,7 +356,7 @@ static void BtnSKI_DoneButtonCallback(GUI_BUTTON* btn, UINT32 reason);
 static BUTTON_PICS* guiSKI_DoneButtonImage;
 static GUIButtonRef guiSKI_DoneButton;
 
-static SGPVObject* guiItemCrossOut;
+static cache_key_t const guiItemCrossOut{ INTERFACEDIR "/itemcrossout.sti" };
 
 static BOOLEAN gfDisplayNoRoomMsg = FALSE;
 
@@ -489,9 +484,6 @@ ScreenID ShopKeeperScreenHandle()
 	SaveBackgroundRects( );
 	RenderFastHelp( );
 
-	ExecuteBaseDirtyRectQueue();
-	EndFrameBufferRender();
-
 	if( gfSKIScreenExit )
 	{
 		ExitShopKeeperInterface();
@@ -572,12 +564,6 @@ static void EnterShopKeeperInterface(void)
 	SOLDIERTYPE* const sel = GetSelectedMan();
 	SetCurrentTacticalPanelCurrentMerc(sel);
 	SetSMPanelCurrentMerc(sel);
-
-	// load the Main trade screen backgroiund image
-	guiMainTradeScreenImage = AddVideoObjectFromFile(INTERFACEDIR "/tradescreen.sti");
-
-	// load the Main trade screen background image
-	guiItemCrossOut = AddVideoObjectFromFile(INTERFACEDIR "/itemcrossout.sti");
 
 	//Create an array of all mercs (anywhere!) currently in the player's employ, and load their small faces
 	// This is to support showing of repair item owner's faces even when they're not in the sector, as long as they still work for player
@@ -796,8 +782,8 @@ static void ExitShopKeeperInterface(void)
 	FreeMouseCursor();
 
 	//Delete the main shopkeep background
-	DeleteVideoObject(guiMainTradeScreenImage);
-	DeleteVideoObject(guiItemCrossOut);
+	RemoveVObject(guiMainTradeScreenImage);
+	RemoveVObject(guiItemCrossOut);
 	DeleteVideoSurface(guiCornerWhereTacticalIsStillSeenImage);
 
 	ShutUpShopKeeper();
@@ -1221,7 +1207,7 @@ static void CreateSkiInventorySlotMouseRegions(void)
 		UINT16 const y = SKI_ARMS_DEALERS_INV_START_Y + i / SKI_NUM_ARMS_DEALERS_INV_COLS * SKI_INV_OFFSET_Y;
 		{
 			MOUSE_REGION* const r = &gDealersInventoryMouseRegions[i];
-			MSYS_DefineRegion(r, x, y, x + SKI_INV_SLOT_WIDTH, y + SKI_INV_SLOT_HEIGHT, MSYS_PRIORITY_HIGH, CURSOR_NORMAL, SelectDealersInventoryMovementRegionCallBack, MouseCallbackPrimarySecondary<MOUSE_REGION>(SelectDealersInventoryRegionCallBackPrimary, SelectDealersInventoryRegionCallBackSecondary, SelectDealersInventoryRegionCallBackScroll));
+			MSYS_DefineRegion(r, x, y, x + SKI_INV_SLOT_WIDTH, y + SKI_INV_SLOT_HEIGHT, MSYS_PRIORITY_HIGH, CURSOR_NORMAL, SelectDealersInventoryMovementRegionCallBack, MouseCallbackPrimarySecondary(SelectDealersInventoryRegionCallBackPrimary, SelectDealersInventoryRegionCallBackSecondary, SelectDealersInventoryRegionCallBackScroll));
 			MSYS_SetRegionUserData(r, 0, i);
 		}
 		if (does_repairs)
@@ -1234,7 +1220,7 @@ static void CreateSkiInventorySlotMouseRegions(void)
 	}
 
 	// Create the mouse regions for the shopkeeper's trading slots
-	MOUSE_CALLBACK selectDealersOfferSlotsRegionCallBack = MouseCallbackPrimarySecondary<MOUSE_REGION>(SelectDealersOfferSlotsRegionCallBackPrimary, SelectDealersOfferSlotsRegionCallBackSecondary);
+	MOUSE_CALLBACK selectDealersOfferSlotsRegionCallBack = MouseCallbackPrimarySecondary(SelectDealersOfferSlotsRegionCallBackPrimary, SelectDealersOfferSlotsRegionCallBackSecondary);
 	for (UINT32 i = 0; i != SKI_NUM_TRADING_INV_SLOTS; ++i)
 	{
 		UINT16 const x = SKI_ARMS_DEALERS_TRADING_INV_X + i % SKI_NUM_TRADING_INV_COLS * SKI_INV_OFFSET_X;
@@ -1254,7 +1240,7 @@ static void CreateSkiInventorySlotMouseRegions(void)
 	}
 
 	// Create the mouse regions for the Players trading slots
-	MOUSE_CALLBACK selectPlayersOfferSlotsRegionCallBack = MouseCallbackPrimarySecondary<MOUSE_REGION>(SelectPlayersOfferSlotsRegionCallBackPrimary, SelectPlayersOfferSlotsRegionCallBackSecondary);
+	MOUSE_CALLBACK selectPlayersOfferSlotsRegionCallBack = MouseCallbackPrimarySecondary(SelectPlayersOfferSlotsRegionCallBackPrimary, SelectPlayersOfferSlotsRegionCallBackSecondary);
 	for (UINT32 i = 0; i != SKI_NUM_TRADING_INV_SLOTS; ++i)
 	{
 		UINT16 const x = SKI_PLAYERS_TRADING_INV_X + i % SKI_NUM_TRADING_INV_COLS * SKI_INV_OFFSET_X;
@@ -1710,7 +1696,7 @@ static void SelectPlayersOfferSlotsRegionCallBackPrimary(MOUSE_REGION* pRegion, 
 			{
 				//Since money is always evaluated
 				o->uiFlags     |= ARMS_INV_PLAYERS_ITEM_HAS_VALUE;
-				o->uiItemPrice  = o->ItemObject.bMoneyStatus;
+				o->uiItemPrice  = o->ItemObject.uiMoneyAmount;
 			}
 		}
 		else	// slot is empty
@@ -2137,7 +2123,7 @@ static UINT32 DisplayInvSlot(UINT8 const slot_num, UINT16 const item_idx, UINT16
 		ST::string overlay_text =
 			item_o.bGunAmmoStatus < 0 ? ST::string(TacticalStr[JAMMED_ITEM_STR]) :
 			print_repaired            ? ST::string(SKI_Text[SKI_TEXT_REPAIRED]) :
-			ST::null;
+			ST::string();
 		if (!overlay_text.empty())
 		{
 			INT16 cen_x;
@@ -2163,7 +2149,7 @@ static int RepairmanItemQsortCompare(void const* pArg1, void const* pArg2)
 	Assert(inv_slot1.sSpecialItemElement != -1);
 	Assert(inv_slot2.sSpecialItemElement != -1);
 
-	DEALER_ITEM_HEADER const (& dih)[MAXITEMS] = gArmsDealersInventory[gbSelectedArmsDealerID];
+	const auto& dih = gArmsDealersInventory[gbSelectedArmsDealerID];
 	UINT32             const repair_time1      = dih[inv_slot1.sItemIndex].SpecialItem[inv_slot1.sSpecialItemElement].uiRepairDoneTime;
 	UINT32             const repair_time2      = dih[inv_slot2.sItemIndex].SpecialItem[inv_slot2.sSpecialItemElement].uiRepairDoneTime;
 
@@ -2406,7 +2392,7 @@ static BOOLEAN RepairIsDone(UINT16 usItemIndex, UINT8 ubElement)
 	// if the item is imprinted (by anyone, even player's mercs), and it's the elctronics guy repairing it
 	if (
 		/*( gArmsDealersInventory[ gbSelectedArmsDealerID ][ usItemIndex ].SpecialItem[ ubElement ].Info.ubImprintID == (NO_PROFILE + 1) ) && */
-		GetDealer(gbSelectedArmsDealerID)->hasFlag(ArmsDealerFlag::REPAIRS_ELECTRONICS))
+		GCM->getDealer(gbSelectedArmsDealerID)->hasFlag(ArmsDealerFlag::REPAIRS_ELECTRONICS))
 	{
 		// then reset the imprinting!
 		RepairItem.ItemObject.ubImprintID = NO_PROFILE;
@@ -2457,9 +2443,6 @@ static UINT32 CalcShopKeeperItemPrice(BOOLEAN fDealerSelling, BOOLEAN fUnitPrice
 	UINT32 uiTotalPrice = 0;
 	UINT8  ubItemsToCount = 0;
 	UINT8  ubItemsNotCounted = 0;
-	UINT32 uiDiscountValue;
-	//UINT32 uiDifFrom10 = 0;
-
 
 	// add up value of the main item(s), exact procedure depends on its item class
 	switch ( GCM->getItem(usItemID)->getItemClass() )
@@ -2541,35 +2524,35 @@ static UINT32 CalcShopKeeperItemPrice(BOOLEAN fDealerSelling, BOOLEAN fUnitPrice
 		}
 	}
 
-
-	// if Flo is doing the dealin' and wheelin'
-	if ( gpSMCurrentMerc->ubProfile == FLO )
+	// if it's a GUN or AMMO (but not Launchers, and all attachments and payload is included)
+	switch (GCM->getItem(usItemID)->getItemClass())
 	{
-		// if it's a GUN or AMMO (but not Launchers, and all attachments and payload is included)
-		switch ( GCM->getItem(usItemID)->getItemClass() )
-		{
-			// start components of IC_WEAPON:
-			case IC_GUN:
-			case IC_BLADE:
-			case IC_THROWING_KNIFE:
-			case IC_LAUNCHER:
-			// end components of IC_WEAPON
-			case IC_AMMO:
-				uiDiscountValue = ( uiUnitPrice * FLO_DISCOUNT_PERCENTAGE ) / 100;
+		// start components of IC_WEAPON:
+		case IC_GUN:
+		case IC_BLADE:
+		case IC_THROWING_KNIFE:
+		case IC_LAUNCHER:
+		// end components of IC_WEAPON
+		case IC_AMMO:
+			// Get the weapons sale multiplicator for this person.
+			// In Vanilla, this was hardcoded to give Flo a 10% bonus.
+			// Now everyone gets at least 10% of the normal price or 1.8 times it at most when selling.
+			int const weaponSaleModifier = MercProfile{gpSMCurrentMerc->ubProfile}.getInfo().weaponSaleModifier;
+			int unitPrice = uiUnitPrice; // need this value signed, discountValue is negative for modifiers < 100
+			int const discountValue = unitPrice * (weaponSaleModifier - 100) / 100;
 
-				// she gets a discount!  Read her M.E.R.C. profile to understand why
-				if ( fDealerSelling )
-				{
-					// she buys for less...
-					uiUnitPrice -= uiDiscountValue;
-				}
-				else
-				{
-					// and sells for more!
-					uiUnitPrice += uiDiscountValue;
-				}
-				break;
-		}
+			// she gets a discount!  Read her M.E.R.C. profile to understand why
+			if (fDealerSelling)
+			{
+				// she buys for less...
+				uiUnitPrice = std::max(1, unitPrice - discountValue);
+			}
+			else
+			{
+				// and sells for more!
+				uiUnitPrice = unitPrice + discountValue;
+			}
+			break;
 	}
 
 	UINT32_S uiUnitPriceAdjusted = uiUnitPrice;
@@ -2821,7 +2804,7 @@ static void SetSkiFaceRegionHelpText(const INVENTORY_IN_SLOT* pInv, MOUSE_REGION
 	}
 	else
 	{
-		zHelpText = ST::null;
+		zHelpText.clear();
 	}
 	pRegion->SetFastHelpText(zHelpText);
 }
@@ -4596,12 +4579,12 @@ static void ClearArmsDealerOfferSlot(INT32 ubSlotToClear)
 	ArmsDealerOfferArea[ ubSlotToClear ] = INVENTORY_IN_SLOT{};
 
 	//Remove the mouse help text from the region
-	gDealersOfferSlotsMouseRegions[ubSlotToClear].SetFastHelpText(ST::null);
+	gDealersOfferSlotsMouseRegions[ubSlotToClear].SetFastHelpText({});
 
 	//if the dealer repairs
 	if (DoesDealerDoRepairs(gbSelectedArmsDealerID))
 	{
-		gDealersOfferSlotsSmallFaceMouseRegions[ubSlotToClear].SetFastHelpText(ST::null);
+		gDealersOfferSlotsSmallFaceMouseRegions[ubSlotToClear].SetFastHelpText({});
 	}
 }
 
@@ -4615,8 +4598,8 @@ static void ClearPlayersOfferSlot(INT32 ubSlotToClear)
 	PlayersOfferArea[ ubSlotToClear ] = INVENTORY_IN_SLOT{};
 
 	//Clear the text for the item
-	gPlayersOfferSlotsMouseRegions[ubSlotToClear].SetFastHelpText(ST::null);
-	gPlayersOfferSlotsSmallFaceMouseRegions[ubSlotToClear].SetFastHelpText(ST::null);
+	gPlayersOfferSlotsMouseRegions[ubSlotToClear].SetFastHelpText({});
+	gPlayersOfferSlotsSmallFaceMouseRegions[ubSlotToClear].SetFastHelpText({});
 
 	// if the player offer area is clear, reset flags for transaction
 	CheckAndHandleClearingOfPlayerOfferArea( );
@@ -4712,7 +4695,7 @@ static void EvaluateItemAddedToPlayersOfferArea(INT8 bSlotID, BOOLEAN fFirstOne)
 					}
 
 					// check if it's the first time a rocket rifle is being submitted to the electronics guy
-					if (fRocketRifleWasEvaluated && GetDealer(gbSelectedArmsDealerID)->hasFlag(ArmsDealerFlag::REPAIRS_ELECTRONICS))
+					if (fRocketRifleWasEvaluated && GCM->getDealer(gbSelectedArmsDealerID)->hasFlag(ArmsDealerFlag::REPAIRS_ELECTRONICS))
 					{
 						//if he hasn't yet said his quote
 						if( !( gArmsDealerStatus[ gbSelectedArmsDealerID ].ubSpecificDealerFlags & ARMS_DEALER_FLAG__FREDO_HAS_SAID_ROCKET_RIFLE_QUOTE ) )
@@ -5971,7 +5954,7 @@ static void HandlePossibleRepairDelays(void)
 	// assume there won't be a delay
 	gfStartWithRepairsDelayedQuote = FALSE;
 
-	if (!GetDealer(gbSelectedArmsDealerID)->hasFlag(ArmsDealerFlag::DELAYS_REPAIR)) return;
+	if (!GCM->getDealer(gbSelectedArmsDealerID)->hasFlag(ArmsDealerFlag::DELAYS_REPAIR)) return;
 
 	ARMS_DEALER_STATUS& status = gArmsDealerStatus[gbSelectedArmsDealerID];
 	// because the quotes are so specific, we'll only use them once per game per repairman
@@ -6310,7 +6293,7 @@ static ST::string BuildDoneWhenTimeString(ArmsDealerID ubArmsDealer, UINT16 usIt
 	//if the item has already been repaired
 	if( gArmsDealersInventory[ ubArmsDealer ][ usItemIndex ].SpecialItem[ ubElement ].uiRepairDoneTime <= GetWorldTotalMin() )
 	{
-		return ST::null;
+		return {};
 	}
 
 	uiDoneTime = gArmsDealersInventory[ ubArmsDealer ][ usItemIndex ].SpecialItem[ ubElement ].uiRepairDoneTime;
@@ -6361,7 +6344,7 @@ static ST::string BuildItemHelpTextString(const INVENTORY_IN_SLOT* pInv, UINT8 u
 	}
 	else
 	{
-		return ST::null;
+		return {};
 	}
 }
 

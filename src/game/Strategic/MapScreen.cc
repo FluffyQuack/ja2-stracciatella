@@ -30,6 +30,7 @@
 #include "Interface_Items.h"
 #include "Interface_Panels.h"
 #include "Interface_Utils.h"
+#include "ItemModel.h"
 #include "Items.h"
 #include "JAScreens.h"
 #include "LaptopSave.h"
@@ -38,6 +39,7 @@
 #include "Map_Screen_Interface.h"
 #include "Map_Screen_Interface_Border.h"
 #include "Map_Screen_Interface_Bottom.h"
+#include "Map_Screen_Interface_Map.h"
 #include "Map_Screen_Interface_Map_Inventory.h"
 #include "Map_Screen_Interface_TownMine_Info.h"
 #include "Meanwhile.h"
@@ -45,6 +47,7 @@
 #include "Merc_Hiring.h"
 #include "Message.h"
 #include "NewStrings.h"
+#include "Object_Cache.h"
 #include "Options_Screen.h"
 #include "Overhead.h"
 #include "Player_Command.h"
@@ -55,15 +58,18 @@
 #include "Radar_Screen.h"
 #include "Render_Dirty.h"
 #include "RenderWorld.h"
+#include "SAM_Sites.h"
 #include "SaveLoadScreen.h"
+#include "ScreenIDs.h"
+#include "Soldier_Control.h"
 #include "Soldier_Macros.h"
 #include "Squads.h"
+#include "StrategicMap.h"
 #include "StrategicMap_Secrets.h"
 #include "Strategic_Movement_Costs.h"
 #include "Strategic_Pathing.h"
 #include "Strategic_Town_Loyalty.h"
 #include "Strategic_Turns.h"
-#include "Sys_Globals.h"
 #include "SysUtil.h"
 #include "Tactical_Save.h"
 #include "Text.h"
@@ -76,14 +82,7 @@
 
 #include <string_theory/format>
 
-struct PopUpBox;
-
-
-
 #define MAX_SORT_METHODS					6
-
-// Cursors
-#define SCREEN_CURSOR CURSOR_NORMAL
 
 // Fonts
 #define CHAR_FONT BLOCKFONT2 // COMPFONT
@@ -231,10 +230,6 @@ struct PopUpBox;
 #define SOLDIER_HAND_X (STD_SCREEN_X + 6)
 #define SOLDIER_HAND_Y (STD_SCREEN_Y + 81)
 
-#define CLOCK_X (STD_SCREEN_X + 554)
-#define CLOCK_Y (STD_SCREEN_Y + 459)
-
-
 #define RGB_WHITE	( FROMRGB( 255, 255, 255 ) )
 #define RGB_YELLOW	( FROMRGB( 255, 255,   0 ) )
 #define RGB_NEAR_BLACK	( FROMRGB(   0,   0,   1 ) )
@@ -338,13 +333,14 @@ UINT32 guiFlashContractBaseTime = 0;
 UINT32 guiFlashCursorBaseTime = 0;
 UINT32 guiPotCharPathBaseTime = 0;
 
-static SGPVObject* guiCHARLIST;
-static SGPVObject* guiCHARINFO;
-static SGPVObject* guiSleepIcon;
-static SGPVObject* guiMAPINV;
-static SGPVObject* guiULICONS;
-static SGPVObject* guiNewMailIcons;
-
+namespace {
+cache_key_t const guiSleepIcon { INTERFACEDIR "/sleepicon.sti" };
+cache_key_t const guiCHARINFO { INTERFACEDIR "/charinfo.sti" };
+cache_key_t const guiCHARLIST { INTERFACEDIR "/newgoldpiece3.sti" };
+cache_key_t const guiMAPINV { INTERFACEDIR "/mapinv.sti" };
+cache_key_t const guiULICONS { INTERFACEDIR "/top_left_corner_icons.sti" };
+cache_key_t const guiNewMailIcons{ INTERFACEDIR "/newemail.sti" };
+}
 
 // misc mouse regions
 static MOUSE_REGION gCharInfoFaceRegion;
@@ -378,7 +374,6 @@ static bool fLockOutMapScreenInterface = false;
 
 
 extern BOOLEAN fDeletedNode;
-extern BOOLEAN gfStartedFromMapScreen;
 
 
 extern PathSt* pTempCharacterPath;
@@ -774,9 +769,7 @@ static void DrawCharacterInfo(SOLDIERTYPE const& s)
 	DrawStringCentered(nickname, PIC_NAME_X,  PIC_NAME_Y,  PIC_NAME_WID,  PIC_NAME_HEI,  CHAR_FONT);
 	DrawStringCentered(name,     CHAR_NAME_X, CHAR_NAME_Y, CHAR_NAME_WID, CHAR_NAME_HEI, CHAR_FONT);
 
-	ST::string assignment =
-		s.bAssignment == VEHICLE ? pShortVehicleStrings[GetVehicle(s.iVehicleId).ubVehicleType] : // Show vehicle type
-		pAssignmentStrings[s.bAssignment];
+	auto const assignment = GetMapscreenMercAssignmentString(s);
 	DrawStringCentered(assignment, CHAR_ASSIGN_X, CHAR_ASSIGN1_Y, CHAR_ASSIGN_WID, CHAR_ASSIGN_HEI, CHAR_FONT);
 
 	// Second assignment line
@@ -902,7 +895,7 @@ static void DrawCharacterInfo(SOLDIERTYPE const& s)
 
 	ST::string morale =
 		s.bAssignment == ASSIGNMENT_POW ? pPOWStrings[1] : // POW - morale unknown
-		s.bLife == 0                    ? ST::null :
+		s.bLife == 0                    ? ST::string() :
 		GetMoraleString(s);
 	DrawStringCentered(morale, CHAR_MORALE_X, CHAR_MORALE_Y, CHAR_MORALE_WID, CHAR_MORALE_HEI, CHAR_FONT);
 }
@@ -1246,7 +1239,7 @@ static void DisplayCharacterList(void)
 			CharacterIsGettingPathPlotted(i) ? FONT_LTBLUE    :
 			/* Not in current sector? */
 			s.sSector.x != sSelMap.x ||
-			s.sSector.x != sSelMap.y ||
+			s.sSector.y != sSelMap.y ||
 			s.sSector.z != iCurrentMapSectorZ ? 5              :
 			/* Mobile? */
 			s.bAssignment < ON_DUTY ||
@@ -1305,9 +1298,6 @@ static void RefreshMapScreen()
 // THIS IS STUFF THAT RUNS *ONCE* DURING APPLICATION EXECUTION, AT INITIAL STARTUP
 void MapScreenInit(void)
 {
-	// init palettes for big map
-	InitializePalettesForMap( );
-
 	InitMapScreenInterfaceMap();
 
 	// set up leave list arrays for dismissed mercs
@@ -1323,8 +1313,6 @@ void MapScreenShutdown(void)
 {
 	// free up alloced mapscreen messages
 	FreeGlobalMessageList( );
-
-	ShutDownPalettesForMap( );
 
 	// free memory for leave list arrays for dismissed mercs
 	ShutDownLeaveList( );
@@ -1470,7 +1458,7 @@ ScreenID MapScreenHandle(void)
 		else	// no loaded sector
 		{
 			// Only select start sector, if there is no current selection, otherwise leave it as is.
-			if (!sSelMap.IsValid() || iCurrentMapSectorZ == -1)
+			if (!sSelMap.IsValid())
 			{
 				ChangeSelectedMapSector(startSector);
 			}
@@ -1520,7 +1508,7 @@ ScreenID MapScreenHandle(void)
 		LoadCharacters();
 
 
-		MOUSE_CALLBACK mapViewRegionCallback = MouseCallbackPrimarySecondary<MOUSE_REGION>(MapViewRegionPrimaryCallback, MapViewRegionSecondaryCallback);
+		MOUSE_CALLBACK mapViewRegionCallback = MouseCallbackPrimarySecondary(MapViewRegionPrimaryCallback, MapViewRegionSecondaryCallback);
 		// set up regions
 		MSYS_DefineRegion( &gMapViewRegion, MAP_VIEW_START_X + MAP_GRID_X, MAP_VIEW_START_Y + MAP_GRID_Y,MAP_VIEW_START_X + MAP_VIEW_WIDTH+MAP_GRID_X-1, MAP_VIEW_START_Y + MAP_VIEW_HEIGHT-1 + 8, MSYS_PRIORITY_HIGH - 3,
 					MSYS_NO_CURSOR, MapViewRegionMovementCallback, mapViewRegionCallback );
@@ -1532,7 +1520,7 @@ ScreenID MapScreenHandle(void)
 					ItemRegionMvtCallback , ItemRegionBtnCallback );
 
 		MSYS_DefineRegion( &gCharInfoFaceRegion, (INT16) PLAYER_INFO_FACE_START_X, (INT16) PLAYER_INFO_FACE_START_Y, (INT16) PLAYER_INFO_FACE_END_X, (INT16) PLAYER_INFO_FACE_END_Y, MSYS_PRIORITY_HIGH,
-					MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(FaceRegionBtnCallbackPrimary, FaceRegionBtnCallbackSecondary) );
+					MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(FaceRegionBtnCallbackPrimary, FaceRegionBtnCallbackSecondary) );
 
 		MSYS_DefineRegion(&gMPanelRegion, INV_REGION_X, INV_REGION_Y, INV_REGION_X + INV_REGION_WIDTH, INV_REGION_Y + INV_REGION_HEIGHT, MSYS_PRIORITY_HIGH, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MSYS_NO_CALLBACK);
 		// screen mask for animated cursors
@@ -1562,7 +1550,7 @@ ScreenID MapScreenHandle(void)
 
 		if ( !gfFadeOutDone && !gfFadeIn )
 		{
-			MSYS_SetCurrentCursor(SCREEN_CURSOR);
+			SetCurrentCursorFromDatabase(CURSOR_NORMAL);
 		}
 		gMPanelRegion.Disable();
 
@@ -1828,7 +1816,7 @@ ScreenID MapScreenHandle(void)
 	if (!fDisableDueToBattleRoster)
 	{
 		// remove the move box once user leaves it
-		CreateDestroyMovementBox( 0,0,0 );
+		CreateDestroyMovementBox();
 
 		// this updates the move box contents when changes took place
 		ReBuildMoveBox( );
@@ -1874,7 +1862,7 @@ ScreenID MapScreenHandle(void)
 
 
 	// display town info
-	DisplayTownInfo(SGPSector(sSelMap.x, sSelMap.y, iCurrentMapSectorZ));
+	DisplayTownInfo(sSelMap);
 
 	if (fShowTownInfo)
 	{
@@ -1909,10 +1897,6 @@ ScreenID MapScreenHandle(void)
 
 	// now the border corner piece
 	//RenderMapBorderCorner( );
-
-
-	// Display Framerate
-	DisplayFrameRate( );
 
 	// update paused states
 	UpdatePausedStatesDueToTimeCompression( );
@@ -2036,17 +2020,10 @@ ScreenID MapScreenHandle(void)
 		GlowItem( );
 	}
 
-
 	RenderFastHelp();
-
-	// execute dirty
-	ExecuteBaseDirtyRectQueue( );
 
 	// update cursor
 	UpdateCursorIfInLastSector( );
-
-	EndFrameBufferRender( );
-
 
 	// if not going anywhere else
 	if ( guiPendingScreen == NO_PENDING_SCREEN )
@@ -2118,7 +2095,7 @@ void DrawStringRight(const ST::string& str, UINT16 x, UINT16 y, UINT16 w, UINT16
 }
 
 
-static void RenderMapHighlight(const SGPSector& sMap, UINT16 usLineColor, BOOLEAN fStationary);
+static void RenderMapHighlight(const SGPSector& sMap, UINT16 usLineColor);
 static void RestoreMapSectorCursor(const SGPSector& sMap);
 
 
@@ -2158,7 +2135,7 @@ static void RenderMapCursorsIndexesAnims(void)
 			}
 
 			// draw WHITE highlight rectangle
-			RenderMapHighlight(gsHighlightSector, Get16BPPColor(RGB_WHITE), FALSE);
+			RenderMapHighlight(gsHighlightSector, Get16BPPColor(RGB_WHITE));
 
 			sPrevHighlightedMap = gsHighlightSector;
 			fHighlightChanged = TRUE;
@@ -2210,7 +2187,7 @@ static void RenderMapCursorsIndexesAnims(void)
 		}
 
 		// always render this one, it's too much of a pain detecting overlaps with the white cursor otherwise
-		RenderMapHighlight(sSelMap, usCursorColor, TRUE);
+		RenderMapHighlight(sSelMap, usCursorColor);
 
 		if (sPrevSelectedMap != sSelMap)
 		{
@@ -2383,9 +2360,7 @@ static UINT32 HandleMapUI(void)
 					if ( gpItemPointerSoldier != NULL )
 					{
 						// make sure it's the owner's sector that's selected
-						if ( (gpItemPointerSoldier->sSector.x != sSelMap.x ) ||
-							( gpItemPointerSoldier->sSector.y != sSelMap.y ) ||
-							( gpItemPointerSoldier->sSector.z != iCurrentMapSectorZ ) )
+						if (gpItemPointerSoldier->sSector != sSelMap)
 						{
 							ChangeSelectedMapSector(gpItemPointerSoldier->sSector);
 						}
@@ -2959,15 +2934,6 @@ static void HandleModCtrl(UINT const key)
 
 		case 't': if (CHEATER_CHEAT_LEVEL()) Teleport(); break;
 
-#if defined SGP_VIDEO_DEBUGGING
-		case 'v':
-			ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, ST::format("VObjects:  {}", guiVObjectSize));
-			ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, ST::format("VSurfaces:  {}", guiVSurfaceSize));
-			ScreenMsg(FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, "SGPVideoDump.txt updated...");
-			PerformVideoInfoDumpIntoFile("SGPVideoDump.txt", TRUE);
-			break;
-#endif
-
 		case 'z':
 			if (CHEATER_CHEAT_LEVEL())
 			{
@@ -3006,14 +2972,6 @@ static void HandleModAlt(UINT32 const key)
 				bSelectedAssignChar = bSelectedInfoChar;
 				RebuildAssignmentsBox();
 				fShowAssignmentMenu = TRUE;
-			}
-			break;
-
-		case 'f':
-			if (INFORMATION_CHEAT_LEVEL())
-			{ // Toggle Frame Rate Display
-				gbFPSDisplay = !gbFPSDisplay;
-				EnableFPSOverlay(gbFPSDisplay);
 			}
 			break;
 
@@ -3163,7 +3121,7 @@ void EndMapScreen( BOOLEAN fDuringFade )
 	if ( fShowMapScreenMovementList )
 	{
 		fShowMapScreenMovementList = FALSE;
-		CreateDestroyMovementBox( 0, 0, 0 );
+		CreateDestroyMovementBox();
 	}
 
 	// the remove merc from team box
@@ -3203,7 +3161,7 @@ void EndMapScreen( BOOLEAN fDuringFade )
 
 	if ( !fDuringFade )
 	{
-		MSYS_SetCurrentCursor(SCREEN_CURSOR);
+		SetCurrentCursorFromDatabase(CURSOR_NORMAL);
 	}
 
 	RemoveMapStatusBarsRegion( );
@@ -3271,8 +3229,6 @@ void EndMapScreen( BOOLEAN fDuringFade )
 		PlayJA2SampleFromFile(SOUNDSDIR "/initial power up (8-11).wav", HIGHVOLUME, 1, MIDDLEPAN);
 		BltVideoObjectOnce(FRAME_BUFFER, INTERFACEDIR "/laptopon.sti", 0, 465, 417);
 		InvalidateRegion( 465, 417, 480, 427 );
-		ExecuteBaseDirtyRectQueue( );
-		EndFrameBufferRender( );
 		RefreshScreen();
 	}
 
@@ -3294,10 +3250,8 @@ static SGPSector GetSectorAtXY(INT16 relX, INT16 relY)
 }
 
 
-static void RenderMapHighlight(const SGPSector& sMap, UINT16 usLineColor, BOOLEAN fStationary)
+static void RenderMapHighlight(const SGPSector& sMap, UINT16 usLineColor)
 {
-	Assert(sMap.IsValid());
-
 	// if we are not allowed to highlight, leave
 	if (!IsTheCursorAllowedToHighLightThisSector(sMap))
 	{
@@ -3499,7 +3453,7 @@ void CreateDestroyMapInvButton()
 
 		INV_REGION_DESC gSCamoXY = {INV_BODY_X, INV_BODY_Y};
 
-		InitInvSlotInterface(g_ui.m_invSlotPositionMap, &gSCamoXY, MAPInvMoveCallback, MouseCallbackPrimarySecondary<MOUSE_REGION>(MAPInvClickCallbackPrimary, MAPInvClickCallbackSecondary, MAPInvClickCallbackCancelMessage), MAPInvMoveCamoCallback, MAPInvClickCamoCallback);
+		InitInvSlotInterface(g_ui.m_invSlotPositionMap, &gSCamoXY, MAPInvMoveCallback, MouseCallbackPrimarySecondary(MAPInvClickCallbackPrimary, MAPInvClickCallbackSecondary, MAPInvClickCallbackCancelMessage), MAPInvMoveCamoCallback, MAPInvClickCamoCallback);
 		gMPanelRegion.Enable();
 
 		// switch hand region help text to "Exit Inventory"
@@ -3659,15 +3613,14 @@ static void MAPInvMoveCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 	if ( pSoldier->inv[ uiHandPos ].usItem == NOTHING )
 		return;
 
-	if (iReason == MSYS_CALLBACK_REASON_GAIN_MOUSE )
-	//if( ( iReason == MSYS_CALLBACK_REASON_MOVE ) || ( iReason == MSYS_CALLBACK_REASON_GAIN_MOUSE ) )
+	if (iReason & MSYS_CALLBACK_REASON_GAIN_MOUSE )
 	{
 		guiMouseOverItemTime = GetJA2Clock( );
 		gfCheckForMouseOverItem = TRUE;
 		HandleCompatibleAmmoUI( pSoldier, (INT8)uiHandPos, FALSE );
 		gbCheckForMouseOverItemPos = (INT8)uiHandPos;
 	}
-	if (iReason == MSYS_CALLBACK_REASON_LOST_MOUSE )
+	else if (iReason & MSYS_CALLBACK_REASON_LOST_MOUSE )
 	{
 		HandleCompatibleAmmoUI( pSoldier, (INT8)uiHandPos, FALSE );
 		gfCheckForMouseOverItem = FALSE;
@@ -4093,7 +4046,6 @@ static void HandleAnimatedCursorsForMapScreen(void)
 {
 	if ( COUNTERDONE( CURSORCOUNTER ) )
 	{
-		RESETCOUNTER( CURSORCOUNTER );
 		UpdateAnimatedCursorFrames( gMapScreenMaskRegion.Cursor );
 		SetCurrentCursorFromDatabase(  gMapScreenMaskRegion.Cursor  );
 	}
@@ -4178,7 +4130,8 @@ static void BlitBackgroundToSaveBuffer(void)
 
 static void MakeRegion(MOUSE_REGION* r, UINT idx, UINT16 x, UINT16 y, UINT16 w, MOUSE_CALLBACK move, MOUSE_CALLBACK click, const ST::string& help)
 {
-	MSYS_DefineRegion(r, x, y, x + w, y + Y_SIZE + 1, MSYS_PRIORITY_NORMAL + 1, MSYS_NO_CURSOR, move, click);
+	MSYS_DefineRegion(r, x, y, x + w, y + Y_SIZE + 1, MSYS_PRIORITY_NORMAL + 1,
+		MSYS_NO_CURSOR, std::move(move), std::move(click));
 	MSYS_SetRegionUserData(r, 0, idx);
 	r->SetFastHelpText(help);
 }
@@ -4212,13 +4165,13 @@ static void CreateMouseRegionsForTeamList(void)
 
 		const UINT16 w = NAME_WIDTH;
 		CharacterRegions& r = g_character_regions[i];
-		MakeRegion(&r.name,        i, NAME_X,           y, w,                    TeamListInfoRegionMvtCallBack,        MouseCallbackPrimarySecondary<MOUSE_REGION>(TeamListInfoRegionBtnCallBackPrimary, TeamListInfoRegionBtnCallBackSecondary),        pMapScreenMouseRegionHelpText[0]); // name region
-		MakeRegion(&r.assignment,  i, ASSIGN_X,         y, ASSIGN_WIDTH,         TeamListAssignmentRegionMvtCallBack,  MouseCallbackPrimarySecondary<MOUSE_REGION>(TeamListAssignmentRegionBtnCallBackPrimary, TeamListAssignmentRegionBtnCallBackSecondary),  pMapScreenMouseRegionHelpText[1]); // assignment region
-		MakeRegion(&r.sleep,       i, SLEEP_X,          y, SLEEP_WIDTH,          TeamListSleepRegionMvtCallBack,       MouseCallbackPrimarySecondary<MOUSE_REGION>(TeamListSleepRegionBtnCallBackPrimary, TeamListSleepRegionBtnCallBackSecondary),       pMapScreenMouseRegionHelpText[5]); // sleep region
+		MakeRegion(&r.name,        i, NAME_X,           y, w,                    TeamListInfoRegionMvtCallBack,        MouseCallbackPrimarySecondary(TeamListInfoRegionBtnCallBackPrimary, TeamListInfoRegionBtnCallBackSecondary),        pMapScreenMouseRegionHelpText[0]); // name region
+		MakeRegion(&r.assignment,  i, ASSIGN_X,         y, ASSIGN_WIDTH,         TeamListAssignmentRegionMvtCallBack,  MouseCallbackPrimarySecondary(TeamListAssignmentRegionBtnCallBackPrimary, TeamListAssignmentRegionBtnCallBackSecondary),  pMapScreenMouseRegionHelpText[1]); // assignment region
+		MakeRegion(&r.sleep,       i, SLEEP_X,          y, SLEEP_WIDTH,          TeamListSleepRegionMvtCallBack,       MouseCallbackPrimarySecondary(TeamListSleepRegionBtnCallBackPrimary, TeamListSleepRegionBtnCallBackSecondary),       pMapScreenMouseRegionHelpText[5]); // sleep region
 		// same function as name regions, so uses the same callbacks
-		MakeRegion(&r.location,    i, LOC_X,            y, LOC_WIDTH,            TeamListInfoRegionMvtCallBack,        MouseCallbackPrimarySecondary<MOUSE_REGION>(TeamListInfoRegionBtnCallBackPrimary, TeamListInfoRegionBtnCallBackSecondary),        pMapScreenMouseRegionHelpText[0]); // location region
-		MakeRegion(&r.destination, i, DEST_ETA_X,       y, DEST_ETA_WIDTH,       TeamListDestinationRegionMvtCallBack, MouseCallbackPrimarySecondary<MOUSE_REGION>(TeamListDestinationRegionBtnCallBackPrimary, TeamListDestinationRegionBtnCallBackSecondary), pMapScreenMouseRegionHelpText[2]); // destination region
-		MakeRegion(&r.contract,    i, TIME_REMAINING_X, y, TIME_REMAINING_WIDTH, TeamListContractRegionMvtCallBack,    MouseCallbackPrimarySecondary<MOUSE_REGION>(TeamListContractRegionBtnCallBackPrimary, TeamListContractRegionBtnCallBackSecondary),    pMapScreenMouseRegionHelpText[3]); // contract region
+		MakeRegion(&r.location,    i, LOC_X,            y, LOC_WIDTH,            TeamListInfoRegionMvtCallBack,        MouseCallbackPrimarySecondary(TeamListInfoRegionBtnCallBackPrimary, TeamListInfoRegionBtnCallBackSecondary),        pMapScreenMouseRegionHelpText[0]); // location region
+		MakeRegion(&r.destination, i, DEST_ETA_X,       y, DEST_ETA_WIDTH,       TeamListDestinationRegionMvtCallBack, MouseCallbackPrimarySecondary(TeamListDestinationRegionBtnCallBackPrimary, TeamListDestinationRegionBtnCallBackSecondary), pMapScreenMouseRegionHelpText[2]); // destination region
+		MakeRegion(&r.contract,    i, TIME_REMAINING_X, y, TIME_REMAINING_WIDTH, TeamListContractRegionMvtCallBack,    MouseCallbackPrimarySecondary(TeamListContractRegionBtnCallBackPrimary, TeamListContractRegionBtnCallBackSecondary),    pMapScreenMouseRegionHelpText[3]); // contract region
 	}
 }
 
@@ -5345,7 +5298,7 @@ static void EnableDisableTeamListRegionsAndHelpText(void)
 				{
 					// "Remove Merc"
 					r.assignment.SetFastHelpText(pRemoveMercStrings[0]);
-					r.destination.SetFastHelpText(ST::null);
+					r.destination.SetFastHelpText({});
 				}
 				else
 				{
@@ -6122,29 +6075,7 @@ static bool AnyMercsLeavingRealSoon()
 
 void HandlePreloadOfMapGraphics(void)
 {
-	guiSleepIcon                = AddVideoObjectFromFile(INTERFACEDIR "/sleepicon.sti");
-	guiCHARINFO                 = AddVideoObjectFromFile(INTERFACEDIR "/charinfo.sti");
-	guiCHARLIST                 = AddVideoObjectFromFile(INTERFACEDIR "/newgoldpiece3.sti");
-
-	guiMAPINV                   = AddVideoObjectFromFile(INTERFACEDIR "/mapinv.sti");
-
-	// the upper left corner piece icons
-	guiULICONS                  = AddVideoObjectFromFile(INTERFACEDIR "/top_left_corner_icons.sti");
-
-	HandleLoadOfMapBottomGraphics( );
-
-	//Kris:  Added this because I need to blink the icons button.
-	guiNewMailIcons             = AddVideoObjectFromFile(INTERFACEDIR "/newemail.sti");
-
-	// graphic for pool inventory
-	LoadInventoryPoolGraphic( );
-
-	// load border graphics
-	LoadMapBorderGraphics( );
-
 	LoadInterfaceItemsGraphics();
-	LoadInterfaceUtilsGraphics();
-	LoadMapScreenInterfaceGraphics();
 	LoadMapScreenInterfaceMapGraphics();
 }
 
@@ -6152,16 +6083,16 @@ void HandlePreloadOfMapGraphics(void)
 void HandleRemovalOfPreLoadedMapGraphics( void )
 {
 	DeleteMapBottomGraphics();
-	DeleteVideoObject(guiSleepIcon);
+	RemoveVObject(guiSleepIcon);
 
-	DeleteVideoObject(guiCHARLIST);
-	DeleteVideoObject(guiCHARINFO);
+	RemoveVObject(guiCHARLIST);
+	RemoveVObject(guiCHARINFO);
 
-	DeleteVideoObject(guiMAPINV);
-	DeleteVideoObject(guiULICONS);
+	RemoveVObject(guiMAPINV);
+	RemoveVObject(guiULICONS);
 
 	//Kris:  Remove the email icons.
-	DeleteVideoObject(guiNewMailIcons);
+	RemoveVObject(guiNewMailIcons);
 
 	// remove inventory pool graphic
 	RemoveInventoryPoolGraphic();
@@ -6784,7 +6715,6 @@ void ChangeSelectedMapSector(const SGPSector& sMap)
 		return;
 
 	sSelMap = sMap;
-	iCurrentMapSectorZ = sMap.z;
 
 	// if going underground while in airspace mode
 	if (sMap.z > 0 && fShowAircraftFlag)
@@ -6816,8 +6746,9 @@ BOOLEAN CanExtendContractForSoldier(const SOLDIERTYPE* const s)
 	Assert(s);
 	Assert(s->bActive);
 
-	// if a vehicle, in transit, or a POW
+	// if a vehicle, an EPC, in transit, or a POW
 	if (s->uiStatusFlags & SOLDIER_VEHICLE ||
+			s->ubWhatKindOfMercAmI == MERC_TYPE__EPC ||
 			s->bAssignment == IN_TRANSIT ||
 			s->bAssignment == ASSIGNMENT_POW)
 	{
@@ -6825,9 +6756,9 @@ BOOLEAN CanExtendContractForSoldier(const SOLDIERTYPE* const s)
 		return (FALSE);
 	}
 
-	// mercs below OKLIFE, M.E.R.C. mercs, EPCs, and the Robot use the Contract menu so they can be DISMISSED/ABANDONED!
-
-	// everything OK
+	// mercs below OKLIFE, M.E.R.C. mercs, and the Robot use the Contract menu
+	// so they can be DISMISSED/ABANDONED! EPCs must be 'unrecruited" via the
+	// assignment menu.
 	return( TRUE );
 }
 
@@ -7491,7 +7422,7 @@ static void DestinationPlottingCompleted(void)
 static void HandleMilitiaRedistributionClick(void)
 {
 	ST::string sString;
-	SGPSector sector(sSelMap.x, sSelMap.y, iCurrentMapSectorZ);
+	auto const& sector{ sSelMap };
 
 	// if on the surface
 	if (sector.z == 0)
@@ -7722,7 +7653,7 @@ ST::string GetMapscreenMercDestinationString(SOLDIERTYPE const& s)
 	else
 	{
 no_destination:
-		return ST::null;
+		return {};
 	}
 }
 
@@ -7909,9 +7840,9 @@ BOOLEAN CanDrawSectorCursor(void)
 		GetNumberOfMercsInUpdateList() == 0 &&
 		sSelectedMilitiaTown == 0           &&
 		!gfMilitiaPopupCreated              &&
-		!gfStartedFromMapScreen             &&
 		!fShowMapScreenMovementList         &&
 		ghMoveBox == NO_POPUP_BOX           &&
+		guiPendingScreen != MSG_BOX_SCREEN  &&
 		!fMapInventoryItem;
 }
 

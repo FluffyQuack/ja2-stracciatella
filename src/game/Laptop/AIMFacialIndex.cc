@@ -14,6 +14,7 @@
 #include "AIMSort.h"
 #include "Assignments.h"
 #include "Button_System.h"
+#include "Object_Cache.h"
 #include "Video.h"
 #include "VSurface.h"
 #include "Font_Control.h"
@@ -24,7 +25,7 @@
 extern UINT8			gbCurrentIndex;
 
 
-static SGPVObject* guiMugShotBorder;
+static cache_key_t const guiMugShotBorder{ LAPTOPDIR "/mugshotborder3.sti" };
 static SGPVObject* guiAimFiFace[MAX_NUMBER_MERCS];
 
 
@@ -66,7 +67,7 @@ static MOUSE_REGION gScreenMouseRegions;
 static void SelectMercFaceMoveRegionCallBack(MOUSE_REGION* pRegion, UINT32 reason);
 static void SelectMercFaceRegionCallBackPrimary(MOUSE_REGION* pRegion, UINT32 iReason);
 static void SelectMercFaceRegionCallBackSecondary(MOUSE_REGION* pRegion, UINT32 iReason);
-static void SelectScreenRegionCallBackPrimary(MOUSE_REGION* pRegion, UINT32 iReason);
+// There is no SelectScreenRegionCallBackPrimary
 static void SelectScreenRegionCallBackSecondary(MOUSE_REGION* pRegion, UINT32 iReason);
 
 
@@ -74,9 +75,6 @@ void EnterAimFacialIndex()
 {
 	UINT8	i;
 	UINT16		usPosX, usPosY, x,y;
-
-	// load the Portait graphic and add it
-	guiMugShotBorder = AddVideoObjectFromFile(LAPTOPDIR "/mugshotborder3.sti");
 
 	usPosX = AIM_FI_FIRST_MUGSHOT_X;
 	usPosY = AIM_FI_FIRST_MUGSHOT_Y;
@@ -91,7 +89,7 @@ void EnterAimFacialIndex()
 						(INT16)(usPosY + AIM_FI_PORTRAIT_HEIGHT),
 						MSYS_PRIORITY_HIGH,
 						CURSOR_WWW, SelectMercFaceMoveRegionCallBack,
-						MouseCallbackPrimarySecondary<MOUSE_REGION>(SelectMercFaceRegionCallBackPrimary, SelectMercFaceRegionCallBackSecondary));
+						MouseCallbackPrimarySecondary(SelectMercFaceRegionCallBackPrimary, SelectMercFaceRegionCallBackSecondary));
 			MSYS_SetRegionUserData( &gMercFaceMouseRegions[ i ], 0, i);
 
 			guiAimFiFace[i] = LoadSmallPortrait(GetProfile(AimMercArray[i]));
@@ -105,7 +103,7 @@ void EnterAimFacialIndex()
 
 	MSYS_DefineRegion(&gScreenMouseRegions, LAPTOP_SCREEN_UL_X, LAPTOP_SCREEN_WEB_UL_Y,
 				LAPTOP_SCREEN_LR_X, LAPTOP_SCREEN_WEB_LR_Y, MSYS_PRIORITY_HIGH-1,
-				CURSOR_LAPTOP_SCREEN, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(MSYS_NO_CALLBACK, SelectScreenRegionCallBackSecondary));
+				CURSOR_LAPTOP_SCREEN, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(MSYS_NO_CALLBACK, SelectScreenRegionCallBackSecondary));
 
 	InitAimMenuBar();
 	InitAimDefaults();
@@ -118,7 +116,7 @@ void ExitAimFacialIndex()
 {
 	RemoveAimDefaults();
 
-	DeleteVideoObject(guiMugShotBorder);
+	RemoveVObject(guiMugShotBorder);
 
 	FOR_EACH(SGPVObject*,  i, guiAimFiFace)          DeleteVideoObject(*i);
 	FOR_EACH(MOUSE_REGION, i, gMercFaceMouseRegions) MSYS_RemoveRegion(&*i);
@@ -246,7 +244,11 @@ static void DrawMercsFaceToScreen(const UINT8 ubMercID, const UINT16 usPosX, con
 	if (IsMercDead(p))
 	{
 		// the merc is dead, so shade the face red
-		face->pShades[0] = Create16BPPPaletteShaded(face->Palette(), DEAD_MERC_COLOR_RED, DEAD_MERC_COLOR_GREEN, DEAD_MERC_COLOR_BLUE, TRUE);
+		if (face->pShades[0] == nullptr)
+		{
+			face->pShades[0] = Create16BPPPaletteShaded(face->Palette(),
+				DEAD_MERC_COLOR_RED, DEAD_MERC_COLOR_GREEN, DEAD_MERC_COLOR_BLUE, TRUE);
+		}
 		face->CurrentShade(0);
 		shaded = FALSE;
 		text   = AimFiText[AIM_FI_DEAD];
@@ -272,7 +274,7 @@ static void DrawMercsFaceToScreen(const UINT8 ubMercID, const UINT16 usPosX, con
 	else
 	{
 		shaded = FALSE;
-		text   = ST::null;
+		text.clear();
 	}
 
 	BltVideoObject(FRAME_BUFFER, face, 0, usPosX + AIM_FI_FACE_OFFSET, usPosY + AIM_FI_FACE_OFFSET);
@@ -282,7 +284,7 @@ static void DrawMercsFaceToScreen(const UINT8 ubMercID, const UINT16 usPosX, con
 		FRAME_BUFFER->ShadowRect(usPosX + AIM_FI_FACE_OFFSET, usPosY + AIM_FI_FACE_OFFSET, usPosX + 48 + AIM_FI_FACE_OFFSET, usPosY + 43 + AIM_FI_FACE_OFFSET);
 	}
 
-	if (text != NULL)
+	if (!text.empty())
 	{
 		DrawTextToScreen(text, usPosX + AIM_FI_AWAY_TEXT_OFFSET_X, usPosY + AIM_FI_AWAY_TEXT_OFFSET_Y, AIM_FI_AWAY_TEXT_OFFSET_WIDTH, FONT10ARIAL, 145, FONT_MCOLOR_BLACK, CENTER_JUSTIFIED);
 	}

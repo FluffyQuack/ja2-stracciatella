@@ -1,5 +1,4 @@
 #include "SAM_Sites.h"
-#include "Campaign_Types.h"
 #include "ContentManager.h"
 #include "Explosion_Control.h"
 #include "GameInstance.h"
@@ -66,7 +65,7 @@ void UpdateSAMDoneRepair(const SGPSector& sec)
 
 void UpdateAirspaceControl()
 {
-	auto samList = GCM->getSamSites();
+	auto && samList{ GCM->getSamSites() };
 	SGPSector sMap;
 	for (sMap.x = 1; sMap.x < (MAP_WORLD_X - 1); sMap.x++)
 	{

@@ -3,10 +3,10 @@
 #include "Dialogue_Control.h"
 #include "Directories.h"
 #include "EMail.h"
-#include "FileMan.h"
 #include "Finances.h"
 #include "Font.h"
 #include "Font_Control.h"
+#include "GameLoop.h"
 #include "Game_Clock.h"
 #include "Game_Event_Hook.h"
 #include "Game_Init.h"
@@ -24,10 +24,12 @@
 #include "Map_Screen_Helicopter.h"
 #include "Map_Screen_Interface_Border.h"
 #include "Map_Screen_Interface_Bottom.h"
+#include "Map_Screen_Interface_Map.h"
 #include "Map_Screen_Interface_Map_Inventory.h"
 #include "MapScreen.h"
 #include "MercPortrait.h"
 #include "Message.h"
+#include "Object_Cache.h"
 #include "Overhead.h"
 #include "PopUpBox.h"
 #include "PreBattle_Interface.h"
@@ -36,13 +38,15 @@
 #include "Render_Dirty.h"
 #include "Render_Fun.h"
 #include "RenderWorld.h"
+#include "SAM_Sites.h"
 #include "SamSiteModel.h"
+#include "ScreenIDs.h"
 #include "ShippingDestinationModel.h"
 #include "Soldier_Macros.h"
 #include "SoundMan.h"
 #include "Squads.h"
 #include "Strategic.h"
-#include "StrategicMap_Secrets.h"
+#include "StrategicMap.h"
 #include "Strategic_Mines.h"
 #include "Strategic_Pathing.h"
 #include "SysUtil.h"
@@ -58,8 +62,6 @@
 #include <iterator>
 #include <string_theory/format>
 #include <string_theory/string>
-struct FACETYPE;
-struct PopUpBox;
 
 // number of LINKED LISTS for sets of leave items (each slot holds an unlimited # of items)
 #define NUM_LEAVE_LIST_SLOTS 20
@@ -135,7 +137,12 @@ static INT32 giSizeOfInterfaceFastHelpTextList = 0;
 //Animated sector locator icon variables.
 SGPSector gsSectorLocator;
 UINT8 gubBlitSectorLocatorCode; //color
-static SGPVObject* guiSectorLocatorGraphicID;
+
+namespace {
+cache_key_t const guiSectorLocatorGraphicID{ INTERFACEDIR "/hilite.sti" };
+cache_key_t const guiSelectedCharArrow{ INTERFACEDIR "/selectedchararrow.sti" };
+}
+
 // the animate time per frame in milliseconds
 #define ANIMATED_BATTLEICON_FRAME_TIME 80
 #define MAX_FRAME_COUNT_FOR_ANIMATED_BATTLE_ICON 12
@@ -210,9 +217,6 @@ INT32 giSleepHighLine = -1;
 // pop up box textures
 SGPVSurface* guiPOPUPTEX;
 SGPVObject* guiPOPUPBORDERS;
-
-// the currently selected character arrow
-static SGPVObject* guiSelectedCharArrow;
 
 static GUIButtonRef guiUpdatePanelButtons[2];
 
@@ -800,18 +804,23 @@ void EnableTeamInfoPanels( void )
 void DoMapMessageBoxWithRect(MessageBoxStyleID ubStyle, const ST::string& str, ScreenID uiExitScreen, MessageBoxFlags usFlags, MSGBOX_CALLBACK ReturnCallback, const SGPBox* centering_rect)
 {	// reset the highlighted line
 	giHighLine = -1;
+
+	// Suppresses the cursor interaction over the map ofArulco, checked
+	// by CanDrawSectorCursor().
+	guiPendingScreen = MSG_BOX_SCREEN;
+
+	// Force redraw.
+	MapScreenHandle();
+
 	DoMessageBox(ubStyle, str, uiExitScreen, usFlags, ReturnCallback, centering_rect);
 }
 
 
 void DoMapMessageBox(MessageBoxStyleID ubStyle, const ST::string& str, ScreenID uiExitScreen, MessageBoxFlags usFlags, MSGBOX_CALLBACK ReturnCallback)
 {
-	// reset the highlighted line
-	giHighLine = -1;
-
 	// do message box and return
 	SGPBox const centering_rect = { 0, 0, SCREEN_WIDTH, INV_INTERFACE_START_Y };
-	DoMessageBox(ubStyle, str, uiExitScreen, usFlags, ReturnCallback, &centering_rect);
+	DoMapMessageBoxWithRect(ubStyle, str, uiExitScreen, usFlags, ReturnCallback, &centering_rect);
 }
 
 
@@ -1247,7 +1256,7 @@ void UpdateCharRegionHelpText(void)
 	ST::string status;
 	if (!s || s->bLife == 0)
 	{
-		status = ST::null;
+		status.clear();
 	}
 	else if (s->bAssignment == ASSIGNMENT_POW)
 	{
@@ -1314,18 +1323,6 @@ void FindAndSetThisContractSoldier( SOLDIERTYPE *pSoldier )
 			fTeamPanelDirty = TRUE;
 			fCharacterInfoPanelDirty = TRUE;
 		}
-	}
-}
-
-
-void HandleMAPUILoseCursorFromOtherScreen( void )
-{
-	// rerender map without cursors
-	fMapPanelDirty = TRUE;
-
-	if ( fInMapMode )
-	{
-		RenderMapRegionBackground( );
 	}
 }
 
@@ -1461,9 +1458,7 @@ BOOLEAN MapscreenCanPassItemToChar(const SOLDIERTYPE* const pNewSoldier)
 	if ( fShowMapInventoryPool && !gpItemPointerSoldier && fMapInventoryItem )
 	{
 		// disallow passing items to anyone not in that sector
-		if (pNewSoldier->sSector.x != sSelMap.x ||
-			pNewSoldier->sSector.y != sSelMap.y ||
-			pNewSoldier->sSector.z != ( INT8 )( iCurrentMapSectorZ ) )
+		if (pNewSoldier->sSector != sSelMap)
 		{
 			return( FALSE );
 		}
@@ -2190,13 +2185,13 @@ static void ClearMouseRegionsForMoveBox(void);
 static void CreatePopUpBoxForMovementBox(void);
 
 
-void CreateDestroyMovementBox( INT16 sSectorX, INT16 sSectorY, INT16 sSectorZ )
+void CreateDestroyMovementBox([[maybe_unused]] SGPSector const& sector)
 {
 	static BOOLEAN fCreated = FALSE;
 
 
 	// not allowed for underground movement!
-	Assert( sSectorZ == 0 );
+	Assert(sector.z == 0);
 
 	if (fShowMapScreenMovementList && !fCreated)
 	{
@@ -2261,7 +2256,7 @@ void SetUpMovingListsForSector(const SGPSector& sSector)
 	}
 
 	fShowMapScreenMovementList = TRUE;
-	CreateDestroyMovementBox(sSector.x, sSector.y, sSector.z);
+	CreateDestroyMovementBox(sSector);
 }
 
 
@@ -2324,7 +2319,7 @@ static void AddStringsToMoveBox(PopUpBox* const box)
 
 
 	// blank line
-	AddMonoString(box, ST::null);
+	AddMonoString(box, {});
 
 
 	// add squads
@@ -2406,7 +2401,7 @@ static void AddStringsToMoveBox(PopUpBox* const box)
 
 
 	// blank line
-	AddMonoString(box, ST::null);
+	AddMonoString(box, {});
 
 
 	if ( IsAnythingSelectedForMoving() )
@@ -2417,7 +2412,7 @@ static void AddStringsToMoveBox(PopUpBox* const box)
 	else
 	{
 		// blank line
-		AddMonoString(box, ST::null);
+		AddMonoString(box, {});
 	}
 
 	// add cancel line
@@ -3023,11 +3018,11 @@ void ReBuildMoveBox( void )
 
 	// stop showing the box
 	fShowMapScreenMovementList = FALSE;
-	CreateDestroyMovementBox( sSelMap.x, sSelMap.y, ( INT16 )iCurrentMapSectorZ );
+	CreateDestroyMovementBox(sSelMap);
 
 	// show the box
 	fShowMapScreenMovementList = TRUE;
-	CreateDestroyMovementBox( sSelMap.x, sSelMap.y, ( INT16 )iCurrentMapSectorZ );
+	CreateDestroyMovementBox(sSelMap);
 	ShowBox( ghMoveBox );
 	MarkAllBoxesAsAltered( );
 }
@@ -3042,7 +3037,7 @@ void CreateScreenMaskForMoveBox( void )
 	if (!fScreenMaskForMoveCreated)
 	{
 		// set up the screen mask
-		MSYS_DefineRegion(&gMoveBoxScreenMask, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, MSYS_PRIORITY_HIGHEST - 4, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(MoveScreenMaskBtnCallbackPrimary, MoveScreenMaskBtnCallbackSecondary));
+		MSYS_DefineRegion(&gMoveBoxScreenMask, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, MSYS_PRIORITY_HIGHEST - 4, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(MoveScreenMaskBtnCallbackPrimary, MoveScreenMaskBtnCallbackSecondary));
 
 		fScreenMaskForMoveCreated = TRUE;
 	}
@@ -3605,17 +3600,17 @@ void UpdateHelpTextForMapScreenMercIcons()
 
 	// if merc is an AIM merc
 	ST::string contract = s && s->ubWhatKindOfMercAmI == MERC_TYPE__AIM_MERC ?
-		zMarksMapScreenText[21] : ST::null;
+		zMarksMapScreenText[21] : ST::string();
 	gContractIconRegion.SetFastHelpText(contract);
 
 	// if merc has life insurance
 	ST::string insurance = s && s->usLifeInsurance > 0 ?
-		zMarksMapScreenText[3] : ST::null;
+		zMarksMapScreenText[3] : ST::string();
 	gInsuranceIconRegion.SetFastHelpText(insurance);
 
 	// if merc has a medical deposit
 	ST::string medical = s && s->usMedicalDeposit > 0 ?
-		zMarksMapScreenText[12] : ST::null;
+		zMarksMapScreenText[12] : ST::string();
 	gDepositIconRegion.SetFastHelpText(medical);
 }
 
@@ -4343,15 +4338,8 @@ BOOLEAN CheckIfSalaryIncreasedAndSayQuote( SOLDIERTYPE *pSoldier, BOOLEAN fTrigg
 }
 
 
-void LoadMapScreenInterfaceGraphics()
-{
-	guiSectorLocatorGraphicID = AddVideoObjectFromFile(INTERFACEDIR "/hilite.sti");
-	guiSelectedCharArrow      = AddVideoObjectFromFile(INTERFACEDIR "/selectedchararrow.sti");
-}
-
-
 void DeleteMapScreenInterfaceGraphics()
 {
-	DeleteVideoObject(guiSectorLocatorGraphicID);
-	DeleteVideoObject(guiSelectedCharArrow);
+	RemoveVObject(guiSectorLocatorGraphicID);
+	RemoveVObject(guiSelectedCharArrow);
 }

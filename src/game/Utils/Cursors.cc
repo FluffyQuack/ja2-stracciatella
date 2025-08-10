@@ -6,7 +6,6 @@
 #include "Font_Control.h"
 #include "Handle_UI.h"
 #include "Interface.h"
-#include "Overhead.h"
 #include "Cursor_Control.h"
 #include "Sound_Control.h"
 #include "Video.h"
@@ -105,6 +104,9 @@ static CursorFileData CursorFileDatabase[] =
 #define SUBCNTX(cur, idx) cur, idx, 0, CENTER_SUBCURSOR, 0
 #define SUBHIDE(cur, idx) cur, idx, 0, HIDE_SUBCURSOR,   HIDE_SUBCURSOR
 #define SUBNORM(cur, idx) cur, idx, 0, 0,                0
+// Strictly speaking the CursorDataBrace is missing lots of braces,
+// but globally disabling the warning seems overblown.
+#pragma GCC diagnostic ignored "-Wmissing-braces"
 
 static CursorData CursorDatabase[] =
 {
@@ -1189,8 +1191,6 @@ void HandleAnimatedCursors(void)
 {
 	if (COUNTERDONE(CURSORCOUNTER))
 	{
-		RESETCOUNTER(CURSORCOUNTER);
-
 		if (gViewportRegion.uiFlags & MSYS_MOUSE_IN_AREA)
 		{
 			UpdateAnimatedCursorFrames(gViewportRegion.Cursor);
@@ -1212,8 +1212,6 @@ void HandleAnimatedCursors(void)
 
 	if (COUNTERDONE(CURSORFLASHUPDATE))
 	{
-		RESETCOUNTER(CURSORFLASHUPDATE);
-
 		if (gViewportRegion.uiFlags & MSYS_MOUSE_IN_AREA)
 		{
 			UpdateFlashingCursorFrames(gViewportRegion.Cursor);
@@ -1349,7 +1347,7 @@ static void DrawMouseText(void)
 				{
 					if (COUNTERDONE(INVALID_AP_HOLD))
 					{
-						RESETCOUNTER(INVALID_AP_HOLD);
+						// INVALID_AP_HOLD was reset by COUNTERDONE
 						RESETCOUNTER(CURSORFLASH);
 
 						fShow = !fShow;
@@ -1360,7 +1358,7 @@ static void DrawMouseText(void)
 				{
 					if (COUNTERDONE(CURSORFLASH))
 					{
-						RESETCOUNTER(CURSORFLASH);
+						// CURSORFLASH was reset by COUNTERDONE
 						RESETCOUNTER(INVALID_AP_HOLD);
 
 						fShow = !fShow;

@@ -1,20 +1,14 @@
-#include "FileMan.h"
 #include "Types.h"
 #include "Map_Information.h"
 #include "Soldier_Init_List.h"
-#include "Random.h"
 #include "WorldDef.h"
 #include "RenderWorld.h"
-#include "EditorMercs.h"
-#include "Exit_Grids.h"
+#include "SGPFile.h"
 #include "Isometric_Utils.h"
 #include "Animation_Data.h"
-#include "Road_Smoothing.h"
-#include "Weapons.h"
 #include "Environment.h"
 #include "Lighting.h"
 #include "Animated_ProgressBar.h"
-#include "Debug.h"
 #include "World_Items.h"
 
 
@@ -245,7 +239,7 @@ void ValidateAndUpdateMapVersionIfNecessary()
 	//Older versions of mercs may require updating due to past bug fixes, new changes, etc.
 	if( gMapInformation.ubMapVersion < MINOR_MAP_VERSION )
 	{
-		SetRelativeStartAndEndPercentage( 0, 92, 93, L"Updating older map version..." );
+		SetRelativeStartAndEndPercentage(0, 92, 93, "Updating older map version...");
 		RenderProgressBar( 0, 0 );
 		UpdateOldVersionMap();
 	}

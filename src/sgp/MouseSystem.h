@@ -45,8 +45,11 @@ struct MOUSE_REGION
 	void AllowDisabledRegionFastHelp(bool allow);
 
 	void SetUserPtr(void* ptr) { user.ptr = ptr; }
-
 	template<typename T> T* GetUserPtr() const { return static_cast<T*>(user.ptr); }
+	template<size_t index>
+	constexpr INT32 GetUserData() const { static_assert(index < 4); return user.data[index]; }
+	template<size_t index>
+	constexpr void SetUserData(INT32 const data) { static_assert(index < 4); user.data[index] = data; }
 
 	bool HasFastHelp() { return FastHelpRect != nullptr; }
 
@@ -150,18 +153,18 @@ void MSYS_DefineRegion(MOUSE_REGION *region,UINT16 tlx,UINT16 tly,UINT16 brx,UIN
 void MSYS_RemoveRegion(MOUSE_REGION *region);
 
 /* Set one of the user data entries in a mouse region */
-void MSYS_SetRegionUserData(MOUSE_REGION*, UINT32 index, INT32 userdata);
+#define MSYS_SetRegionUserData(region, index, data) ((region)->SetUserData<(index)>((data)))
 
 /* Retrieve one of the user data entries in a mouse region */
-INT32 MSYS_GetRegionUserData(MOUSE_REGION const*, UINT32 index);
+#define MSYS_GetRegionUserData(region, index) ((region)->GetUserData<(index)>())
 
 // Create a callback with primary and secondary and all actions callbacks
 // Primary action will be triggered on left mouse button up (or mouse button down if triggerOnMouseDown is true), or short touch
 // Secondary action will be triggered on right mouse button up, or first touch repeat event
 // The all events callback will be triggered for all events (useful to add other behavior, such as scrolling)
-// This function works for mouse and button callbacks via a template parameter
-template<typename T>
-std::function<void(T*, UINT32)> MouseCallbackPrimarySecondary(
+// This function needs to be specialized for mouse regions and buttons
+template<typename T, UINT32 EXISTS_FLAG>
+std::function<void(T*, UINT32)> CallbackPrimarySecondary(
 	std::function<void(T*, UINT32)> primaryAction,
 	std::function<void(T*, UINT32)> secondaryAction,
 	std::function<void(T*, UINT32)> allEvents = nullptr,
@@ -184,10 +187,15 @@ std::function<void(T*, UINT32)> MouseCallbackPrimarySecondary(
 			fPointerDown = FALSE;
 			fRightMouseButtonDown = TRUE;
 		}
+
+		// First gather all the callbacks that should be invoked (0-2), and only then execute them at the end of the function.
+		// It is important that by the time the second callback is invoked, no access to this lambda's captures is happening anymore, as the object might already be deleted.
+		std::vector<std::function<void(T*, UINT32)>> triggeredEventFns;
+
 		if (((reason & mouseReason) && fPointerDown) || ((reason & MSYS_CALLBACK_REASON_TFINGER_UP) && fPointerDown && !fTouchRepeatHandled))
 		{
 			if (primaryAction) {
-				primaryAction(r, reason);
+				triggeredEventFns.push_back(primaryAction);
 			}
 		}
 		if (((reason & MSYS_CALLBACK_REASON_RBUTTON_UP) && fRightMouseButtonDown) || ((reason & MSYS_CALLBACK_REASON_TFINGER_REPEAT) && fPointerDown && !fTouchRepeatHandled))
@@ -199,14 +207,31 @@ std::function<void(T*, UINT32)> MouseCallbackPrimarySecondary(
 				fRightMouseButtonDown = FALSE;
 			}
 			if (secondaryAction) {
-				secondaryAction(r, reason);
+				triggeredEventFns.push_back(secondaryAction);
 			}
 		}
+		// We need to guard against deletions of the mouse region during callbacks
 		if (allEvents) {
-			allEvents(r, reason);
+			triggeredEventFns.push_back(allEvents);
+		}
+
+		for (const auto& f : triggeredEventFns) {
+			// We need to guard against deletions of the mouse region during callbacks
+			if (!(r->uiFlags & EXISTS_FLAG)) {
+				break;
+			}
+			f(r, reason);
+			// Consider: assert after events that still EXISTS_FLAG?
 		}
 	};
 }
+
+MOUSE_CALLBACK MouseCallbackPrimarySecondary(
+	MOUSE_CALLBACK primaryAction,
+	MOUSE_CALLBACK secondaryAction,
+	MOUSE_CALLBACK allEvents = nullptr,
+	bool triggerPrimaryOnMouseDown = false
+);
 
 // This function will force a re-evaluation of mous regions
 // Usually used to force change of mouse cursor if panels switch, etc
@@ -232,8 +257,6 @@ class MouseRegion : private MOUSE_REGION
 		{
 			MSYS_RemoveRegion(this);
 		}
-
-		MOUSE_REGION const& Base() const { return *this; } // XXX hack
 
 		using MOUSE_REGION::ChangeCursor;
 		using MOUSE_REGION::Disable;

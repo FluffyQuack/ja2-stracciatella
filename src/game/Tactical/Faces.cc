@@ -1,5 +1,6 @@
 #include "Faces.h"
 #include "Assignments.h"
+#include "Campaign_Types.h"
 #include "ContentManager.h"
 #include "Dialogue_Control.h"
 #include "Directories.h"
@@ -111,31 +112,30 @@ FACETYPE& InitFace(const ProfileID id, SOLDIERTYPE* const s, const UINT32 uiInit
 
 	FACETYPE& f = GetFreeFace();
 
-	const char* face_file;
+	ST::string face_file;
 	// Check if we are a big-face....
 	if (uiInitFlags & FACE_BIGFACE)
 	{
-		face_file = FACESDIR "/b%02d.sti";
+		face_file = FACESDIR "/b{02d}.sti";
 		// ATE: Check for profile - if elliot, use special face :)
 		if (id == ELLIOT && p.bNPCData > 3)
 		{
-			if      (p.bNPCData <   7) face_file = FACESDIR "/b%02da.sti";
-			else if (p.bNPCData <  10) face_file = FACESDIR "/b%02db.sti";
-			else if (p.bNPCData <  13) face_file = FACESDIR "/b%02dc.sti";
-			else if (p.bNPCData <  16) face_file = FACESDIR "/b%02dd.sti";
-			else if (p.bNPCData == 17) face_file = FACESDIR "/b%02de.sti";
+			if      (p.bNPCData <   7) face_file = FACESDIR "/b{02d}a.sti";
+			else if (p.bNPCData <  10) face_file = FACESDIR "/b{02d}b.sti";
+			else if (p.bNPCData <  13) face_file = FACESDIR "/b{02d}c.sti";
+			else if (p.bNPCData <  16) face_file = FACESDIR "/b{02d}d.sti";
+			else if (p.bNPCData == 17) face_file = FACESDIR "/b{02d}e.sti";
 		}
 	}
 	else
 	{
-		face_file = FACESDIR "/%02d.sti";
+		face_file = FACESDIR "/{02d}.sti";
 	}
 
 	// HERVE, PETER, ALBERTO and CARLO all use HERVE's portrait
 	INT32 const face_id = HERVE <= id && id <= CARLO ? HERVE : p.ubFaceIndex;
 
-	SGPFILENAME ImageFile;
-	sprintf(ImageFile, face_file, face_id);
+	ST::string ImageFile = ST::format(face_file.c_str(), face_id);
 	SGPVObject* const vo = AddVideoObjectFromFile(ImageFile);
 
 	f = FACETYPE{};
@@ -154,7 +154,6 @@ FACETYPE& InitFace(const ProfileID id, SOLDIERTYPE* const s, const UINT32 uiInit
 
 	f.uiExpressionFrequency = p.uiExpressionFrequency;
 	f.sMouthFrame           = 0;
-	f.uiMouthDelay          = 120;
 	f.uiVideoObject         = vo;
 
 	// Set palette
@@ -571,7 +570,7 @@ static void MouthAutoFace(FACETYPE& f)
 				FaceRestoreSavedBackgroundRect(f, f.usMouthX, f.usMouthY, f.usMouthOffsetX, f.usMouthOffsetY, f.usMouthWidth, f.usMouthHeight);
 			}
 		}
-		else if (GetJA2Clock() - f.uiMouthlast > f.uiMouthDelay)
+		else if (GetJA2Clock() - f.uiMouthlast > 120)
 		{
 			f.uiMouthlast = GetJA2Clock();
 
@@ -1151,8 +1150,6 @@ void HandleAutoFaces(void)
 				case FLASH_PORTRAIT_START:
 					if (TIMECOUNTERDONE(s->PortraitFlashCounter, FLASH_PORTRAIT_DELAY))
 					{
-						RESETTIMECOUNTER(s->PortraitFlashCounter, FLASH_PORTRAIT_DELAY);
-
 						if (++s->bFlashPortraitFrame > FLASH_PORTRAIT_ENDSHADE)
 						{
 							s->bFlashPortraitFrame = FLASH_PORTRAIT_ENDSHADE;
@@ -1206,7 +1203,7 @@ static void FaceRestoreSavedBackgroundRect(FACETYPE const& f, INT16 const sDestL
 }
 
 
-void SetFaceTalking(FACETYPE& f, const char* zSoundFile, const ST::string& zTextString)
+void SetFaceTalking(FACETYPE& f, const ST::string& zSoundFile, const ST::string& zTextString)
 {
 	// Set face to talking
 	f.fTalking          = TRUE;

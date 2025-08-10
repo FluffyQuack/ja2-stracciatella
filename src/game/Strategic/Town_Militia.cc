@@ -1,6 +1,6 @@
-#include "Local.h"
 #include "MapScreen.h"
 #include "MessageBoxScreen.h"
+#include "SAM_Sites.h"
 #include "Town_Militia.h"
 #include "Militia_Control.h"
 #include "Campaign_Types.h"
@@ -10,13 +10,10 @@
 #include "Random.h"
 #include "Text.h"
 #include "Map_Screen_Interface.h"
-#include "Interface.h"
 #include "LaptopSave.h"
 #include "Finances.h"
 #include "Game_Clock.h"
 #include "Assignments.h"
-#include "Squads.h"
-#include "Soldier_Create.h"
 #include "Dialogue_Control.h"
 #include "Queen_Command.h"
 #include "PreBattle_Interface.h"
@@ -192,14 +189,14 @@ void TownMilitiaTrainingCompleted(SOLDIERTYPE *pTrainer, const SGPSector& sector
 }
 
 
-INT8 SoldierClassToMilitiaRank(UINT8 const soldier_class)
+std::optional<UINT8> SoldierClassToMilitiaRank(UINT8 const soldier_class)
 {
 	switch (soldier_class)
 	{
 		case SOLDIER_CLASS_GREEN_MILITIA: return GREEN_MILITIA;
 		case SOLDIER_CLASS_REG_MILITIA:   return REGULAR_MILITIA;
 		case SOLDIER_CLASS_ELITE_MILITIA: return ELITE_MILITIA;
-		default:                          return -1;
+		default:                          return {};
 	}
 }
 
@@ -446,9 +443,6 @@ void HandleInterfaceMessageForCostOfTrainingMilitia( SOLDIERTYPE *pSoldier )
 		return;
 	}
 
-	// ok to start training, ask player
-
-
 	if( iNumberOfSectors > 1 )
 	{
 		sString = st_format_printf(pMilitiaConfirmStrings[6], iNumberOfSectors, giTotalCostOfTraining, pMilitiaConfirmStrings[1]);
@@ -500,7 +494,7 @@ static void HandleInterfaceMessageForContinuingTrainingMilitia(SOLDIERTYPE* cons
 		if ( bTownId == BLANK_SECTOR )
 		{
 			// wilderness SAM site
-			sStringB = GetSectorIDString(sector, TRUE);
+			sStringB = GetSectorIDString(pSoldier->sSector, TRUE);
 			sString = st_format_printf(pMilitiaConfirmStrings[9], sStringB);
 		}
 		else
@@ -526,11 +520,10 @@ static void HandleInterfaceMessageForContinuingTrainingMilitia(SOLDIERTYPE* cons
 
 	// ok to continue, ask player
 
-	sStringB = GetSectorIDString(sector, TRUE);
+	sStringB = GetSectorIDString(pSoldier->sSector, TRUE);
 	sString = st_format_printf(pMilitiaConfirmStrings[ 3 ], sStringB, pMilitiaConfirmStrings[ 4 ], giTotalCostOfTraining);
 
 	// ask player whether he'd like to continue training
-	//DoScreenIndependantMessageBox( sString, MSG_BOX_FLAG_YESNO, PayMilitiaTrainingYesNoBoxCallback );
 	DoMapMessageBox( MSG_BOX_BASIC_STYLE, sString, MAP_SCREEN, MSG_BOX_FLAG_YESNO, PayMilitiaTrainingYesNoBoxCallback );
 }
 
@@ -820,7 +813,7 @@ static void BuildListOfUnpaidTrainableSectors()
 	}
 	else
 	{ // Handle for tactical
-		AddIfTrainingUnpaidSector(*gUIFullTarget);
+		AddIfTrainingUnpaidSector(*pMilitiaTrainerSoldier);
 	}
 }
 
@@ -952,7 +945,7 @@ ST::string BuildMilitiaPromotionsString()
 {
 	ST::string str;
 
-	if (gbMilitiaPromotions == 0) return ST::null;
+	if (gbMilitiaPromotions == 0) return {};
 
 	PromoteMilitia(str, gbGreenToElitePromotions, gzLateLocalizedString[STR_LATE_29], gzLateLocalizedString[STR_LATE_22]);
 	PromoteMilitia(str, gbGreenToRegPromotions,  gzLateLocalizedString[STR_LATE_30], gzLateLocalizedString[STR_LATE_23]);

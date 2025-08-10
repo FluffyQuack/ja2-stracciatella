@@ -26,14 +26,6 @@
 #define FOR_EACHX(type, iter, array, x) for (type* iter = (array); iter != endof((array)); (x), ++iter)
 #define FOR_EACH(type, iter, array)     FOR_EACHX(type, iter, (array), (void)0)
 
-template<typename T> static inline void Swap(T& a, T& b)
-{
-	T t(a);
-	a = b;
-	b = t;
-}
-
-
 typedef int32_t     INT;
 typedef int32_t     INT32;
 typedef uint32_t    UINT;
@@ -52,13 +44,7 @@ typedef char            CHAR8;
 
 // other
 typedef unsigned char		BOOLEAN;
-typedef void *					PTR;
 typedef UINT8						BYTE;
-typedef CHAR8						STRING512[512];
-
-#define SGPFILENAME_LEN 100
-typedef CHAR8 SGPFILENAME[SGPFILENAME_LEN];
-
 
 #ifndef TRUE
 #define TRUE 1
@@ -67,8 +53,6 @@ typedef CHAR8 SGPFILENAME[SGPFILENAME_LEN];
 #ifndef FALSE
 #define FALSE 0
 #endif
-
-#define BAD_INDEX -1
 
 #define PI 3.1415926
 
@@ -79,7 +63,7 @@ struct SGPBox
 	UINT16 w;
 	UINT16 h;
 
-	void set(UINT16 _x, UINT16 _y, UINT16 _w, UINT16 _h)
+	constexpr void set(UINT16 _x, UINT16 _y, UINT16 _w, UINT16 _h)
 	{
 		x = _x;
 		y = _y;
@@ -95,7 +79,7 @@ struct SGPRect
 	UINT16 iRight;
 	UINT16 iBottom;
 
-	void set(UINT16 left, UINT16 top, UINT16 right, UINT16 bottom)
+	constexpr void set(UINT16 left, UINT16 top, UINT16 right, UINT16 bottom)
 	{
 		iLeft       = left;
 		iTop        = top;
@@ -109,7 +93,7 @@ struct SGPPoint
 	UINT16 iX;
 	UINT16 iY;
 
-	void set(UINT16 x, UINT16 y)
+	constexpr void set(UINT16 x, UINT16 y)
 	{
 		iX = x;
 		iY = y;
@@ -123,9 +107,11 @@ public:
 	INT16 y = 0;
 	INT8 z = 0;
 
-	SGPSector() noexcept = default;
-	SGPSector(INT16 a, INT16 b, INT8 c = 0) noexcept : x(a), y(b), z(c) {};
-	SGPSector(const SGPSector&) noexcept = default;
+	constexpr SGPSector() noexcept = default;
+	// Could add 'constexpr ~SGPSector() = default;' in C++20.
+	constexpr SGPSector(INT16 a, INT16 b, INT8 c = 0) noexcept : x(a), y(b), z(c) {};
+	constexpr SGPSector(const SGPSector&) noexcept = default;
+	constexpr SGPSector& operator=(const SGPSector&) noexcept = default;
 	SGPSector(UINT32 s) noexcept; // normal FromSectorID
 	static SGPSector FromStrategicIndex(UINT16 idx);
 	static SGPSector FromShortString(const ST::string coordinates, INT8 h = 0);
@@ -177,12 +163,12 @@ typedef SGPFile* HWFILE;
 
 
 #ifdef __cplusplus
-#	define ENUM_BITSET(type)                                                                   \
-		static inline type operator ~  (type  a)         { return     (type)~(int)a;           } \
-		static inline type operator &  (type  a, type b) { return     (type)((int)a & (int)b); } \
-		static inline type operator &= (type& a, type b) { return a = (type)((int)a & (int)b); } \
-		static inline type operator |  (type  a, type b) { return     (type)((int)a | (int)b); } \
-		static inline type operator |= (type& a, type b) { return a = (type)((int)a | (int)b); }
+#	define ENUM_BITSET(type)                                                                 \
+		constexpr type operator ~  (type  a)         { return     (type)~(int)a;           } \
+		constexpr type operator &  (type  a, type b) { return     (type)((int)a & (int)b); } \
+		constexpr type operator &= (type& a, type b) { return a = (type)((int)a & (int)b); } \
+		constexpr type operator |  (type  a, type b) { return     (type)((int)a | (int)b); } \
+		constexpr type operator |= (type& a, type b) { return a = (type)((int)a | (int)b); }
 #else
 #	define ENUM_BITSET(type)
 #endif
@@ -197,9 +183,9 @@ namespace _Types
 	template<typename T>
 	struct BoxedValue
 	{
-		BoxedValue<T>(T v) : val(v) {};
+		constexpr BoxedValue(T v) noexcept : val(v) {};
 
-		operator T() const { return val; }
+		constexpr operator T() const noexcept { return val; }
 
 		T val;
 	};

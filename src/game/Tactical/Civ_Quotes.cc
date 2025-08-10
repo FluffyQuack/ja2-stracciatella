@@ -1,7 +1,6 @@
 #include "Civ_Quotes.h"
 #include "Directories.h"
 #include "Font_Control.h"
-#include "Local.h"
 #include "MouseSystem.h"
 #include "Soldier_Find.h"
 #include "StrategicMap.h"
@@ -17,7 +16,6 @@
 #include "Animation_Data.h"
 #include "Video.h"
 #include "Message.h"
-#include "RenderWorld.h"
 #include "Cursors.h"
 #include "Dialogue_Control.h"
 #include "Quests.h"
@@ -26,7 +24,6 @@
 #include "NPC.h"
 #include "Strategic_Mines.h"
 #include "Random.h"
-#include "FileMan.h"
 #include "UILayout.h"
 
 #include "ContentManager.h"
@@ -125,23 +122,23 @@ static UINT16 gusCivQuoteBoxHeight;
 static BOOLEAN GetCivQuoteText(UINT8 ubCivQuoteID, UINT8 ubEntryID, ST::string& zQuote)
 try
 {
-	char zFileName[164];
+	ST::string zFileName;
 
 	// Build filename....
 	if ( ubCivQuoteID == CIV_QUOTE_HINT )
 	{
 		if (gWorldSector.z > 0)
 		{
-			sprintf(zFileName, NPCDATADIR "/civ%02d.edt", CIV_QUOTE_MINERS_NOT_FOR_PLAYER);
+			zFileName = ST::format(NPCDATADIR "/civ{02d}.edt", CIV_QUOTE_MINERS_NOT_FOR_PLAYER);
 		}
 		else
 		{
-			sprintf(zFileName, NPCDATADIR "/%c%d.edt", 'a' + (gWorldSector.y - 1) , gWorldSector.x);
+			zFileName = ST::format(NPCDATADIR "/{}.edt", gWorldSector.AsShortString());
 		}
 	}
 	else
 	{
-		sprintf(zFileName, NPCDATADIR "/civ%02d.edt", ubCivQuoteID);
+		zFileName = ST::format(NPCDATADIR "/civ{02d}.edt", ubCivQuoteID);
 	}
 
 	zQuote = GCM->loadEncryptedString(zFileName, CIV_QUOTE_TEXT_SIZE * ubEntryID, CIV_QUOTE_TEXT_SIZE);
@@ -170,7 +167,7 @@ static void SurrenderMessageBoxCallBack(MessageBoxReturnValue const ubExitValue)
 		EndCaptureSequence( );
 
 		gfSurrendered = TRUE;
-		SetCustomizableTimerCallbackAndDelay( 3000, CaptureTimerCallback, FALSE );
+		SetCustomizableTimerCallbackAndDelay(3s, CaptureTimerCallback, false);
 
 		ActionDone( gCivQuoteData.pCiv );
 	}

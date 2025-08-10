@@ -13,7 +13,6 @@
 #include "Insurance_Text.h"
 #include "Soldier_Profile.h"
 #include "Overhead.h"
-#include "Soldier_Add.h"
 #include "Game_Clock.h"
 #include "Finances.h"
 #include "History.h"
@@ -1082,9 +1081,7 @@ static INT32 CalcStartDayOfInsurance(SOLDIERTYPE* pSoldier);
 
 void PurchaseOrExtendInsuranceForSoldier( SOLDIERTYPE *pSoldier, UINT32 uiInsuranceLength )
 {
-	INT32	iAmountOfMoneyTransfer = -1;
-
-	AssertMsg(pSoldier != NULL, "Soldier pointer is NULL!");
+	Assert(pSoldier);
 
 	//if the user doesnt have insruance already,
 	if( !(pSoldier->usLifeInsurance ) )
@@ -1095,7 +1092,8 @@ void PurchaseOrExtendInsuranceForSoldier( SOLDIERTYPE *pSoldier, UINT32 uiInsura
 	}
 
 	//transfer money
-	iAmountOfMoneyTransfer = CalculateInsuranceContractCost( uiInsuranceLength, pSoldier->ubProfile );
+	INT32 const iAmountOfMoneyTransfer =
+		CalculateInsuranceContractCost(uiInsuranceLength, pSoldier->ubProfile);
 
 	//if the user did have insruance already,
 	if( pSoldier->usLifeInsurance )

@@ -1,6 +1,6 @@
 #include "GameLoop.h"
 #include "GameVersion.h"
-#include "Local.h"
+#include "Input.h"
 #include "SGP.h"
 #include "Screens.h"
 #include "ShopKeeper_Interface.h"
@@ -12,25 +12,20 @@
 #include "Laptop.h"
 #include "MapScreen.h"
 #include "Game_Clock.h"
-#include "Overhead.h"
 #include "Map_Screen_Interface.h"
 #include "Tactical_Save.h"
-#include "Interface.h"
 #include "GameSettings.h"
 #include "GameInstance.h"
 #include "ContentManager.h"
 #include "Text.h"
 #include "HelpScreen.h"
 #include "SaveLoadGame.h"
-#include "Finances.h"
 #include "Options_Screen.h"
-#include "Debug.h"
-#include "Video.h"
 #include "Button_System.h"
 #include "Font_Control.h"
 #include "UILayout.h"
 #include "GameMode.h"
-#include "sgp/FileMan.h"
+#include "FPS.h"
 #include "Logger.h"
 
 #include <string_theory/format>
@@ -58,6 +53,8 @@ void InitializeGame(void)
 
 	// Init Fonts
 	InitializeFonts();
+
+	FPS::Init(GameLoop, gp10PointArial);
 
 	InitTacticalSave();
 
@@ -116,8 +113,7 @@ try
 	InputAtom InputEvent;
 	ScreenID uiOldScreen = guiCurrentScreen;
 
-	SGPPoint MousePos;
-	GetMousePos(&MousePos);
+	auto const MousePos{ GetMousePos() };
 	// Hook into mouse stuff for MOVEMENT MESSAGES
 	MouseSystemHook(MOUSE_POS, 0, MousePos.iX, MousePos.iY);
 	MusicPoll();
@@ -215,7 +211,10 @@ try
 		guiCurrentScreen = uiOldScreen;
 	}
 
-	RefreshScreen();
+	// Call the special version of RefreshScreen that respects the
+	// user defined FPS limit in game.json.
+	extern void RefreshScreenCapped();
+	RefreshScreenCapped();
 
 	guiGameCycleCounter++;
 
@@ -225,37 +224,37 @@ try
 catch (std::exception const& e)
 {
 	guiPreviousOptionScreen = guiCurrentScreen;
-	char const* what;
+	char const* what = "file";
 	ST::string success = "failed";
 	char const* attach = "";
 
-	if (gfEditMode && GameMode::getInstance()->isEditorMode())
+	if (guiCurrentScreen != MAINMENU_SCREEN)
 	{
-		what = "map";
-		if (SaveWorldAbsolute("error.dat"))
+		if (gfEditMode && GameMode::getInstance()->isEditorMode())
 		{
-			success = "succeeded (error.dat)";
-			attach  = " Do not forget to attach the map.";
+			what = "map";
+			if (SaveWorldAbsolute("error.dat"))
+			{
+				success = "succeeded (error.dat)";
+				attach = " Do not forget to attach the map.";
+			}
+		}
+		else
+		{
+			what = "savegame";
+			auto saveName = GetErrorSaveName();
+			if (SaveGame(saveName, "error savegame"))
+			{
+				success = ST::format("succeeded ({}.sav)", saveName);
+				attach = " Do not forget to attach the savegame.";
+			}
 		}
 	}
-	else
-	{
-		what = "savegame";
-		auto saveName = GetErrorSaveName();
-		if (SaveGame(saveName, "error savegame"))
-		{
-			success = ST::format("succeeded ({}.sav)", saveName);
-			attach  = " Do not forget to attach the savegame.";
-		}
-	}
-	char msg[2048];
-	snprintf(msg, lengthof(msg),
-		"%s\n"
-		"Creating an emergency %s %s.\n"
-		"Please report this error with a description of the circumstances.%s",
-		e.what(), what, success.c_str(), attach
+	ST::string msg = ST::format(
+		"{}\nCreating an emergency {} {}.\nPlease report this error with a description of the circumstances. {}",
+		e.what(), what, success, attach
 	);
-	throw std::runtime_error(msg);
+	throw std::runtime_error(msg.c_str());
 }
 
 

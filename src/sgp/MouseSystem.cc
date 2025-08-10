@@ -27,7 +27,6 @@
 #include "Timer.h"
 #include "Font_Control.h"
 #include "JAScreens.h"
-#include "Local.h"
 #include "Render_Dirty.h"
 #include "VSurface.h"
 #include "ScreenIDs.h"
@@ -517,7 +516,7 @@ static void MSYS_UpdateMouseRegion(void)
 
 			MSYS_Action &= ~MSYS_DO_MOVE;
 
-			if (cur->ButtonCallback && MSYS_Action & (MSYS_DO_BUTTONS | MSYS_DO_TFINGER_UP | MSYS_DO_TFINGER_DOWN | MSYS_DO_TFINGER_REPEAT))
+			if (cur->ButtonCallback && (MSYS_Action & (MSYS_DO_BUTTONS | MSYS_DO_TFINGER_UP | MSYS_DO_TFINGER_DOWN | MSYS_DO_TFINGER_REPEAT)))
 			{
 				if (cur->uiFlags & MSYS_REGION_ENABLED)
 				{
@@ -682,8 +681,6 @@ static void MSYS_UpdateMouseRegion(void)
 /* Inits a MOUSE_REGION structure for use with the mouse system */
 void MSYS_DefineRegion(MOUSE_REGION* const r, UINT16 const tlx, UINT16 const tly, UINT16 const brx, UINT16 const bry, INT8 priority, UINT16 const crsr, MOUSE_CALLBACK const movecallback, MOUSE_CALLBACK const buttoncallback)
 {
-	AssertMsg(!(r->uiFlags & MSYS_REGION_EXISTS), "Attempting to define a mouse region that already exists.");
-
 	if (priority <= MSYS_PRIORITY_LOWEST) priority = MSYS_PRIORITY_LOWEST;
 
 	r->PriorityLevel      = priority;
@@ -701,7 +698,7 @@ void MSYS_DefineRegion(MOUSE_REGION* const r, UINT16 const tlx, UINT16 const tly
 	r->MovementCallback   = movecallback;
 	r->ButtonCallback     = buttoncallback;
 	r->FastHelpTimer      = 0;
-	r->FastHelpText       = ST::null;
+	r->FastHelpText.clear();
 	r->FastHelpRect       = nullptr;
 	r->next               = 0;
 	r->prev               = 0;
@@ -723,7 +720,7 @@ void MOUSE_REGION::ChangeCursor(UINT16 const crsr)
 
 void MSYS_RemoveRegion(MOUSE_REGION* const r)
 {
-	AssertMsg(r, "Attempting to remove a NULL mouse region.");
+	Assert(r); // Attempting to remove a NULL mouse region?
 
 	if (!r) return;
 
@@ -734,7 +731,7 @@ void MSYS_RemoveRegion(MOUSE_REGION* const r)
 		FreeBackgroundRectPending(r->FastHelpRect);
 	}
 
-	r->FastHelpText = ST::null;
+	r->FastHelpText.clear();
 
 	MSYS_DeleteRegionFromList(r);
 
@@ -758,19 +755,6 @@ void MSYS_SetCurrentCursor(UINT16 Cursor)
 }
 
 
-void MSYS_SetRegionUserData(MOUSE_REGION* const r, UINT32 const index, INT32 const userdata)
-{
-	if (lengthof(r->user.data) <= index) throw std::logic_error("User data index is out of range");
-	r->user.data[index] = userdata;
-}
-
-
-INT32 MSYS_GetRegionUserData(MOUSE_REGION const* const r, UINT32 const index)
-{
-	if (lengthof(r->user.data) <= index) throw std::logic_error("User data index is out of range");
-	return r->user.data[index];
-}
-
 // This function will force a re-evaluation of mouse regions
 // Usually used to force change of mouse cursor if panels switch, etc
 void RefreshMouseRegions( )
@@ -783,7 +767,7 @@ void RefreshMouseRegions( )
 
 void MOUSE_REGION::SetFastHelpText(const ST::string& str)
 {
-	FastHelpText = ST::null;
+	FastHelpText.clear();
 
 	if (!(uiFlags & MSYS_REGION_EXISTS)) return;
 
@@ -973,4 +957,14 @@ void MOUSE_REGION::AllowDisabledRegionFastHelp(bool const allow)
 	{
 		uiFlags &= ~MSYS_ALLOW_DISABLED_FASTHELP;
 	}
+}
+
+MOUSE_CALLBACK MouseCallbackPrimarySecondary(
+	MOUSE_CALLBACK primaryAction,
+	MOUSE_CALLBACK secondaryAction,
+	MOUSE_CALLBACK allEvents,
+	bool triggerPrimaryOnMouseDown
+)
+{
+	return CallbackPrimarySecondary<MOUSE_REGION, MSYS_REGION_ENABLED>(primaryAction, secondaryAction, allEvents, triggerPrimaryOnMouseDown);
 }

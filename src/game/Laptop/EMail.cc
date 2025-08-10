@@ -2,17 +2,13 @@
 #include "Font.h"
 #include "Laptop.h"
 #include "EMail.h"
-#include "Local.h"
 #include "VObject.h"
 #include "Debug.h"
 #include "WordWrap.h"
-#include "Render_Dirty.h"
 #include "Cursors.h"
 #include "Soldier_Profile.h"
 #include "IMP_Compile_Character.h"
 #include "IMP_Portraits.h"
-#include "Game_Clock.h"
-#include "Environment.h"
 #include "AIMMembers.h"
 #include "Random.h"
 #include "Text.h"
@@ -223,7 +219,6 @@ static MOUSE_REGION g_mail_scroll_region;
 static Record* pMessageRecordList = NULL;
 
 // video handles
-static SGPVObject* guiEmailTitle;
 static SGPVObject* guiEmailBackground;
 static SGPVObject* guiEmailIndicator;
 static SGPVObject* guiEmailMessage;
@@ -259,7 +254,7 @@ static void InitializeMouseRegions(void)
 		const UINT16 w = LINE_WIDTH;
 		const UINT16 h = MIDDLE_WIDTH;
 		MOUSE_REGION* const r = &pEmailRegions[i];
-		MSYS_DefineRegion(r, x, y, x + w, y + h, MSYS_PRIORITY_NORMAL + 2, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(EmailBtnCallBackPrimary, EmailBtnCallBackSecondary, EmailBtnCallBackScroll));
+		MSYS_DefineRegion(r, x, y, x + w, y + h, MSYS_PRIORITY_NORMAL + 2, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(EmailBtnCallBackPrimary, EmailBtnCallBackSecondary, EmailBtnCallBackScroll));
 		MSYS_SetRegionUserData(r, 0, i);
 	}
 
@@ -278,6 +273,9 @@ void GameInitEmail()
 {
 	pEmailList=NULL;
 	pPageList=NULL;
+
+	CurrentMail = NULL;
+	PreviousMail = NULL;
 
 	iLastPage=-1;
 
@@ -300,9 +298,6 @@ void EnterEmail()
 	// load graphics
 
 	iCurrentPage = LaptopSaveInfo.iCurrentEmailPage;
-
-	// title bar
-	guiEmailTitle = AddVideoObjectFromFile(LAPTOPDIR "/programtitlebar.sti");
 
 	// the list background
 	guiEmailBackground = AddVideoObjectFromFile(LAPTOPDIR "/mailwindow.sti");
@@ -369,7 +364,6 @@ void ExitEmail()
 	DeleteEmailMouseRegions();
 
 	// remove video objects being used by email screen
-	DeleteVideoObject(guiEmailTitle);
 	DeleteVideoObject(guiEmailBackground);
 	DeleteVideoObject(guiMAILDIVIDER);
 	DeleteVideoObject(guiEmailIndicator);
@@ -472,7 +466,7 @@ static void ReDisplayBoxes(void);
 void RenderEmail( void )
 {
 	BltVideoObject(FRAME_BUFFER, guiEmailBackground, 0, LAPTOP_SCREEN_UL_X, EMAIL_LIST_WINDOW_Y + LAPTOP_SCREEN_UL_Y);
-	BltVideoObject(FRAME_BUFFER, guiEmailTitle,      0, LAPTOP_SCREEN_UL_X, LAPTOP_SCREEN_UL_Y - 2);
+	BltVideoObject(FRAME_BUFFER, guiTITLEBARLAPTOP,  0, LAPTOP_SCREEN_UL_X, LAPTOP_SCREEN_UL_Y - 2);
 
 	// show text on titlebar
 	DisplayTextOnTitleBar( );
@@ -1524,7 +1518,7 @@ static void MakeButton(UINT idx, INT16 x, GUI_CALLBACK click, const ST::string& 
 static void CreateMailScreenButtons(void)
 {
 	// create sort buttons, right now - not finished
-	MakeButton(0, ENVELOPE_BOX_X, ReadCallback,    ST::null);
+	MakeButton(0, ENVELOPE_BOX_X, ReadCallback,    {});
 	MakeButton(1, FROM_BOX_X,     FromCallback,    pEmailHeaders[FROM_HEADER]);
 	MakeButton(2, SUBJECT_BOX_X,  SubjectCallback, pEmailHeaders[SUBJECT_HEADER]);
 	MakeButton(3, DATE_BOX_X,     DateCallback,    pEmailHeaders[RECD_HEADER]);
@@ -1539,27 +1533,22 @@ static void DisplayEmailMessageSubjectDateFromLines(Email* pMail, INT32 iViewerY
 	SetFontAttributes(MESSAGE_FONT, FONT_BLACK, NO_SHADOW);
 
 	// all headers, but not info are right justified
-	INT16 usX;
-	INT16 usY;
+	RightAlign const alignment{ MESSAGE_HEADER_WIDTH };
 
 	// print from
-	FindFontRightCoordinates(MESSAGE_HEADER_X - 20, MESSAGE_FROM_Y + iViewerY, MESSAGE_HEADER_WIDTH, MESSAGE_FROM_Y + GetFontHeight(MESSAGE_FONT), pEmailHeaders[0], MESSAGE_FONT, &usX, &usY);
-	MPrint(usX, MESSAGE_FROM_Y + iViewerY, pEmailHeaders[0]);
+	MPrint(MESSAGE_HEADER_X - 20, MESSAGE_FROM_Y + iViewerY, pEmailHeaders[0], alignment);
 
 	// the actual from info
 	MPrint( MESSAGE_HEADER_X+MESSAGE_HEADER_WIDTH-13, MESSAGE_FROM_Y + iViewerY, pSenderNameList[pMail->ubSender]);
 
-
 	// print date
-	FindFontRightCoordinates(MESSAGE_HEADER_X + 168, MESSAGE_DATE_Y + iViewerY, MESSAGE_HEADER_WIDTH, MESSAGE_DATE_Y + GetFontHeight(MESSAGE_FONT), pEmailHeaders[2], MESSAGE_FONT, &usX, &usY);
-	MPrint(usX, MESSAGE_DATE_Y + iViewerY, pEmailHeaders[2]);
+	MPrint(MESSAGE_HEADER_X + 168, MESSAGE_DATE_Y + iViewerY, pEmailHeaders[2], alignment);
 
 	// the actual date info
 	MPrint(MESSAGE_HEADER_X + 235, MESSAGE_DATE_Y + iViewerY, ST::format("{}", pMail->iDate / (24 * 60)));
 
 	// print subject
-	FindFontRightCoordinates(MESSAGE_HEADER_X - 20, MESSAGE_SUBJECT_Y, MESSAGE_HEADER_WIDTH, MESSAGE_SUBJECT_Y + GetFontHeight(MESSAGE_FONT), pEmailHeaders[1], MESSAGE_FONT, &usX, &usY);
-	MPrint(usX, MESSAGE_SUBJECT_Y + iViewerY, pEmailHeaders[1]);
+	MPrint(MESSAGE_HEADER_X - 20, MESSAGE_SUBJECT_Y + iViewerY, pEmailHeaders[1], alignment);
 
  	// the actual subject info
 	IanDisplayWrappedString(SUBJECT_LINE_X + 2, SUBJECT_LINE_Y + 2 + iViewerY, SUBJECT_LINE_WIDTH, MESSAGE_GAP, MESSAGE_FONT, MESSAGE_COLOR, pMail->pSubject, 0, 0);
@@ -2268,11 +2257,9 @@ static void DisplayNumberOfPagesToThisEmail(INT32 const iViewerY)
 	// display the indent for the display of pages to this email..along with the current page/number of pages
 	SetFontAttributes(FONT12ARIAL, FONT_BLACK, NO_SHADOW);
 
-	ST::string str = ST::format("{} / {}", giMessagePage + 1, giNumberOfPagesToCurrentEmail - 1);
-	INT16 sX;
-	INT16 sY;
-	FindFontCenterCoordinates(VIEWER_X + INDENT_X_OFFSET, 0, INDENT_X_WIDTH, 0, str, FONT12ARIAL, &sX, &sY);
-	MPrint(sX, VIEWER_Y + iViewerY + INDENT_Y_OFFSET - 2, str);
+	MPrint(VIEWER_X + INDENT_X_OFFSET, VIEWER_Y + iViewerY + INDENT_Y_OFFSET - 2,
+		ST::format("{} / {}", giMessagePage + 1, giNumberOfPagesToCurrentEmail - 1),
+		CenterAlign(INDENT_X_WIDTH));
 
 	SetFontShadow(DEFAULT_SHADOW);
 }

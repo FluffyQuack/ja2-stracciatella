@@ -1,12 +1,16 @@
 #pragma once
+
 #include "Item_Types.h"
 #include "ItemStrings.h"
 #include "InventoryGraphicsModel.h"
+#include "Json.h"
 #include "TilesetTileIndexModel.h"
+
 #include <string_theory/string>
 
 class JsonObject;
-class JsonObjectReader;
+class JsonObject;
+struct ExplosiveModel;
 struct MagazineModel;
 struct WeaponModel;
 
@@ -14,23 +18,23 @@ struct ItemModel
 {
 	ItemModel(
 		uint16_t itemIndex,
-		ST::string internalName,
+		ST::string&& internalName,
 		uint32_t usItemClass,
 		uint8_t classIndex=0,
 		ItemCursor cursor=INVALIDCURS);
 
 	ItemModel(
 		uint16_t   itemIndex,
-		ST::string internalName,
-		ST::string shortName,
-		ST::string name,
-		ST::string description,
+		ST::string&& internalName,
+		ST::string&& shortName,
+		ST::string&& name,
+		ST::string&& description,
 		uint32_t   usItemClass,
 		uint8_t    ubClassIndex,
 		ItemCursor ubCursor,
-		InventoryGraphicsModel inventoryGraphics,
-		TilesetTileIndexModel tileGraphic,
-		uint8_t    ubWeight,
+		InventoryGraphicsModel&& inventoryGraphics,
+		TilesetTileIndexModel&& tileGraphic,
+		uint8_t    ubWeight, // In hectogram, so f.e. ubWeight==4 means 400 grams.
 		uint8_t    ubPerPocket,
 		uint16_t   usPrice,
 		uint8_t    ubCoolness,
@@ -38,8 +42,7 @@ struct ItemModel
 		int8_t     bRepairEase,
 		uint16_t   fFlags);
 
-	// This could be default in C++11
-	virtual ~ItemModel();
+	virtual ~ItemModel() = default;
 
 	const virtual ST::string& getInternalName() const;
 	const virtual ST::string& getShortName() const;
@@ -86,17 +89,25 @@ struct ItemModel
 
 	virtual const WeaponModel* asWeapon() const   { return NULL; }
 	virtual const MagazineModel* asAmmo() const   { return NULL; }
+	virtual const ExplosiveModel* asExplosive() const   { return NULL; }
 
 	/** Check if the given attachment can be attached to the item. */
 	virtual bool canBeAttached(uint16_t attachment) const;
 
-	virtual void serializeTo(JsonObject &obj) const;
+	struct InitData
+	{
+		JsonObject const& json;
+		BinaryData const& strings;
+	};
 
-	static ST::string deserializeShortName(JsonObjectReader &obj, const VanillaItemStrings& vanillaItemStrings);
-	static ST::string deserializeName(JsonObjectReader &obj, const VanillaItemStrings& vanillaItemStrings);
-	static ST::string deserializeDescription(JsonObjectReader &obj, const VanillaItemStrings& vanillaItemStrings);
-	static const ItemModel* deserialize(JsonObjectReader &obj, const VanillaItemStrings& vanillaItemStrings);
+	virtual JsonValue serialize() const;
+	static const ItemModel* deserialize(const JsonValue &json, const BinaryData& vanillaItemStrings);
+
 protected:
+	static ST::string deserializeShortName(InitData const&);
+	static ST::string deserializeName(InitData const&);
+	static ST::string deserializeDescription(InitData const&);
+
 	uint16_t   itemIndex;
 	ST::string internalName;
 	ST::string shortName;
@@ -116,5 +127,5 @@ protected:
 	uint16_t   fFlags;
 
 	void serializeFlags(JsonObject &obj) const;
-	uint32_t deserializeFlags(JsonObjectReader &obj) const;
+	static uint16_t deserializeFlags(const JsonObject &obj);
 };

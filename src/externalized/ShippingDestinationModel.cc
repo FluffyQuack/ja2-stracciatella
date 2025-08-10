@@ -18,8 +18,9 @@ uint8_t ShippingDestinationModel::getDeliverySector() const
 	return deliverySector.AsByte();
 }
 
-ShippingDestinationModel* ShippingDestinationModel::deserialize(JsonObjectReader& obj)
+ShippingDestinationModel* ShippingDestinationModel::deserialize(const JsonValue& json)
 {
+	auto obj = json.toObject();
 	uint8_t destSectorId = 0, destSectorZ = 0;
 	int16_t destGridNo = 0;
 	bool isPrimary = false;
@@ -41,7 +42,7 @@ ShippingDestinationModel* ShippingDestinationModel::deserialize(JsonObjectReader
 	);
 }
 
-void ShippingDestinationModel::validateData(std::vector<const ShippingDestinationModel*> destinations, std::vector<const ST::string*> destinationNames)
+void ShippingDestinationModel::validateData(std::vector<const ShippingDestinationModel*> destinations, std::vector<ST::string> const& destinationNames)
 {
 	int numPrimaryDestinations = 0;
 	for (size_t i = 0; i < destinations.size(); i++)

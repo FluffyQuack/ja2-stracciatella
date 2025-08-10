@@ -1,6 +1,7 @@
 #include "Directories.h"
 #include "Font.h"
 #include "Isometric_Utils.h"
+#include "ItemModel.h"
 #include "Local.h"
 #include "HImage.h"
 #include "MapScreen.h"
@@ -21,6 +22,7 @@
 #include "RenderWorld.h"
 #include "Cursors.h"
 #include "Radar_Screen.h"
+#include "Video.h"
 #include "WorldMan.h"
 #include "Font_Control.h"
 #include "Render_Dirty.h"
@@ -31,7 +33,6 @@
 #include "Faces.h"
 #include "Interface_Control.h"
 #include "Interface_Items.h"
-#include "Soldier_Profile.h"
 #include "MercTextBox.h"
 #include "Soldier_Functions.h"
 #include "Cursor_Control.h"
@@ -46,9 +47,6 @@
 #include "Vehicles.h"
 #include "GameSettings.h"
 #include "Squads.h"
-#include "Message.h"
-#include "Debug.h"
-#include "Video.h"
 #include "Items.h"
 #include "GameScreen.h"
 #include "MercProfile.h"
@@ -57,6 +55,7 @@
 
 #include "ContentManager.h"
 #include "GameInstance.h"
+#include "NewStrings.h"
 
 #include <string_theory/format>
 #include <string_theory/string>
@@ -78,7 +77,6 @@ BOOLEAN	gfInMovementMenu = FALSE;
 static INT32 giMenuAnchorX;
 static INT32 giMenuAnchorY;
 
-static BOOLEAN gfProgBarActive   = FALSE;
 static UINT8   gubProgNumEnemies = 0;
 static UINT8   gubProgCurEnemy   = 0;
 
@@ -998,10 +996,8 @@ void DrawSelectedUIAboveGuy(SOLDIERTYPE& s)
 		}
 		else
 		{
-			if (TIMECOUNTERDONE(s.BlinkSelCounter, 80))
+			if (TIMECOUNTERDONE(s.BlinkSelCounter, 80ms))
 			{
-				RESETTIMECOUNTER(s.BlinkSelCounter, 80);
-
 				s.fShowLocator = TRUE;
 				if (++s.sLocatorFrame == 5)
 				{
@@ -1394,14 +1390,20 @@ static void MakeButtonDoor(UINT idx, UINT gfx, INT16 x, INT16 y, INT16 ap, INT16
 {
 	GUIButtonRef const btn = QuickCreateButton(iIconImages[gfx], x, y, MSYS_PRIORITY_HIGHEST - 1, BtnDoorMenuCallback);
 	iActionIcons[idx] = btn;
+	ST::string diagWarning = "";
+	if (gOpenDoorMenu.pSoldier->bDesiredDirection & 1 && idx != OPEN_DOOR_ICON && idx != CANCEL_ICON)
+	{
+		diagWarning = *(GCM->getNewString(NS_DIAGONALITY_WARNING));
+		DisableButton(btn);
+	}
 	if (ap == 0 || !(gTacticalStatus.uiFlags & INCOMBAT))
 	{
-		btn->SetFastHelpText(help);
+		btn->SetFastHelpText(help+diagWarning);
 	}
 	else
 	{
 		ST::string zDisp = ST::format("{} ( {} )", help, ap);
-		btn->SetFastHelpText(zDisp);
+		btn->SetFastHelpText(zDisp+diagWarning);
 	}
 	if (disable || (ap != 0 && !EnoughPoints(gOpenDoorMenu.pSoldier, ap, bp, FALSE)))
 	{
@@ -1424,8 +1426,8 @@ static void PopupDoorOpenMenu(BOOLEAN fClosingDoor)
 	// Create mouse region over all area to facilitate clicking to end
 	MSYS_DefineRegion(&gMenuOverlayRegion, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, MSYS_PRIORITY_HIGHEST - 1, CURSOR_NORMAL, MSYS_NO_CALLBACK, DoorMenuBackregionCallback);
 
-	const BOOLEAN d0 = fClosingDoor || AM_AN_EPC(gOpenDoorMenu.pSoldier);
-	BOOLEAN d;
+	const bool d0 = fClosingDoor || AM_AN_EPC(gOpenDoorMenu.pSoldier);
+	bool d;
 
 	d = d0 || !SoldierHasKey(*gOpenDoorMenu.pSoldier, ANYKEY);
 	MakeButtonDoor(USE_KEYRING_ICON, USE_KEYRING_IMAGES, dx + 20, dy, AP_UNLOCK_DOOR, BP_UNLOCK_DOOR, d,
@@ -1444,7 +1446,7 @@ static void PopupDoorOpenMenu(BOOLEAN fClosingDoor)
 			d, pTacticalPopupButtonStrings[EXPLOSIVE_DOOR_ICON]);
 
 	ST::string help = pTacticalPopupButtonStrings[fClosingDoor ? CANCEL_ICON + 1 : OPEN_DOOR_ICON];
-	MakeButtonDoor(OPEN_DOOR_ICON, OPEN_DOOR_IMAGES, dx, dy, AP_OPEN_DOOR, BP_OPEN_DOOR, FALSE, help);
+	MakeButtonDoor(OPEN_DOOR_ICON, OPEN_DOOR_IMAGES, dx, dy, doorAPs[gOpenDoorMenu.pSoldier->ubDoorHandleCode], BP_OPEN_DOOR, FALSE, help);
 
 	MakeButtonDoor(EXAMINE_DOOR_ICON, EXAMINE_DOOR_IMAGES, dx, dy + 20, AP_EXAMINE_DOOR, BP_EXAMINE_DOOR, d0,
 			pTacticalPopupButtonStrings[EXAMINE_DOOR_ICON]);
@@ -1564,7 +1566,7 @@ static void BtnDoorMenuCallback(GUI_BUTTON* btn, UINT32 reason)
 		{
 			// Open door normally...
 			// Check APs
-			if (EnoughPoints(gOpenDoorMenu.pSoldier, AP_OPEN_DOOR, BP_OPEN_DOOR, FALSE))
+			if (EnoughPoints(gOpenDoorMenu.pSoldier, doorAPs[gOpenDoorMenu.pSoldier->ubDoorHandleCode], BP_OPEN_DOOR, FALSE))
 			{
 				// Set UI
 				SetUIBusy(gOpenDoorMenu.pSoldier);
@@ -1847,10 +1849,7 @@ static void CreateTopMessage(void)
 		default: abort();
 	}
 
-	INT16 sX;
-	INT16 sY;
-	FindFontCenterCoordinates(bar->x, bar->y, bar->w, bar->h, msg, TINYFONT1, &sX, &sY);
-	MPrint(sX, sY, msg);
+	MPrint(bar->x, bar->y, msg, HCenterVCenterAlign(bar->w, bar->h));
 
 	SetFontDestBuffer(FRAME_BUFFER);
 	SetFontShadow(DEFAULT_SHADOW);
@@ -1884,10 +1883,8 @@ void HandleTopMessages(void)
 		case MILITIA_INTERRUPT_MESSAGE:
 		case AIR_RAID_TURN_MESSAGE:
 			// OK, update timer.....
-			if (TIMECOUNTERDONE(giTimerTeamTurnUpdate, PLAYER_TEAM_TIMER_SEC_PER_TICKS))
+			if (COUNTERDONE(TEAMTURNUPDATE))
 			{
-				RESETTIMECOUNTER(giTimerTeamTurnUpdate, PLAYER_TEAM_TIMER_SEC_PER_TICKS);
-
 				// Update counter....
 				if (ts->usTactialTurnLimitCounter < ts->usTactialTurnLimitMax)
 				{
@@ -1913,10 +1910,8 @@ void HandleTopMessages(void)
 			{
 				ts->uiTactialTurnLimitClock = 0;
 
-				if (TIMECOUNTERDONE(giTimerTeamTurnUpdate, PLAYER_TEAM_TIMER_SEC_PER_TICKS))
+				if (COUNTERDONE(TEAMTURNUPDATE))
 				{
-					RESETTIMECOUNTER(giTimerTeamTurnUpdate, PLAYER_TEAM_TIMER_SEC_PER_TICKS);
-
 					if (ts->fTactialTurnLimitStartedBeep)
 					{
 						if (GetJA2Clock() - gTopMessage.uiTimeSinceLastBeep > PLAYER_TEAM_TIMER_TIME_BETWEEN_BEEPS)
@@ -1989,7 +1984,6 @@ void InitEnemyUIBar( UINT8 ubNumEnemies, UINT8 ubDoneEnemies )
 	// OK, set value
 	gubProgNumEnemies = ubNumEnemies + ubDoneEnemies;
 	gubProgCurEnemy = ubDoneEnemies;
-	gfProgBarActive = TRUE;
 
 	gTacticalStatus.usTactialTurnLimitCounter = ubDoneEnemies * PLAYER_TEAM_TIMER_TICKS_PER_ENEMY;
 	gTacticalStatus.usTactialTurnLimitMax = ( (ubNumEnemies + ubDoneEnemies) * PLAYER_TEAM_TIMER_TICKS_PER_ENEMY );
@@ -1998,15 +1992,10 @@ void InitEnemyUIBar( UINT8 ubNumEnemies, UINT8 ubDoneEnemies )
 
 void UpdateEnemyUIBar( )
 {
-	// Are we active?
-	if ( gfProgBarActive )
-	{
-		// OK, update team limit counter....
-		gTacticalStatus.usTactialTurnLimitCounter = ( gubProgCurEnemy * PLAYER_TEAM_TIMER_TICKS_PER_ENEMY );
+	// OK, update team limit counter....
+	gTacticalStatus.usTactialTurnLimitCounter = gubProgCurEnemy * PLAYER_TEAM_TIMER_TICKS_PER_ENEMY;
 
-		gubProgCurEnemy++;
-
-	}
+	gubProgCurEnemy++;
 
 	// Do we have an active enemy bar?
 	if (gTacticalStatus.fInTopMessage &&
@@ -2063,8 +2052,7 @@ void InitPlayerUIBar( BOOLEAN fInterrupt )
 	gTacticalStatus.fTactialTurnLimitStartedBeep = FALSE;
 
 	// RESET COIUNTER...
-	RESETTIMECOUNTER( giTimerTeamTurnUpdate, PLAYER_TEAM_TIMER_SEC_PER_TICKS );
-
+	RESETCOUNTER(TEAMTURNUPDATE);
 
 	// OK, set value
 	AddTopMessage(fInterrupt != TRUE ? PLAYER_TURN_MESSAGE : PLAYER_INTERRUPT_MESSAGE);

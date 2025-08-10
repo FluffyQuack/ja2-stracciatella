@@ -7,7 +7,6 @@
 #include "ContentManager.h"
 #include "Debug.h"
 #include "Facts.h"
-#include "FileMan.h"
 #include "Game_Clock.h"
 #include "Game_Event_Hook.h"
 #include "Game_Init.h"
@@ -36,6 +35,7 @@
 #include "StrategicAIPolicy.h"
 #include "StrategicMap.h"
 #include "Town_Militia.h"
+#include <memory>
 #include <vector>
 
 #define SAI_VERSION		29
@@ -138,8 +138,7 @@ extern UINT8 gubNumGroupsArrivedSimultaneously;
 //group.  When the queen wants to send forces to attack a town that is defended, the initial number of forces that
 //she would send would be considered too weak.  So, instead, she will send that force to the sector's adjacent sector,
 //and stage, while
-UINT8 *gubGarrisonReinforcementsDenied = NULL;
-UINT8 *gubPatrolReinforcementsDenied = NULL;
+std::unique_ptr<UINT8 []> gubGarrisonReinforcementsDenied;
 
 //Unsaved vars
 BOOLEAN gfDisplayStrategicAILogs = FALSE;
@@ -367,14 +366,12 @@ void InitStrategicAI()
 
 	// Initialize the patrol group definitions
 	gPatrolGroup = GCM->getPatrolGroups();
-	gubPatrolReinforcementsDenied = new UINT8[gPatrolGroup.size()]{};
 
 	// Initialize the garrison group definitions
-	auto origGarrisonGroups = GCM->getGarrisonGroups();
-	size_t uiGarrisonArraySize = origGarrisonGroups.size();
-	gGarrisonGroup = origGarrisonGroups;
+	gGarrisonGroup = GCM->getGarrisonGroups();
+	size_t uiGarrisonArraySize = gGarrisonGroup.size();
 
-	gubGarrisonReinforcementsDenied = new UINT8[uiGarrisonArraySize]{};
+	gubGarrisonReinforcementsDenied = std::make_unique<UINT8 []>(uiGarrisonArraySize);
 
 	// Modify initial force sizes?
 	INT32 const force_percentage = giForcePercentage;
@@ -569,16 +566,6 @@ void KillStrategicAI()
 	gPatrolGroup.clear();
 	gGarrisonGroup.clear();
 
-	if( gubPatrolReinforcementsDenied )
-	{
-		delete[] gubPatrolReinforcementsDenied;
-		gubPatrolReinforcementsDenied = NULL;
-	}
-	if( gubGarrisonReinforcementsDenied )
-	{
-		delete[] gubGarrisonReinforcementsDenied;
-		gubGarrisonReinforcementsDenied = NULL;
-	}
 	DeleteAllStrategicEventsOfType( EVENT_EVALUATE_QUEEN_SITUATION );
 }
 
@@ -1948,7 +1935,6 @@ void EvaluateQueenSituation()
 	INT32 iRandom, iWeight;
 	UINT32 uiOffset;
 	UINT16 usDefencePoints;
-	INT32 iSumOfAllWeights = 0;
 
 	// figure out how long it shall be before we call this again
 
@@ -1997,9 +1983,6 @@ void EvaluateQueenSituation()
 		iWeight = gGarrisonGroup[ i ].bWeight;
 		if( iWeight > 0 )
 		{	//if group is requesting reinforcements.
-
-			iSumOfAllWeights += iWeight;	// debug only!
-
 			if( iRandom < iWeight && !gGarrisonGroup[ i ].ubPendingGroupID &&
 					EnemyPermittedToAttackSector( NULL, gGarrisonGroup[ i ].ubSectorID ) &&
 					GarrisonRequestingMinimumReinforcements( i ) )
@@ -2026,8 +2009,6 @@ void EvaluateQueenSituation()
 		iWeight = gPatrolGroup[ i ].bWeight;
 		if( iWeight > 0 )
 		{
-			iSumOfAllWeights += iWeight;	// debug only!
-
 			if( iRandom < iWeight && !gPatrolGroup[ i ].ubPendingGroupID && PatrolRequestingMinimumReinforcements( i ) )
 			{ //This is the group that gets the reinforcements!
 				SendReinforcementsForPatrol( i, NULL );
@@ -2095,9 +2076,10 @@ void SaveStrategicAI(HWFILE const hFile)
 		hFile->write(&gEmptyGarrisonGroup, sizeof(GARRISON_GROUP));
 	}
 
-	hFile->write(gubPatrolReinforcementsDenied, gPatrolGroup.size());
+	// Skip over the removed (because unused) gubPatrolReinforcementsDenied.
+	hFile->seek(static_cast<INT32>(gPatrolGroup.size()), FileSeekMode::FILE_SEEK_FROM_CURRENT);
 
-	hFile->write(gubGarrisonReinforcementsDenied, gGarrisonGroup.size());
+	hFile->write(gubGarrisonReinforcementsDenied.get(), gGarrisonGroup.size());
 }
 
 
@@ -2170,23 +2152,12 @@ void LoadStrategicAI(HWFILE const hFile)
 	}
 	ArmyCompositionModel::validateLoadedData(gArmyComp);
 
-	//Load the list of reinforcement patrol points.
-	if( gubPatrolReinforcementsDenied )
-	{
-		delete[] gubPatrolReinforcementsDenied;
-		gubPatrolReinforcementsDenied = NULL;
-	}
-	gubPatrolReinforcementsDenied = new UINT8[iPatrolArraySize]{};
-	hFile->read(gubPatrolReinforcementsDenied, iPatrolArraySize);
+	// Skip over the removed (because unused) gubPatrolReinforcementsDenied.
+	hFile->seek(iPatrolArraySize, FileSeekMode::FILE_SEEK_FROM_CURRENT);
 
 	//Load the list of reinforcement garrison points.
-	if( gubGarrisonReinforcementsDenied )
-	{
-		delete[] gubGarrisonReinforcementsDenied;
-		gubGarrisonReinforcementsDenied = NULL;
-	}
-	gubGarrisonReinforcementsDenied = new UINT8[iGarrisonArraySize]{};
-	hFile->read(gubGarrisonReinforcementsDenied, iGarrisonArraySize);
+	gubGarrisonReinforcementsDenied = std::make_unique<UINT8 []>(iGarrisonArraySize);
+	hFile->read(gubGarrisonReinforcementsDenied.get(), iGarrisonArraySize);
 
 	if( ubSAIVersion < 6 )
 	{ //Reinitialize the costs since they have changed.
@@ -2196,7 +2167,7 @@ void LoadStrategicAI(HWFILE const hFile)
 		EvolveQueenPriorityPhase( TRUE );
 
 		//Recreate the patrol desired sizes
-		auto origPatrolGroup = GCM->getPatrolGroups();
+		auto && origPatrolGroup{ GCM->getPatrolGroups() };
 		for( i = 0; i < gPatrolGroup.size(); i++ )
 		{
 			gPatrolGroup[ i ].bSize = origPatrolGroup[ i ].bSize;
@@ -2705,9 +2676,6 @@ static void EvolveQueenPriorityPhase(BOOLEAN fForceChange)
 }
 
 
-static void RequestHighPriorityGarrisonReinforcements(INT32 iGarrisonID, UINT8 ubSoldiersRequested);
-
-
 void ExecuteStrategicAIAction(UINT16 usActionCode, const SGPSector* sMap)
 {
 	GROUP *pGroup, *pPendingGroup = NULL;
@@ -2952,7 +2920,7 @@ static void RequestHighPriorityGarrisonReinforcements(size_t iGarrisonID, UINT8 
 			pGroup = GetGroup( gPatrolGroup[ i ].ubGroupID );
 			if( pGroup && pGroup->ubGroupSize >= ubSoldiersRequested )
 			{
-				ubDist = SectorDistance(pGroup->ubSector.AsByte(), gGarrisonGroup[iGarrisonID].ubSectorID);
+				ubDist = SectorDistance(pGroup->ubSector, gGarrisonGroup[iGarrisonID].ubSectorID);
 				if( ubDist < ubBestDist )
 				{
 					ubBestDist = ubDist;
@@ -3396,38 +3364,6 @@ size_t FindPatrolGroupIndexForGroupID( UINT8 ubGroupID )
 		{
 			// found it
 			return( sPatrolIndex );
-		}
-	}
-
-	// not there!
-	return( -1 );
-}
-
-
-size_t FindPatrolGroupIndexForGroupIDPending( UINT8 ubGroupID )
-{
-	for( size_t sPatrolIndex = 0; sPatrolIndex < gPatrolGroup.size(); sPatrolIndex++ )
-	{
-		if ( gPatrolGroup[ sPatrolIndex ].ubPendingGroupID == ubGroupID )
-		{
-			// found it
-			return( sPatrolIndex );
-		}
-	}
-
-	// not there!
-	return( -1 );
-}
-
-
-size_t FindGarrisonIndexForGroupIDPending( UINT8 ubGroupID )
-{
-	for( size_t sGarrisonIndex = 0; sGarrisonIndex < gGarrisonGroup.size(); sGarrisonIndex++ )
-	{
-		if ( gGarrisonGroup[ sGarrisonIndex ].ubPendingGroupID == ubGroupID )
-		{
-			// found it
-			return( sGarrisonIndex );
 		}
 	}
 

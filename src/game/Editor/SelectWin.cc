@@ -8,7 +8,6 @@
 #include "VSurface.h"
 #include "WorldDat.h"
 #include "Random.h"
-#include "SysUtil.h"
 #include "Font_Control.h"
 #include "SelectWin.h"
 #include "EditorDefines.h"
@@ -21,8 +20,7 @@
 #include <string_theory/format>
 #include <string_theory/string>
 
-#include <stdexcept>
-
+#include <utility>
 
 // defines for DisplaySpec.ubType
 #define DISPLAY_TEXT    1
@@ -63,6 +61,11 @@ struct DisplayList
 	BOOLEAN      fChosen;
 	DisplayList* pNext;
 };
+
+constexpr bool operator==(Selections const& selection, DisplayList const& dlist)
+{
+	return dlist.uiObjIndx == selection.uiObject && dlist.uiIndex == selection.usIndex;
+}
 
 
 extern BOOLEAN fDontUseRandom;
@@ -227,7 +230,8 @@ static GUIButtonRef MakeButton(UINT idx, const char* gfx, INT16 y, INT16 h, GUI_
 {
 	INT16 const img = LoadGenericButtonIcon(gfx);
 	iButtonIcons[idx] = img;
-	GUIButtonRef const btn = CreateIconButton(img, 0, SCREEN_WIDTH - 40, y, 40, h, MSYS_PRIORITY_HIGH, click);
+	GUIButtonRef const btn = CreateIconButton(img, 0, SCREEN_WIDTH - 40, y,
+	 40, h, MSYS_PRIORITY_HIGH, std::move(click));
 	btn->SetFastHelpText(help);
 	return btn;
 }
@@ -696,8 +700,8 @@ void RenderSelectionWindow( void )
 			iEY = gusMouseYPos;
 
 
-			if (iEX < iSX) Swap(iEX, iSX);
-			if (iEY < iSY) Swap(iEY, iSY);
+			if (iEX < iSX) std::swap(iEX, iSX);
+			if (iEY < iSY) std::swap(iEY, iSY);
 
 			iEX = std::min(iEX, 600);
 			iSY = std::max(INT32(g_sel_win_box.y), iSY);
@@ -788,8 +792,8 @@ static void SelWinClkCallback(GUI_BUTTON* button, UINT32 reason)
 
 		gfRenderSquareArea = FALSE;
 
-		if (iEndClickX < iStartClickX) Swap(iEndClickX, iStartClickX);
-		if (iEndClickY < iStartClickY) Swap(iEndClickY, iStartClickY);
+		if (iEndClickX < iStartClickX) std::swap(iEndClickX, iStartClickX);
+		if (iEndClickY < iStartClickY) std::swap(iEndClickY, iStartClickY);
 
 		iXInc = iYInc = 1;
 		for( iClickY = iStartClickY; iClickY <= iEndClickY; iClickY += iYInc )
@@ -875,8 +879,7 @@ static void AddToSelectionList(DisplayList* pNode)
 {
 	for (INT32 iIndex = 0; iIndex < *pNumSelList; ++iIndex)
 	{
-		if ( pNode->uiObjIndx == pSelList[ iIndex ].uiObject &&
-			pNode->uiIndex == pSelList[ iIndex ].usIndex )
+		if (pSelList[iIndex] == *pNode)
 		{
 			// Was already in the list, so bump up the count
 			++pSelList[iIndex].sCount;
@@ -936,8 +939,7 @@ static BOOLEAN RemoveFromSelectionList(DisplayList* pNode)
 
 	for (INT32 iIndex = 0; iIndex < *pNumSelList; ++iIndex)
 	{
-		if ( pNode->uiObjIndx == pSelList[ iIndex ].uiObject &&
-			pNode->uiIndex == pSelList[ iIndex ].usIndex )
+		if (pSelList[iIndex] == *pNode)
 		{
 			if (--pSelList[iIndex].sCount <= 0)
 			{
@@ -997,8 +999,7 @@ static BOOLEAN IsInSelectionList(const DisplayList* pNode)
 {
 	for (INT32 iIndex = 0; iIndex < *pNumSelList; iIndex++)
 	{
-		if (pNode->uiObjIndx == pSelList[iIndex].uiObject &&
-				pNode->uiIndex   == pSelList[iIndex].usIndex)
+		if (pSelList[iIndex] == *pNode)
 		{
 			return TRUE;
 		}
@@ -1010,17 +1011,17 @@ static BOOLEAN IsInSelectionList(const DisplayList* pNode)
 
 /* Find an occurance of a particular display list object in the current
  * selection list. Returns the corresponding selection list entry. */
-static Selections const& FindInSelectionList(DisplayList const& n)
+static Selections const * FindInSelectionList(DisplayList const& n)
 {
 	Selections const* const end = pSelList + *pNumSelList;
 	for (Selections const* i = pSelList; i != end; ++i)
 	{
-		Selections const& sel = *i;
-		if (n.uiObjIndx != sel.uiObject) continue;
-		if (n.uiIndex   != sel.usIndex)  continue;
-		return sel;
+		if (*i == n)
+		{
+			return i;
+		}
 	}
-	throw std::logic_error("node not in selection list");
+	return nullptr;
 }
 
 
@@ -1125,15 +1126,14 @@ static void DisplayWindowFunc(DisplayList*, INT16 top_cut_off, SGPBox const* are
 //	Displays the objects in the display list to the selection window.
 static void DrawSelections(void)
 {
-	SGPRect					ClipRect, NewRect;
+	SGPRect NewRect;
 
 	NewRect.iLeft   = g_sel_win_box.x;
 	NewRect.iTop    = g_sel_win_box.y;
 	NewRect.iRight  = g_sel_win_box.x + g_sel_win_box.w - 1;
 	NewRect.iBottom = g_sel_win_box.y + g_sel_win_box.h - 1;
 
-	GetClippingRect(&ClipRect);
-	SetClippingRect(&NewRect);
+	SGPRect const ClipRect = SetClippingRect(NewRect);
 
 	SetFont( gpLargeFontType1 );
 	SetFontShade(LARGEFONT1, FONT_SHADE_GREY_165);
@@ -1142,7 +1142,7 @@ static void DrawSelections(void)
 
 	SetFontShade(LARGEFONT1, FONT_SHADE_NEUTRAL);
 
-	SetClippingRect(&ClipRect);
+	SetClippingRect(ClipRect);
 }
 
 
@@ -1233,7 +1233,10 @@ static void DisplayWindowFunc(DisplayList* const n, INT16 const top_cut_off, SGP
 
 	if (n->fChosen)
 	{
-		INT16 const count = FindInSelectionList(*n).sCount;
-		if (count != 0) GPrint(x, y, ST::format("{}", count));
+		auto * const selection = FindInSelectionList(*n);
+		if (selection != nullptr && selection->sCount != 0)
+		{
+			GPrint(x, y, ST::format("{}", selection->sCount));
+		}
 	}
 }

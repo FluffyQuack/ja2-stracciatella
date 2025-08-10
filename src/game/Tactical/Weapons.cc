@@ -1,9 +1,8 @@
-#include <math.h> // floorf
-
 #include "Directories.h"
 #include "Font_Control.h"
 #include "Handle_Items.h"
 #include "Overhead_Types.h"
+#include "SGPStrings.h"
 #include "Soldier_Control.h"
 #include "Overhead.h"
 #include "Event_Pump.h"
@@ -30,7 +29,6 @@
 #include "Dialogue_Control.h"
 #include "SkillCheck.h"
 #include "Explosion_Control.h"
-#include "Quests.h"
 #include "Physics.h"
 #include "Random.h"
 #include "Vehicles.h"
@@ -42,15 +40,13 @@
 #include "Soldier_Macros.h"
 #include "SmokeEffects.h"
 #include "Auto_Resolve.h"
-#include "SoundMan.h"
 #include "Debug.h"
 
-#include "CalibreModel.h"
 #include "ContentManager.h"
 #include "GameInstance.h"
 #include "WeaponModels.h"
 #include "Logger.h"
-#include "policy/GamePolicy.h"
+#include "GamePolicy.h"
 
 // NB this is arbitrary, chances in DG ranged from 1 in 6 to 1 in 20
 #define BASIC_DEPRECIATE_CHANCE	15
@@ -127,45 +123,6 @@ ARMOURTYPE const Armour[] =
 	{ARMOURCLASS_VEST,	27,		15}, /* Kevlar 2 jack w X */
 	{ARMOURCLASS_VEST,	32,		10}, /* Kevlar 2 jack w Y */
 };
-
-EXPLOSIVETYPE const Explosive[] =
-{
-	//Type,		Yield,	Yield2,	Radius,	Volume,	Volatility,	Animation,	Description
-	//-----		-----	------	------	------	--------- 	------------------
-	{EXPLOSV_STUN,		1,	70,	4,	0,	0,	STUN_BLAST}, /* stun grenade */
-	{EXPLOSV_TEARGAS,	0,	20,	4,	0,	0,	TARGAS_EXP}, /* tear gas grenade */
-	{EXPLOSV_MUSTGAS,	15,	40,	4,	0,	0,	MUSTARD_EXP}, /* mustard gas grenade*/
-	{EXPLOSV_NORMAL,	15,	7,	3,	15,	1,	BLAST_1}, /* mini hand grenade */
-	{EXPLOSV_NORMAL,	25,	10,	4,	25,	1,	BLAST_1}, /* reg hand grenade */
-	{EXPLOSV_NORMAL,	40,	12,	5,	20,	10,	BLAST_2}, /* RDX */
-	{EXPLOSV_NORMAL,	50,	15,	5,	50,	2,	BLAST_2}, /* TNT (="explosives")*/
-	{EXPLOSV_NORMAL,	60,	15,	6,	60,	2,	BLAST_2}, /* HMX (=RDX+TNT) */
-	{EXPLOSV_NORMAL,	55,	15,	6,	55,	0,	BLAST_2}, /* C1 (=RDX+min oil) */
-	{EXPLOSV_NORMAL,	50,	22,	6,	50,	2,	BLAST_2}, /* mortar shell */
-
-	{EXPLOSV_NORMAL,	30,	30,	2,	30,	2,	BLAST_1}, /* mine */
-	{EXPLOSV_NORMAL,	65,	30,	7,	65,	0,	BLAST_1}, /* C4 ("plastique") */
-	{EXPLOSV_FLARE,		0,	0,	10,	0,	0,	BLAST_1}, /* trip flare */
-	{EXPLOSV_NOISE,		0,	0,	50,	50,	0,	BLAST_1}, /* trip klaxon */
-	{EXPLOSV_NORMAL,	20,	0,	1,	20,	0,	BLAST_1}, /* shaped charge */
-	{EXPLOSV_FLARE,		0,	0,	10,	0,	0,	BLAST_1,}, /* break light */
-	{EXPLOSV_NORMAL,	25,	5,	4,	25,	1,	BLAST_1,}, /* GL grenade */
-	{EXPLOSV_TEARGAS,	0,	20,	3,	0,	0,	TARGAS_EXP,}, /* GL tear gas grenade*/
-	{EXPLOSV_STUN,		1,	50,	4,	0,	0,	STUN_BLAST,}, /* GL stun grenade */
-	{EXPLOSV_SMOKE,		0,	0,	3,	0,	0,	SMOKE_EXP,}, /* GL smoke grenade */
-
-	{EXPLOSV_SMOKE,		0,	0,	4,	0,	0,	SMOKE_EXP,}, /* smoke grenade */
-	{EXPLOSV_NORMAL,	60,	20,	6,	60,	2,	BLAST_2,}, /* Tank Shell */
-	{EXPLOSV_NORMAL,	100,	0,	0,	0,	0,	BLAST_1,}, /* Fake structure igniter */
-	{EXPLOSV_NORMAL,	100,	0,	1,	0,	0,	BLAST_1,}, /* creature cocktail */
-	{EXPLOSV_NORMAL,	50,	10,	5,	50,	2,	BLAST_2,}, /* fake struct explosion*/
-	{EXPLOSV_NORMAL,	50,	10,	5,	50,	2,	BLAST_3,}, /* fake vehicle explosion*/
-	{EXPLOSV_TEARGAS,	0,	40,	4,	0,	0,	TARGAS_EXP}, /* big tear gas */
-	{EXPLOSV_CREATUREGAS,	5,	0,	1,	0,	0,	NO_BLAST}, /* small creature gas*/
-	{EXPLOSV_CREATUREGAS,	8,	0,	3,	0,	0,	NO_BLAST}, /* big creature gas*/
-	{EXPLOSV_CREATUREGAS,	0,	0,	0,	0,	0,	NO_BLAST}, /* vry sm creature gas*/
-};
-
 
 // the amount of momentum reduction for the head, torso, and legs
 // used to determine whether the bullet will go through someone
@@ -358,21 +315,18 @@ static void AdjustImpactByHitLocation(INT32 iImpact, UINT8 ubHitLocation, INT32*
 
 // #define TESTGUNJAM
 
-BOOLEAN CheckForGunJam( SOLDIERTYPE * pSoldier )
+FireWeaponResult CheckForGunJam(SOLDIERTYPE * const pSoldier)
 {
-	OBJECTTYPE *pObj;
-	INT32      iChance, iResult;
-
 	// should jams apply to enemies?
 	if (pSoldier->uiStatusFlags & SOLDIER_PC)
 	{
 		if ( GCM->getItem(pSoldier->usAttackingWeapon)->getItemClass() == IC_GUN && !EXPLOSIVE_GUN( pSoldier->usAttackingWeapon ) )
 		{
-			pObj = &(pSoldier->inv[pSoldier->ubAttackingHand]);
-				if (pObj->bGunAmmoStatus > 0)
+			auto & obj = pSoldier->inv[pSoldier->ubAttackingHand];
+			if (obj.bGunAmmoStatus > 0)
 			{
 				// gun might jam, figure out the chance
-				iChance = (80 - pObj->bGunStatus);
+				INT32 iChance = 80 - obj.bGunStatus;
 
 				// CJC: removed reliability from formula...
 
@@ -402,23 +356,23 @@ BOOLEAN CheckForGunJam( SOLDIERTYPE * pSoldier )
 					gfNextFireJam = FALSE;
 
 					// jam! negate the gun ammo status.
-					pObj->bGunAmmoStatus *= -1;
+					obj.bGunAmmoStatus *= -1;
 
 					// Deduct AMMO!
 					DeductAmmo( pSoldier, pSoldier->ubAttackingHand );
 
 					TacticalCharacterDialogue( pSoldier, QUOTE_JAMMED_GUN );
-					return( TRUE );
+					return FireWeaponResult::JAMMED;
 				}
 			}
-			else if (pObj->bGunAmmoStatus < 0)
+			else if (obj.bGunAmmoStatus < 0)
 			{
 				// try to unjam gun
-				iResult = SkillCheck( pSoldier, UNJAM_GUN_CHECK, (INT8) (GCM->getItem(pObj->usItem)->getReliability() * 4) );
-				if (iResult > 0)
+				if (SkillCheck(pSoldier, UNJAM_GUN_CHECK,
+					GCM->getItem(obj.usItem)->getReliability() * 4) > 0)
 				{
 					// yay! unjammed the gun
-					pObj->bGunAmmoStatus *= -1;
+					obj.bGunAmmoStatus *= -1;
 
 					// MECHANICAL/DEXTERITY GAIN: Unjammed a gun
 					StatChange(*pSoldier, MECHANAMT, 5, FROM_SUCCESS);
@@ -427,23 +381,21 @@ BOOLEAN CheckForGunJam( SOLDIERTYPE * pSoldier )
 					DirtyMercPanelInterface( pSoldier, DIRTYLEVEL2 );
 
 					// We unjammed gun, return appropriate value!
-					return( 255 );
+					return FireWeaponResult::UNJAMMED;
 				}
 				else
 				{
-					return( TRUE );
+					return FireWeaponResult::JAMMED;
 				}
 			}
 		}
 	}
-	return( FALSE );
+	return FireWeaponResult::FIREABLE;
 }
 
 
-BOOLEAN	OKFireWeapon( SOLDIERTYPE *pSoldier )
+FireWeaponResult OKFireWeapon(SOLDIERTYPE * const pSoldier)
 {
-	BOOLEAN bGunJamVal;
-
 	// 1) Are we attacking with our second hand?
 	if ( pSoldier->ubAttackingHand == SECONDHANDPOS )
 	{
@@ -452,45 +404,30 @@ BOOLEAN	OKFireWeapon( SOLDIERTYPE *pSoldier )
 			if (pSoldier->bTeam == OUR_TEAM)
 			{
 				ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE, g_langRes->Message[ STR_2ND_CLIP_DEPLETED ] );
-				return( FALSE );
+				return FireWeaponResult::FAILED;
 			}
-
 		}
 	}
 
-	bGunJamVal = CheckForGunJam( pSoldier );
-
-	if ( bGunJamVal == 255 )
-	{
-		return( 255 );
-	}
-
-	if ( bGunJamVal )
-	{
-		return( FALSE );
-	}
-
-	return( TRUE );
+	return CheckForGunJam(pSoldier);
 }
 
 
-static BOOLEAN UseGun(      SOLDIERTYPE* pSoldier, INT16 sTargetGridNo);
-static void    UseBlade(    SOLDIERTYPE* pSoldier, INT16 sTargetGridNo);
-static void    UseThrown(   SOLDIERTYPE* pSoldier, INT16 sTargetGridNo);
-static BOOLEAN UseLauncher( SOLDIERTYPE* pSoldier, INT16 sTargetGridNo);
+static void UseGun(     SOLDIERTYPE * pSoldier, GridNo sTargetGridNo);
+static void UseBlade(   SOLDIERTYPE * pSoldier, GridNo sTargetGridNo);
+static void UseThrown(  SOLDIERTYPE * pSoldier, GridNo sTargetGridNo);
+static void UseLauncher(SOLDIERTYPE * pSoldier, GridNo sTargetGridNo);
 
 
-BOOLEAN FireWeapon( SOLDIERTYPE *pSoldier , INT16 sTargetGridNo )
+FireWeaponResult FireWeapon(SOLDIERTYPE * const pSoldier, GridNo const sTargetGridNo)
 {
-	// ignore passed in target gridno for now
-
 	// if target gridno is the same as ours, do not fire!
 	if (sTargetGridNo == pSoldier->sGridNo)
 	{
 		// FREE UP NPC!
 		SLOGD("Freeing up attacker - attack on own gridno!");
 		FreeUpAttacker(pSoldier);
-		return( FALSE );
+		return FireWeaponResult::FAILED;
 	}
 
 	// SET ATTACKER TO NOBODY, WILL GET SET EVENTUALLY
@@ -507,7 +444,7 @@ BOOLEAN FireWeapon( SOLDIERTYPE *pSoldier , INT16 sTargetGridNo )
 				pSoldier->fDoSpread = FALSE;
 			}
 
-			if ( pSoldier->fDoSpread >= 6 )
+			if ( pSoldier->fDoSpread > 6 )
 			{
 				pSoldier->fDoSpread = FALSE;
 			}
@@ -547,7 +484,7 @@ BOOLEAN FireWeapon( SOLDIERTYPE *pSoldier , INT16 sTargetGridNo )
 			UseThrown( pSoldier, sTargetGridNo );
 			break;
 	}
-	return( TRUE );
+	return FireWeaponResult::FIRED;
 }
 
 
@@ -701,7 +638,38 @@ static UINT16 ModifyExpGainByTarget(const UINT16 exp_gain, const SOLDIERTYPE* co
 static BOOLEAN WillExplosiveWeaponFail(const SOLDIERTYPE* pSoldier, const OBJECTTYPE* pObj);
 
 
-static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
+static ST::string GetBurstSoundName(SOLDIERTYPE const& soldier)
+{
+	auto * const weapon = GCM->getWeapon(soldier.usAttackingWeapon);
+	bool isSilenced = FindAttachment(&soldier.inv[soldier.ubAttackingHand], SILENCER) != NO_SLOT;
+	auto const& burstSound = isSilenced ? weapon->silencedBurstSound : weapon->burstSound;
+
+	if (!burstSound.empty())
+	{
+		// Was a burst sound specified and do we have the matching sound file?
+		auto tryBurstSound = st_format_printf(burstSound, soldier.bBulletsLeft);
+		if (GCM->doesGameResExists(tryBurstSound))
+		{
+			return tryBurstSound;
+		}
+	}
+
+	if (soldier.bBulletsLeft == 1)
+	{
+		// No burst sound found for 1-shot bursts, see if we can find a
+		// file for a single shot.
+		auto const& singleSound = isSilenced ? weapon->silencedSound : weapon->sound;
+		if (!singleSound.empty() && GCM->doesGameResExists(singleSound))
+		{
+			return singleSound;
+		}
+	}
+
+	// Everything else failed, use the generic burst sound.
+	return "sounds/weapons/bursttype1.wav";
+}
+
+static void UseGun(SOLDIERTYPE * const pSoldier, GridNo const sTargetGridNo)
 {
 	UINT32  uiHitChance, uiDiceRoll;
 	INT16   sAPCost;
@@ -714,7 +682,6 @@ static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 	INT8    bSilencerPos;
 	UINT8   ubDirection;
 	INT16   sNewGridNo;
-	BOOLEAN fGonnaHit = FALSE;
 	UINT16  usExpGain = 0;
 	UINT32  uiDepreciateTest;
 
@@ -728,17 +695,10 @@ static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 		// ONly deduct points once
 		if ( pSoldier->bDoBurst == 1 )
 		{
-			auto weapon = GCM->getWeapon( usItemNum );
-			auto burstSound = &weapon->burstSound;
-			auto isSilenced = FindAttachment( &( pSoldier->inv[ pSoldier->ubAttackingHand ] ), SILENCER ) != NO_SLOT;
-			if (isSilenced) {
-				burstSound = &weapon->silencedBurstSound;
-			}
-
-			if (!burstSound->empty()) {
-				auto renderedBurstSound = burstSound->replace("%d", ST::format("{}", pSoldier->bBulletsLeft));
-				pSoldier->uiBurstSoundID = PlayLocationJA2SampleFromFile(pSoldier->sGridNo, renderedBurstSound.c_str(), HIGHVOLUME, 1);
-			}
+			auto burstSound = GetBurstSoundName(*pSoldier);
+			SLOGD("Using burst sound {}", burstSound);
+			pSoldier->uiBurstSoundID = PlayLocationJA2SampleFromFile(pSoldier->sGridNo,
+				burstSound.c_str(), HIGHVOLUME, 1);
 
 			DeductPoints( pSoldier, sAPCost, 0 );
 		}
@@ -802,7 +762,7 @@ static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 	// ROLL DICE
 	uiDiceRoll = PreRandom( 100 );
 
-	fGonnaHit = uiDiceRoll <= uiHitChance;
+	bool const fGonnaHit = uiDiceRoll <= uiHitChance;
 
 	// ATE; Moved a whole blotch if logic code for finding target positions to a function
 	// so other places can use it
@@ -935,8 +895,6 @@ static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 			SLOGD("Freeing up attacker - ATTACK ANIMATION {} ENDED BY BAD EXPLOSIVE CHECK, Now {}",
 				gAnimControl[pSoldier->usAnimState].zAnimStr, gTacticalStatus.ubAttackBusyCount);
 			ReduceAttackBusyCount(pSoldier, FALSE);
-
-			return( FALSE );
 		}
 	}
 
@@ -1016,8 +974,6 @@ static BOOLEAN UseGun(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 	{
 		pSoldier->bMonsterSmell--;
 	}
-
-	return( TRUE );
 }
 
 
@@ -1032,11 +988,10 @@ static void AgilityForEnemyMissingPlayer(const SOLDIERTYPE* const attacker, SOLD
 }
 
 
-static void UseBlade(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo)
+static void UseBlade(SOLDIERTYPE * const pSoldier, GridNo const sTargetGridNo)
 {
 	INT32          iHitChance, iDiceRoll;
 	INT16          sAPCost;
-	EV_S_WEAPONHIT SWeaponHit;
 	INT32          iImpact, iImpactForCrits;
 	BOOLEAN        fGonnaHit = FALSE;
 	UINT16         usExpGain = 0;
@@ -1113,7 +1068,7 @@ static void UseBlade(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo)
 			}
 
 			// Send event for getting hit
-			SWeaponHit = EV_S_WEAPONHIT{};
+			EV_S_WEAPONHIT SWeaponHit{};
 			SWeaponHit.usSoldierID = pTargetSoldier->ubID;
 			SWeaponHit.usWeaponIndex = pSoldier->usAttackingWeapon;
 			SWeaponHit.sDamage = (INT16) iImpact;
@@ -1182,7 +1137,6 @@ void UseHandToHand(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo, BOOLE
 {
 	INT32          iHitChance, iDiceRoll;
 	INT16          sAPCost;
-	EV_S_WEAPONHIT SWeaponHit;
 	INT32          iImpact;
 	UINT16         usOldItem;
 
@@ -1304,7 +1258,7 @@ void UseHandToHand(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo, BOOLE
 				{
 					ScreenMsg( FONT_MCOLOR_LTYELLOW, MSG_INTERFACE,
 						st_format_printf(g_langRes->Message[ STR_FAILED_TO_STEAL_SOMETHING ],
-						pSoldier->name, pSoldier->name, GCM->getItem(pTargetSoldier->inv[HANDPOS].usItem)->getShortName()) );
+						pSoldier->name, GCM->getItem(pTargetSoldier->inv[HANDPOS].usItem)->getShortName()) );
 					if ( pSoldier->bTeam == OUR_TEAM )
 					{
 						DoMercBattleSound( pSoldier, BATTLE_SOUND_CURSE1 );
@@ -1364,7 +1318,7 @@ void UseHandToHand(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo, BOOLE
 				iImpact = HTHImpact( pSoldier, pTargetSoldier, (iHitChance - iDiceRoll), FALSE );
 
 				// Send event for getting hit
-				SWeaponHit = EV_S_WEAPONHIT{};
+				EV_S_WEAPONHIT SWeaponHit{};
 				SWeaponHit.usSoldierID = pTargetSoldier->ubID;
 				SWeaponHit.usWeaponIndex = pSoldier->usAttackingWeapon;
 				SWeaponHit.sDamage = (INT16) iImpact;
@@ -1393,7 +1347,7 @@ void UseHandToHand(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo, BOOLE
 }
 
 
-static void UseThrown(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo)
+static void UseThrown(SOLDIERTYPE * const pSoldier, GridNo const sTargetGridNo)
 {
 	UINT32 uiHitChance, uiDiceRoll;
 	INT8   bLoop;
@@ -1461,7 +1415,7 @@ static void UseThrown(SOLDIERTYPE* const pSoldier, INT16 const sTargetGridNo)
 }
 
 
-static BOOLEAN UseLauncher(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
+static void UseLauncher(SOLDIERTYPE * const pSoldier, GridNo const sTargetGridNo)
 {
 	UINT32     uiHitChance, uiDiceRoll;
 	INT16      sAPCost = 0;
@@ -1474,7 +1428,7 @@ static BOOLEAN UseLauncher(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 
 	if ( !EnoughAmmo( pSoldier, TRUE, pSoldier->ubAttackingHand ) )
 	{
-		return( FALSE );
+		return;
 	}
 
 	pObj = &(pSoldier->inv[HANDPOS]);
@@ -1491,7 +1445,7 @@ static BOOLEAN UseLauncher(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 	if (bAttachPos == MAX_ATTACHMENTS)
 	{
 		// this should not happen!!
-		return( FALSE );
+		return;
 	}
 
 	CreateItem( pObj->usAttachItem[ bAttachPos ],	pObj->bAttachStatus[ bAttachPos ], &Launchable );
@@ -1522,7 +1476,7 @@ static BOOLEAN UseLauncher(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 		ReduceAttackBusyCount(pSoldier, FALSE);
 
 		// So all's well, should be good from here....
-		return( FALSE );
+		return;
 	}
 
 	if ( !GCM->getWeapon( usItemNum )->sound.empty()  )
@@ -1559,8 +1513,6 @@ static BOOLEAN UseLauncher(SOLDIERTYPE* pSoldier, INT16 sTargetGridNo)
 
 	delete pSoldier->pThrowParams;
 	pSoldier->pThrowParams = NULL;
-
-	return( TRUE );
 }
 
 
@@ -3076,7 +3028,7 @@ INT32 BulletImpact( SOLDIERTYPE *pFirer, SOLDIERTYPE * pTarget, UINT8 ubHitLocat
 						}
 						break;
 					case AIM_SHOT_TORSO:
-						if (PreRandom( 1 ) == 0 && !(pTarget->uiStatusFlags & SOLDIER_MONSTER) )
+						if (PreChance(50) && !(pTarget->uiStatusFlags & SOLDIER_MONSTER))
 						{
 							if (bStatLoss >= pTarget->bDexterity)
 							{
@@ -3684,7 +3636,7 @@ UINT32 CalcThrownChanceToHit(SOLDIERTYPE *pSoldier, INT16 sGridNo, UINT8 ubAimTi
 	else
 	{
 		// MECHANICALLY FIRED arced projectile (ie. mortar), need brains & know-how
-		iChance = ( EffectiveDexterity( pSoldier ) + EffectiveMarksmanship( pSoldier ) + EffectiveWisdom( pSoldier ) + pSoldier->bExpLevel ) / 4;
+		iChance = ( EffectiveDexterity( pSoldier ) + EffectiveMarksmanship( pSoldier ) + EffectiveWisdom( pSoldier ) + (10 * EffectiveExpLevel( pSoldier ) )) / 4;
 
 		// heavy weapons trait helps out
 		iChance += gbSkillTraitBonus[HEAVY_WEAPS] * NUM_SKILL_TRAITS(pSoldier, HEAVY_WEAPS);

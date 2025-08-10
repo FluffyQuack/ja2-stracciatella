@@ -1,25 +1,20 @@
 #include "Soldier_Create.h"
+#include "ItemModel.h"
 #include "Overhead.h"
 #include "Soldier_Profile.h"
 #include "Animation_Control.h"
 #include "Animation_Data.h"
-#include "Sound_Control.h"
 #include "Overhead_Types.h"
 #include "Faces.h"
 #include "Isometric_Utils.h"
 #include "Items.h"
-#include "Weapons.h"
 #include "OppList.h"
 #include "Random.h"
-#include "Assignments.h"
-#include "Soldier_Init_List.h"
-#include "EditorMercs.h"
 #include "Smell.h"
 #include "Squads.h"
 #include "Interface_Panels.h"
 #include "StrategicMap.h"
 #include "Inventory_Choosing.h"
-#include "Queen_Command.h"
 #include "Soldier_Add.h"
 #include "Quests.h"
 #include "Sys_Globals.h"
@@ -44,8 +39,8 @@
 
 #include "ContentManager.h"
 #include "GameInstance.h"
-#include "policy/GamePolicy.h"
-#include "externalized/strategic/BloodCatSpawnsModel.h"
+#include "GamePolicy.h"
+#include "BloodCatSpawnsModel.h"
 
 #include <string_theory/string>
 
@@ -76,8 +71,6 @@ BOOLEAN gfProfiledEnemyAdded = FALSE;
 
 UINT32 guiCurrentUniqueSoldierId = 1;
 
-// CJC note: trust me, it's easiest just to put this here; this is the only
-// place it should need to be used
 UINT8 gubItemDroppableFlag[NUM_INV_SLOTS] =
 {
 	0x01,
@@ -964,8 +957,22 @@ static void InitSoldierStruct(SOLDIERTYPE& s)
 void InternalTacticalRemoveSoldier(SOLDIERTYPE& s, BOOLEAN const fRemoveVehicle)
 {
 	if (GetSelectedMan() == &s) SetSelectedMan(0);
-	if (gUIFullTarget    == &s) gUIFullTarget   = 0;
-	if (gpSMCurrentMerc  == &s) gpSMCurrentMerc = 0;
+	if (gUIFullTarget    == &s)
+	{
+		gUIFullTarget = nullptr;
+		// Force back cursor to move mode, otherwise it might get stuck.
+		guiPendingOverrideEvent = UIEventKind::A_CHANGE_TO_MOVE;
+	}
+	if (gpSMCurrentMerc  == &s)
+	{
+		if (guiCurrentScreen == ScreenID::GAME_SCREEN)
+		{
+			SetCurrentInterfacePanel(InterfacePanelKind::TEAM_PANEL);
+		}
+		// SetCurrentInterfacePanel still needs the old value
+		// of gpSMCurrentMerc so it must be cleared afterwards.
+		gpSMCurrentMerc = nullptr;
+	}
 
 	if (!s.bActive) return;
 

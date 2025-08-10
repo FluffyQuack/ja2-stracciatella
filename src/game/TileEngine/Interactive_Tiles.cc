@@ -1,11 +1,10 @@
 #include "Animation_Data.h"
+#include "Cursor_Control.h"
 #include "Cursors.h"
-#include "Font_Control.h"
 #include "HImage.h"
 #include "Isometric_Utils.h"
 #include "TileDef.h"
 #include "VObject.h"
-#include "SysUtil.h"
 #include "RenderWorld.h"
 #include "Interface.h"
 #include "Sound_Control.h"
@@ -14,7 +13,6 @@
 #include "WorldMan.h"
 #include "Structure.h"
 #include "Animation_Control.h"
-#include "Points.h"
 #include "Overhead.h"
 #include "Structure_Wrap.h"
 #include "Tile_Animation.h"
@@ -23,10 +21,8 @@
 #include "StrategicMap.h"
 #include "Quests.h"
 #include "Dialogue_Control.h"
-#include "Random.h"
 #include "English.h"
 #include "Handle_Items.h"
-#include "Message.h"
 #include "Handle_UI.h"
 #include "NPC.h"
 #include "Explosion_Control.h"
@@ -87,10 +83,8 @@ void StartInteractiveObject(GridNo const gridno, STRUCTURE const& structure, SOL
 	if (s.usAnimState == BEGIN_OPENSTRUCT)          return;
 	if (s.usAnimState == BEGIN_OPENSTRUCT_CROUCHED) return;
 
-	SoldierSP soldier = GetSoldier(&s);
-
 	// Add soldier event for opening door/struct
-	soldier->setPendingAction(structure.fFlags & STRUCTURE_ANYDOOR ? MERC_OPENDOOR : MERC_OPENSTRUCT);
+	Soldier{&s}.setPendingAction(structure.fFlags & STRUCTURE_ANYDOOR ? MERC_OPENDOOR : MERC_OPENSTRUCT);
 	s.uiPendingActionData1     = structure.usStructureID;
 	s.sPendingActionData2      = gridno;
 	s.bPendingActionData3      = direction;
@@ -323,8 +317,7 @@ void LogMouseOverInteractiveTile(INT16 const sGridNo)
 	ConvertGridNoToCellXY(sGridNo, &sXMapPos, &sYMapPos);
 
 	// Set mouse stuff
-	INT16 const sScreenX = gusMouseXPos;
-	INT16 const sScreenY = gusMouseYPos;
+	auto const cursorPosition{ GetCursorPos() };
 
 	for (LEVELNODE const* n = gpWorldLevelData[sGridNo].pStructHead; n; n = n->pNext)
 	{
@@ -332,9 +325,9 @@ void LogMouseOverInteractiveTile(INT16 const sGridNo)
 		GetLevelNodeScreenRect(*n, aRect, sXMapPos, sYMapPos, sGridNo);
 
 		// Make sure we are always on guy if we are on same gridno
-		if (!IsPointInScreenRect(sScreenX, sScreenY, aRect)) continue;
+		if (!IsPointInScreenRect(cursorPosition.iX, cursorPosition.iY, aRect)) continue;
 
-		if (!RefinePointCollisionOnStruct(sScreenX, sScreenY, aRect.iLeft, aRect.iBottom, *n)) continue;
+		if (!RefinePointCollisionOnStruct(cursorPosition.iX, cursorPosition.iY, aRect.iLeft, aRect.iBottom, *n)) continue;
 
 		if (!RefineLogicOnStruct(sGridNo, *n)) continue;
 

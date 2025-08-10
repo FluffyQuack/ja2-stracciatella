@@ -76,10 +76,10 @@
 #include "VObject.h"
 #include "VSurface.h"
 #include <algorithm>
+#include <bitset>
 #include <iterator>
 #include <string_theory/format>
 #include <string_theory/string>
-struct PopUpBox;
 
 
 // various reason an assignment can be aborted before completion
@@ -160,6 +160,7 @@ static MOUSE_REGION gVehicleMenuRegion[20];
 static MOUSE_REGION gAssignmentScreenMaskRegion;
 
 BOOLEAN fShownAssignmentMenu    = FALSE;
+SOLDIERTYPE* gAssignmentTargetSoldier = NULL;
 static BOOLEAN fShowVehicleMenu = FALSE;
 BOOLEAN fShowRepairMenu         = FALSE;
 BOOLEAN fShownContractMenu      = FALSE;
@@ -238,16 +239,17 @@ BOOLEAN gfReEvaluateEveryonesNothingToDo = FALSE;
 */
 
 // a list of which sectors have characters
-static BOOLEAN fSectorsWithSoldiers[MAP_WORLD_X * MAP_WORLD_Y][4];
+static std::bitset<MAP_WORLD_X * MAP_WORLD_Y * 4> fSectorsWithSoldiers;
+static std::size_t SectorsWithSoldiersPos(SGPSector const& sector)
+{
+	return sector.AsStrategicIndex() * 4 + sector.z;
+}
 static const SGPSector gunRange(GUN_RANGE_X, GUN_RANGE_Y, GUN_RANGE_Z);
 
 void InitSectorsWithSoldiersList( void )
 {
 	// init list of sectors
-	for (auto& i : fSectorsWithSoldiers)
-	{
-		std::fill(std::begin(i), std::end(i), 0);
-	}
+	fSectorsWithSoldiers.reset();
 }
 
 
@@ -256,12 +258,12 @@ void BuildSectorsWithSoldiersList( void )
 	// fills array with pressence of player controlled characters
 	CFOR_EACH_IN_TEAM(s, OUR_TEAM)
 	{
-		fSectorsWithSoldiers[s->sSector.AsStrategicIndex()][s->sSector.z] = TRUE;
+		fSectorsWithSoldiers.set(SectorsWithSoldiersPos(s->sSector));
 	}
 }
 
 
-void ChangeSoldiersAssignment( SOLDIERTYPE *pSoldier, INT8 bAssignment )
+void ChangeSoldiersAssignment(SOLDIERTYPE * const pSoldier, Assignments const bAssignment)
 {
 	// This is the most basic assignment-setting function.  It must be called before setting any subsidiary
 	// values like fFixingRobot.  It will clear all subsidiary values so we don't leave the merc in a messed
@@ -275,8 +277,14 @@ void ChangeSoldiersAssignment( SOLDIERTYPE *pSoldier, INT8 bAssignment )
 		// life checks should agree with the assignment
 		pSoldier->bLife = 0;
 	}
-	pSoldier->fFixingRobot = FALSE;
-	pSoldier->bVehicleUnderRepairID = -1;
+
+	if (bAssignment != REPAIR)
+	{
+		// Only reset these values if the new assignment is not REPAIR,
+		// they must have been set to sane values by the caller in that case.
+		pSoldier->fFixingRobot = FALSE;
+		pSoldier->bVehicleUnderRepairID = -1;
+	}
 
 	if ( ( bAssignment == DOCTOR ) || ( bAssignment == PATIENT ) || ( bAssignment == ASSIGNMENT_HOSPITAL ) )
 	{
@@ -935,7 +943,7 @@ void UpdateAssignments()
 			for (sector.z = 0; sector.z < 4; sector.z++)
 			{
 				// is there anyone in this sector?
-				if (fSectorsWithSoldiers[sector.AsStrategicIndex()][sector.z])
+				if (IsThereASoldierInThisSector(sector))
 				{
 					// handle any doctors
 					HandleDoctorsInSector(sector);
@@ -1356,7 +1364,6 @@ static UINT16 HealPatient(SOLDIERTYPE* pPatient, SOLDIERTYPE* pDoctor, UINT16 us
 {
 	// heal patient and return the number of healing pts used
 	UINT16 usHealingPtsLeft;
-	UINT16 usTotalFullPtsUsed = 0;
 	UINT16 usTotalHundredthsUsed = 0;
 	INT8 bPointsToUse = 0;
 	INT8 bPointsUsed = 0;
@@ -1402,7 +1409,6 @@ static UINT16 HealPatient(SOLDIERTYPE* pPatient, SOLDIERTYPE* pDoctor, UINT16 us
 
 				bPointsToUse -= bPointsHealed;
 				usHealingPtsLeft -= bPointsHealed;
-				usTotalFullPtsUsed += bPointsHealed;
 
 				// heal person the amount / POINT_COST_PER_HEALTH_BELOW_OKLIFE
 				pPatient -> bLife += (bPointsHealed / POINT_COST_PER_HEALTH_BELOW_OKLIFE);
@@ -1441,7 +1447,6 @@ static UINT16 HealPatient(SOLDIERTYPE* pPatient, SOLDIERTYPE* pDoctor, UINT16 us
 
 				bPointsToUse -= bPointsHealed;
 				usHealingPtsLeft -= bPointsHealed;
-				usTotalFullPtsUsed += bPointsHealed;
 
 				pPatient -> bLife += bPointsHealed;
 
@@ -1484,7 +1489,7 @@ static void HealHospitalPatient(SOLDIERTYPE* pPatient, UINT16 usHealingPtsLeft);
 static void CheckForAndHandleHospitalPatients(void)
 {
 	static const SGPSector hospital(HOSPITAL_SECTOR_X, HOSPITAL_SECTOR_Y);
-	if (!fSectorsWithSoldiers[hospital.AsStrategicIndex()][0])
+	if (!IsThereASoldierInThisSector(hospital))
 	{
 		// nobody in the hospital sector... leave
 		return;
@@ -2722,9 +2727,9 @@ static void HandleHealingByNaturalCauses(SOLDIERTYPE* pSoldier)
 		// use high activity level to simulate stress, torture, poor conditions for healing
 		bActivityLevelDivisor = HIGH_ACTIVITY_LEVEL;
 	}
-	if (pSoldier->fMercAsleep            ||
-			pSoldier->bAssignment == PATIENT ||
-			pSoldier->bAssignment == ASSIGNMENT_HOSPITAL)
+	else if (pSoldier->fMercAsleep            ||
+	         pSoldier->bAssignment == PATIENT ||
+	         pSoldier->bAssignment == ASSIGNMENT_HOSPITAL)
 	{
 		bActivityLevelDivisor = LOW_ACTIVITY_LEVEL;
 	}
@@ -2840,7 +2845,7 @@ static void CreateDestroyMouseRegionsForAssignmentMenu(void)
 			SetBoxXY(ghAssignmentBox, AssignmentPosition.iX, AssignmentPosition.iY);
 		}
 
-		SOLDIERTYPE     const& s    = *GetSelectedAssignSoldier(FALSE);
+		SOLDIERTYPE     const& s    = *gAssignmentTargetSoldier;
 		PopUpBox const* const  box  = s.ubWhatKindOfMercAmI == MERC_TYPE__EPC ? ghEpcBox : ghAssignmentBox;
 		SGPBox          const& area = GetBoxArea(box);
 		UINT16          const  x    = area.x;
@@ -2852,7 +2857,7 @@ static void CreateDestroyMouseRegionsForAssignmentMenu(void)
 		for (UINT32 i = 0; i < GetNumberOfLinesOfTextInBox(ghAssignmentBox); ++i)
 		{
 			MOUSE_REGION* const r = &gAssignmentMenuRegion[i];
-			MSYS_DefineRegion(r, x, y, x + w, y + dy, MSYS_PRIORITY_HIGHEST - 4, MSYS_NO_CURSOR, AssignmentMenuMvtCallBack, MouseCallbackPrimarySecondary<MOUSE_REGION>(AssignmentMenuBtnCallbackPrimary, AssignmentMenuBtnCallbackSecondary));
+			MSYS_DefineRegion(r, x, y, x + w, y + dy, MSYS_PRIORITY_HIGHEST - 4, MSYS_NO_CURSOR, AssignmentMenuMvtCallBack, MouseCallbackPrimarySecondary(AssignmentMenuBtnCallbackPrimary, AssignmentMenuBtnCallbackSecondary));
 			MSYS_SetRegionUserData(r, 0, i);
 			y += dy;
 		}
@@ -2955,7 +2960,7 @@ static void HandleShadingOfLinesForVehicleMenu()
 	PopUpBox* const box = ghVehicleBox;
 	if (box == NO_POPUP_BOX) return;
 
-	SOLDIERTYPE const& s    = *GetSelectedAssignSoldier(FALSE);
+	SOLDIERTYPE const& s    = *gAssignmentTargetSoldier;
 	UINT32             line = 0;
 	CFOR_EACH_VEHICLE(v)
 	{
@@ -2974,7 +2979,7 @@ static void VehicleMenuBtnCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 	// btn callback handler for assignment region
 	if (iReason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
-		SOLDIERTYPE& s = *GetSelectedAssignSoldier(FALSE);
+		SOLDIERTYPE& s = *gAssignmentTargetSoldier;
 		VEHICLETYPE& v = *pRegion->GetUserPtr<VEHICLETYPE>();
 
 		// inaccessible vehicles shouldn't be listed in the menu!
@@ -3095,7 +3100,7 @@ static void HandleShadingOfLinesForRepairMenu()
 	 * routines, which must remain in synch:
 	 * CreateDestroyMouseRegionForRepairMenu(), DisplayRepairMenu() and
 	 * HandleShadingOfLinesForRepairMenu(). */
-	SOLDIERTYPE const& s    = *GetSelectedAssignSoldier(FALSE);
+	SOLDIERTYPE const& s    = *gAssignmentTargetSoldier;
 	INT32              line = 0;
 
 	if (s.sSector.z == 0)
@@ -3123,12 +3128,16 @@ static void RepairMenuBtnCallback(MOUSE_REGION* pRegion, UINT32 iReason);
 static void RepairMenuMvtCallback(MOUSE_REGION* pRegion, UINT32 iReason);
 
 
-static void MakeRepairRegion(const INT32 idx, const UINT16 x, const UINT16 y, const UINT16 w, const UINT16 h, const UINT32 data)
+static void MakeRepairRegion(INT32 const idx, SGPBox const area,
+                             INT32 const data, SOLDIERTYPE const& s)
 {
 	MOUSE_REGION* const r = &gRepairMenuRegion[idx];
-	MSYS_DefineRegion(r, x, y, x + w, y + h, MSYS_PRIORITY_HIGHEST - 4, MSYS_NO_CURSOR, RepairMenuMvtCallback, RepairMenuBtnCallback);
+	MSYS_DefineRegion(r, area.x, area.y, area.x + area.w, area.y + area.h,
+		 MSYS_PRIORITY_HIGHEST - 4, MSYS_NO_CURSOR,
+		 RepairMenuMvtCallback, RepairMenuBtnCallback);
 	MSYS_SetRegionUserData(r, 0, idx);
 	MSYS_SetRegionUserData(r, 1, data);
+	MSYS_SetRegionUserData(r, 2, s.ubID);
 }
 
 
@@ -3140,7 +3149,7 @@ static void CreateDestroyMouseRegionForRepairMenu(void)
 	{
 		CheckAndUpdateTacticalAssignmentPopUpPositions();
 
-		SOLDIERTYPE const& s = *GetSelectedAssignSoldier(FALSE);
+		SOLDIERTYPE const& s = *gAssignmentTargetSoldier;
 
 		PopUpBox* const  box  = ghRepairBox;
 		SGPBox    const& area = GetBoxArea(box);
@@ -3148,6 +3157,7 @@ static void CreateDestroyMouseRegionForRepairMenu(void)
 		UINT16           y    = area.y + GetTopMarginSize(ghAssignmentBox); // XXX wrong box?
 		UINT16    const  w    = area.w;
 		UINT16    const  h    = GetLineSpace(box) + GetFontHeight(GetBoxFont(box));
+		SGPBox regionArea { x, y, w, h };
 		INT32            idx  = 0;
 
 		// PLEASE NOTE: make sure any changes you do here are reflected in all 3 routines which must remain in synch:
@@ -3165,24 +3175,24 @@ static void CreateDestroyMouseRegionForRepairMenu(void)
 				if (!IsThisVehicleAccessibleToSoldier(s, v)) continue;
 
 				// add mouse region for each line of text..and set user data
-				MakeRepairRegion(idx++, x, y, w, h, VEHICLE2ID(v));
-				y += h;
+				MakeRepairRegion(idx++, regionArea, VEHICLE2ID(v), s);
+				regionArea.y += h;
 			}
 		}
 
 		// robot
 		if (IsRobotInThisSector(s.sSector))
 		{
-			MakeRepairRegion(idx++, x, y, w, h, REPAIR_MENU_ROBOT);
-			y += h;
+			MakeRepairRegion(idx++, regionArea, REPAIR_MENU_ROBOT, s);
+			regionArea.y += h;
 		}
 
 		// items
-		MakeRepairRegion(idx++, x, y, w, h, REPAIR_MENU_ITEMS);
-		y += h;
+		MakeRepairRegion(idx++, regionArea, REPAIR_MENU_ITEMS, s);
+		regionArea.y += h;
 
 		// cancel
-		MakeRepairRegion(idx, x, y, w, h, REPAIR_MENU_CANCEL);
+		MakeRepairRegion(idx, regionArea, REPAIR_MENU_CANCEL, s);
 
 		PauseGame();
 
@@ -3226,46 +3236,19 @@ static bool AssignMercToAMovementGroup(SOLDIERTYPE&);
 static void RepairMenuBtnCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 {
 	// btn callback handler for assignment region
-	INT32 iValue = -1;
-	SOLDIERTYPE *pSoldier = NULL;
-	INT32 iRepairWhat;
-
-
-	iValue = MSYS_GetRegionUserData( pRegion, 0 );
+	auto const [ lineIndex, iRepairWhat, mercID, _ ] = pRegion->user.data;
 
 	// ignore clicks on disabled lines
-	if (GetBoxShadeFlag(ghRepairBox, iValue)) return;
+	if (GetBoxShadeFlag(ghRepairBox, lineIndex)) return;
 
-	// WHAT is being repaired is stored in the second user data argument
-	iRepairWhat = MSYS_GetRegionUserData( pRegion, 1 );
+	SOLDIERTYPE & pSoldier = GetMan(mercID);
 
-
-	pSoldier = GetSelectedAssignSoldier( FALSE );
-
-
-	if ( pSoldier && pSoldier->bActive && ( iReason & MSYS_CALLBACK_REASON_POINTER_UP ) )
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
 		if( ( iRepairWhat >= REPAIR_MENU_VEHICLE1 ) && ( iRepairWhat <= REPAIR_MENU_VEHICLE3 ) )
 		{
 			// repair VEHICLE
-			PreChangeAssignment(*pSoldier);
-
-			if( ( pSoldier->bAssignment != REPAIR )|| ( pSoldier -> fFixingRobot ) )
-			{
-				SetTimeOfAssignmentChangeForMerc( pSoldier );
-			}
-
-			MakeSureToolKitIsInHand( pSoldier );
-
-			ChangeSoldiersAssignment( pSoldier, REPAIR );
-
-			pSoldier -> bVehicleUnderRepairID = ( INT8 ) iRepairWhat;
-
-			MakeSureToolKitIsInHand( pSoldier );
-
-			// assign to a movement group
-			AssignMercToAMovementGroup(*pSoldier);
-
+			SetSoldierAssignmentRepair(pSoldier, false, iRepairWhat);
 			// set assignment for group
 			SetAssignmentForList( ( INT8 ) REPAIR, 0 );
 			fShowAssignmentMenu = FALSE;
@@ -3274,30 +3257,16 @@ static void RepairMenuBtnCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 		else if( iRepairWhat == REPAIR_MENU_ROBOT )
 		{
 			// repair ROBOT
-			PreChangeAssignment(*pSoldier);
-			MakeSureToolKitIsInHand( pSoldier );
-
-			if (pSoldier->bAssignment != REPAIR || !pSoldier->fFixingRobot)
-			{
-				SetTimeOfAssignmentChangeForMerc( pSoldier );
-			}
-
-			ChangeSoldiersAssignment( pSoldier, REPAIR );
-			pSoldier->fFixingRobot = TRUE;
+			SetSoldierAssignmentRepair(pSoldier, true, -1);
 
 			// the second argument is irrelevant here, function looks at pSoldier itself to know what's being repaired
 			SetAssignmentForList( ( INT8 ) REPAIR, 0 );
 			fShowAssignmentMenu = FALSE;
-
-			MakeSureToolKitIsInHand( pSoldier );
-
-			// assign to a movement group
-			AssignMercToAMovementGroup(*pSoldier);
 		}
 		else if( iRepairWhat == REPAIR_MENU_ITEMS )
 		{
 			// items
-			SetSoldierAssignmentRepair(*pSoldier, FALSE, -1);
+			SetSoldierAssignmentRepair(pSoldier, false, -1);
 
 			// the second argument is irrelevant here, function looks at pSoldier itself to know what's being repaired
 			SetAssignmentForList( ( INT8 ) REPAIR, 0 );
@@ -3363,6 +3332,10 @@ static void MakeSureToolKitIsInHand(SOLDIERTYPE* pSoldier)
 			if( pSoldier -> inv[ bPocket ].usItem == TOOLKIT )
 			{
 				SwapObjs( &pSoldier -> inv[ HANDPOS ], &pSoldier -> inv[ bPocket ] );
+				if (pSoldier->inv[SECONDHANDPOS].usItem == NOTHING && pSoldier->inv[bPocket].usItem != NOTHING)
+				{
+					SwapObjs(&pSoldier->inv[SECONDHANDPOS], &pSoldier->inv[bPocket]);
+				}
 				break;
 			}
 		}
@@ -3389,6 +3362,10 @@ static BOOLEAN MakeSureMedKitIsInHand(SOLDIERTYPE* pSoldier)
 		{
 			fCharacterInfoPanelDirty = TRUE;
 			SwapObjs( &pSoldier -> inv[ HANDPOS ], &pSoldier -> inv[ bPocket ] );
+			if (pSoldier->inv[SECONDHANDPOS].usItem == NOTHING && pSoldier->inv[bPocket].usItem != NOTHING)
+			{
+				SwapObjs(&pSoldier->inv[SECONDHANDPOS], &pSoldier->inv[bPocket]);
+			}
 			return(TRUE);
 		}
 	}
@@ -3408,7 +3385,7 @@ void HandleShadingOfLinesForAssignmentMenus()
 {
 	if (!fShowAssignmentMenu || ghAssignmentBox == NO_POPUP_BOX) return;
 
-	SOLDIERTYPE const* const s = GetSelectedAssignSoldier(FALSE);
+	SOLDIERTYPE const* const s = gAssignmentTargetSoldier;
 	if (s && s->bActive)
 	{
 		if (s->ubWhatKindOfMercAmI == MERC_TYPE__EPC)
@@ -3486,7 +3463,7 @@ static void ShowAssignmentBox(void)
 		}
 	}
 
-	SOLDIERTYPE const& s = *GetSelectedAssignSoldier(FALSE);
+	SOLDIERTYPE const& s = *gAssignmentTargetSoldier;
 	if (s.ubWhatKindOfMercAmI == MERC_TYPE__EPC)
 	{
 		ShowBox(ghEpcBox);
@@ -3510,9 +3487,11 @@ void DetermineWhichAssignmentMenusCanBeShown(void)
 
 	if (fInMapMode)
 	{
+		SOLDIERTYPE const * const s = gAssignmentTargetSoldier
+			? gAssignmentTargetSoldier : GetSelectedAssignSoldier(TRUE);
 		if (fShowMapScreenMovementList)
 		{
-			if( bSelectedDestChar == -1 )
+			if( s == NULL )
 			{
 				fCharacterNoLongerValid = TRUE;
 				HandleShowingOfMovementBox( );
@@ -3523,7 +3502,7 @@ void DetermineWhichAssignmentMenusCanBeShown(void)
 				fCharacterNoLongerValid = TRUE;
 			}
 		}
-		else if( bSelectedAssignChar == -1 )
+		else if( s == NULL )
 		{
 			fCharacterNoLongerValid = TRUE;
 		}
@@ -3536,6 +3515,7 @@ void DetermineWhichAssignmentMenusCanBeShown(void)
 	if (!fShowAssignmentMenu || fCharacterNoLongerValid)
 	{
 		// reset show assignment menus
+		gAssignmentTargetSoldier = NULL;
 		fShowAssignmentMenu = FALSE;
 		fShowVehicleMenu = FALSE;
 		fShowRepairMenu = FALSE;
@@ -3569,6 +3549,11 @@ void DetermineWhichAssignmentMenusCanBeShown(void)
 
 		// no menus, leave
 		return;
+	}
+
+	if (!gAssignmentTargetSoldier)
+	{
+		gAssignmentTargetSoldier = GetSelectedAssignSoldier(true);
 	}
 
 	// update the assignment positions
@@ -3756,7 +3741,7 @@ void CreateDestroyMouseRegionsForContractMenu(void)
 		for (UINT32 i = 0; i < GetNumberOfLinesOfTextInBox(box); ++i)
 		{
 			MOUSE_REGION* const r = &gContractMenuRegion[i];
-			MSYS_DefineRegion(r, x, y, x + w, y + dy, MSYS_PRIORITY_HIGHEST - 4, MSYS_NO_CURSOR, ContractMenuMvtCallback, MouseCallbackPrimarySecondary<MOUSE_REGION>(ContractMenuBtnCallbackPrimary, ContractMenuBtnCallbackSecondary));
+			MSYS_DefineRegion(r, x, y, x + w, y + dy, MSYS_PRIORITY_HIGHEST - 4, MSYS_NO_CURSOR, ContractMenuMvtCallback, MouseCallbackPrimarySecondary(ContractMenuBtnCallbackPrimary, ContractMenuBtnCallbackSecondary));
 			MSYS_SetRegionUserData(r, 0, i);
 			y += dy;
 		}
@@ -3818,7 +3803,7 @@ static void CreateDestroyMouseRegionsForTrainingMenu(void)
 		{
 			// add mouse region for each line of text..and set user data
 			MOUSE_REGION* const r = &gTrainingMenuRegion[i];
-			MSYS_DefineRegion(r, x, y, x + w, y + h, MSYS_PRIORITY_HIGHEST - 3, MSYS_NO_CURSOR, TrainingMenuMvtCallBack, MouseCallbackPrimarySecondary<MOUSE_REGION>(TrainingMenuBtnCallbackPrimary, TrainingMenuBtnCallbackSecondary, TrainingMenuBtnCallbackMarkDirty));
+			MSYS_DefineRegion(r, x, y, x + w, y + h, MSYS_PRIORITY_HIGHEST - 3, MSYS_NO_CURSOR, TrainingMenuMvtCallBack, MouseCallbackPrimarySecondary(TrainingMenuBtnCallbackPrimary, TrainingMenuBtnCallbackSecondary, TrainingMenuBtnCallbackMarkDirty));
 			MSYS_SetRegionUserData(r, 0, i);
 			y += h;
 		}
@@ -3949,7 +3934,7 @@ static void CreateDestroyMouseRegionsForRemoveMenu(void)
 		INT32  const  w    = area.w;
 		INT32  const  h    = GetLineSpace(ghRemoveMercAssignBox) + GetFontHeight(GetBoxFont(ghRemoveMercAssignBox));
 
-		for (UINT32 i = 0; i < GetNumberOfLinesOfTextInBox(ghRemoveMercAssignBox); ++i)
+		for (INT32 i = 0; i != MAX_REMOVE_MERC_COUNT; ++i)
 		{
 			// add mouse region for each line of text..and set user data
 			MOUSE_REGION* const r = &gRemoveMercAssignRegion[i];
@@ -3964,9 +3949,9 @@ static void CreateDestroyMouseRegionsForRemoveMenu(void)
 	}
 	else if (fCreated && !fShowAssignmentMenu && !fShowContractMenu)
 	{
-		for (UINT32 i = 0; i < GetNumberOfLinesOfTextInBox(ghRemoveMercAssignBox); ++i)
+		for (auto & region : gRemoveMercAssignRegion)
 		{
-			MSYS_RemoveRegion(&gRemoveMercAssignRegion[i]);
+			MSYS_RemoveRegion(&region);
 		}
 
 		fShownContractMenu = FALSE;
@@ -4064,7 +4049,7 @@ static void AssignmentMenuMvtCallBack(MOUSE_REGION* pRegion, UINT32 iReason)
 	iValue = MSYS_GetRegionUserData( pRegion, 0 );
 
 
-	pSoldier = GetSelectedAssignSoldier( FALSE );
+	pSoldier = gAssignmentTargetSoldier;
 
 	if (HandleAssignmentExpansionAndHighLightForAssignMenu(pSoldier))
 	{
@@ -4108,12 +4093,9 @@ static void AssignmentMenuMvtCallBack(MOUSE_REGION* pRegion, UINT32 iReason)
 static void RemoveMercMenuMvtCallBack(MOUSE_REGION* pRegion, UINT32 iReason)
 {
 	// mvt callback handler for assignment region
-	INT32 iValue = -1;
-
-	iValue = MSYS_GetRegionUserData( pRegion, 0 );
-
 	if (iReason & MSYS_CALLBACK_REASON_GAIN_MOUSE )
 	{
+		INT32 const iValue = MSYS_GetRegionUserData(pRegion, 0);
 		// highlight string
 
 		// get the string line handle
@@ -4198,17 +4180,9 @@ static void SquadMenuMvtCallBack(MOUSE_REGION* pRegion, UINT32 iReason)
 static void RemoveMercMenuBtnCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 {
 	// btn callback handler for contract region
-	INT32 iValue = -1;
-	SOLDIERTYPE * pSoldier = NULL;
-
-
-	pSoldier = GetSelectedAssignSoldier( FALSE );
-
-	iValue = MSYS_GetRegionUserData( pRegion, 0 );
-
 	if (iReason & MSYS_CALLBACK_REASON_POINTER_UP)
 	{
-		switch( iValue )
+		switch (MSYS_GetRegionUserData(pRegion, 0))
 		{
 			case REMOVE_MERC_CANCEL:
 				// stop showing menus
@@ -4232,8 +4206,12 @@ static void RemoveMercMenuBtnCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 
 				break;
 			case( REMOVE_MERC ):
+				auto * const deadMerc{ gCharactersList[bSelectedInfoChar].merc };
+				if (deadMerc)
+				{
+					StrategicRemoveMerc(*deadMerc);
+				}
 				bSelectedInfoChar = -1;
-				StrategicRemoveMerc(*pSoldier);
 
 				// dirty region
 				fCharacterInfoPanelDirty = TRUE;
@@ -4480,7 +4458,7 @@ static void SquadMenuBtnCallback(MOUSE_REGION* const pRegion, UINT32 const reaso
 
 		/* Can the character join this squad?  If already in it, accept that as a
 			* legal choice and exit menu */
-		SOLDIERTYPE& s = *GetSelectedAssignSoldier(FALSE);
+		SOLDIERTYPE& s = *gAssignmentTargetSoldier;
 		ST::string buf;
 		switch (CanCharacterSquad(s, value))
 		{
@@ -4545,7 +4523,7 @@ static void TrainingMenuBtnCallbackPrimary(MOUSE_REGION* pRegion, UINT32 iReason
 	INT32 iValue = MSYS_GetRegionUserData( pRegion, 0 );
 	ST::string sString;
 
-	SOLDIERTYPE* pSoldier = GetSelectedAssignSoldier( FALSE );
+	SOLDIERTYPE* pSoldier = gAssignmentTargetSoldier;
 	const SGPSector& sSector = pSoldier->sSector;
 	INT8 const bTownId = GetTownIdForSector(sSector);
 
@@ -4712,7 +4690,7 @@ static void AttributesMenuBtnCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 	SOLDIERTYPE * pSoldier = NULL;
 
 
-	pSoldier = GetSelectedAssignSoldier( FALSE );
+	pSoldier = gAssignmentTargetSoldier;
 
 	iValue = MSYS_GetRegionUserData( pRegion, 0 );
 
@@ -4748,7 +4726,7 @@ static void AttributesMenuBtnCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 			giAssignHighLine = -1;
 
 			// train stat
-			ChangeSoldiersAssignment( pSoldier, gbTrainingMode );
+			ChangeSoldiersAssignment(pSoldier, static_cast<Assignments>(gbTrainingMode));
 
 			// assign to a movement group
 			AssignMercToAMovementGroup(*pSoldier);
@@ -4774,7 +4752,7 @@ static void AssignmentMenuBtnCallbackPrimary(MOUSE_REGION* pRegion, UINT32 iReas
 	// btn callback handler for assignment region
 	INT32 iValue = MSYS_GetRegionUserData( pRegion, 0 );
 	ST::string sString;
-	SOLDIERTYPE * pSoldier = GetSelectedAssignSoldier( FALSE );
+	SOLDIERTYPE * pSoldier = gAssignmentTargetSoldier;
 
 	if( ( fShowAttributeMenu )||( fShowTrainingMenu ) || ( fShowRepairMenu ) || ( fShowVehicleMenu ) ||( fShowSquadMenu ) )
 	{
@@ -5105,7 +5083,7 @@ static void HandleShadingOfLinesForSquadMenu(void)
 	PopUpBox* const box = ghSquadBox;
 	if (box == NO_POPUP_BOX) return;
 
-	SOLDIERTYPE const& s         = *GetSelectedAssignSoldier(FALSE);
+	SOLDIERTYPE const& s         = *gAssignmentTargetSoldier;
 	UINT32      const  max_squad = GetLastSquadListedInSquadMenu();
 	for (UINT32 i = 0; i <= max_squad; ++i)
 	{
@@ -5466,7 +5444,7 @@ static void CheckAndUpdateTacticalAssignmentPopUpPositions(void)
 	if (!fShowAssignmentMenu) return;
 	if (fInMapMode)           return;
 
-	SOLDIERTYPE const& s               = *GetSelectedAssignSoldier(FALSE);
+	SOLDIERTYPE const& s               = *gAssignmentTargetSoldier;
 	PopUpBox*   const  assignment_box  = s.ubWhatKindOfMercAmI == MERC_TYPE__EPC ? ghEpcBox : ghAssignmentBox;
 	SGPBox      const& assignment_area = GetBoxArea(assignment_box);
 
@@ -5810,7 +5788,7 @@ static void PreSetAssignment(SOLDIERTYPE& s, INT8 const assignment)
 }
 
 
-static void PostSetAssignment(SOLDIERTYPE& s, INT8 const assignment)
+static void PostSetAssignment(SOLDIERTYPE& s, Assignments const assignment)
 {
 	ChangeSoldiersAssignment(&s, assignment);
 	AssignMercToAMovementGroup(s);
@@ -6007,7 +5985,7 @@ static void HandleShadingOfLinesForTrainingMenu(void)
 	PopUpBox* const box = ghTrainingBox;
 	if (box == NO_POPUP_BOX) return;
 
-	SOLDIERTYPE const& s = *GetSelectedAssignSoldier(FALSE);
+	SOLDIERTYPE const& s = *gAssignmentTargetSoldier;
 
 	ShadeStringInBox(box, TRAIN_MENU_SELF,           !CanCharacterPractise(&s));
 	PopUpShade const shade =
@@ -6028,7 +6006,7 @@ static void HandleShadingOfLinesForAttributeMenus(void)
 	PopUpBox* const box = ghAttributeBox;
 	if (box == NO_POPUP_BOX) return;
 
-	SOLDIERTYPE const& s = *GetSelectedAssignSoldier(FALSE);
+	SOLDIERTYPE const& s = *gAssignmentTargetSoldier;
 	for (INT8 stat = 0; stat < ATTRIB_MENU_CANCEL; ++stat)
 	{
 		BOOLEAN stat_trainable;
@@ -6161,9 +6139,9 @@ BOOLEAN PutMercInAwakeState( SOLDIERTYPE *pSoldier )
 }
 
 
-BOOLEAN IsThereASoldierInThisSector(const SGPSector& sSector)
+bool IsThereASoldierInThisSector(const SGPSector& sSector)
 {
-	return fSectorsWithSoldiers[sSector.AsByte()][sSector.z];
+	return fSectorsWithSoldiers.test(SectorsWithSoldiersPos(sSector));
 }
 
 

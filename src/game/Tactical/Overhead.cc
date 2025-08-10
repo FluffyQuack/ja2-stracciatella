@@ -1,108 +1,103 @@
-#include "Handle_Doors.h"
-#include "Handle_Items.h"
-#include "MapScreen.h"
-#include "Soldier_Find.h"
-#include "Spread_Burst.h"
-#include "TileDef.h"
-#include "VObject.h"
-#include "WCheck.h"
-#include "Debug.h"
-#include "WorldDef.h"
-#include "WorldMan.h"
-#include "RenderWorld.h"
-#include "Assignments.h"
-#include "Soldier_Control.h"
+#include "AI.h"
 #include "Animation_Control.h"
 #include "Animation_Data.h"
-#include "Isometric_Utils.h"
-#include "Event_Pump.h"
-#include "Timer_Control.h"
-#include "Render_Fun.h"
-#include "Render_Dirty.h"
-#include "MouseSystem.h"
-#include "Interface.h"
-#include "SysUtil.h"
-#include "Points.h"
-#include "Random.h"
-#include "AI.h"
-#include "Interactive_Tiles.h"
-#include "Soldier_Ani.h"
-#include "Overhead.h"
-#include "OppList.h"
-#include "Sound_Control.h"
-#include "Font_Control.h"
-#include "Lighting.h"
-#include "PathAI.h"
-#include "ScreenIDs.h"
-#include "Interface_Cursors.h"
-#include "Weapons.h"
-#include "Rotting_Corpses.h"
-#include "Structure.h"
-#include "Interface_Panels.h"
-#include "Message.h"
-#include "Items.h"
-#include "Soldier_Profile.h"
-#include "FOV.h"
-#include "Soldier_Macros.h"
-#include "EditorMercs.h"
-#include "Soldier_Tile.h"
-#include "Structure_Wrap.h"
-#include "Tile_Animation.h"
-#include "Strategic_Merc_Handler.h"
-#include "Strategic_Movement.h"
-#include "Strategic_Turns.h"
-#include "Squads.h"
-#include "Morale.h"
+#include "Arms_Dealer_Init.h"
+#include "Assignments.h"
+#include "Auto_Bandage.h"
+#include "Boxing.h"
 #include "Campaign.h"
-#include "Music_Control.h"
+#include "Civ_Quotes.h"
 #include "ContentMusic.h"
-#include "Faces.h"
+#include "Debug.h"
 #include "Dialogue_Control.h"
+#include "Drugs_And_Alcohol.h"
+#include "End_Game.h"
+#include "Event_Pump.h"
+#include "Exit_Grids.h"
+#include "Explosion_Control.h"
+#include "Faces.h"
+#include "Font_Control.h"
+#include "FOV.h"
+#include "Game_Clock.h"
+#include "Game_Event_Hook.h"
+#include "GameSettings.h"
+#include "Handle_Doors.h"
+#include "Handle_Items.h"
+#include "History.h"
+#include "Interactive_Tiles.h"
+#include "Interface.h"
+#include "Interface_Control.h"
+#include "Interface_Dialogue.h"
+#include "Interface_Items.h"
+#include "Interface_Panels.h"
+#include "Interface_Utils.h"
+#include "Isometric_Utils.h"
+#include "ItemModel.h"
+#include "Items.h"
+#include "JAScreens.h"
+#include "Keys.h"
+#include "Lighting.h"
+#include "LOS.h"
+#include "Map_Screen_Helicopter.h"
+#include "MapScreen.h"
+#include "Meanwhile.h"
+#include "Message.h"
+#include "MessageBoxScreen.h"
+#include "Morale.h"
+#include "Music_Control.h"
+#include "NPC.h"
+#include "OppList.h"
+#include "Overhead.h"
+#include "PathAI.h"
+#include "Player_Command.h"
+#include "Points.h"
+#include "PreBattle_Interface.h"
 #include "Queen_Command.h"
 #include "Quests.h"
-#include "NPC.h"
-#include "StrategicMap.h"
-#include "Soldier_Functions.h"
-#include "Auto_Bandage.h"
-#include "Game_Event_Hook.h"
-#include "Explosion_Control.h"
-#include "SkillCheck.h"
-#include "World_Items.h"
+#include "Random.h"
+#include "Render_Fun.h"
+#include "RenderWorld.h"
+#include "Rotting_Corpses.h"
+#include "ScreenIDs.h"
 #include "Smell.h"
-#include "Player_Command.h"
-#include "GameSettings.h"
-#include "MessageBoxScreen.h"
-#include "Game_Clock.h"
-#include "Strategic_Town_Loyalty.h"
-#include "Strategic_Mines.h"
-#include "Interface_Items.h"
-#include "Text.h"
-#include "Keys.h"
-#include "Boxing.h"
-#include "Town_Militia.h"
-#include "Meanwhile.h"
-#include "Map_Screen_Helicopter.h"
-#include "Interface_Control.h"
-#include "Exit_Grids.h"
-#include "Game_Init.h"
-#include "JAScreens.h"
-#include "Arms_Dealer_Init.h"
-#include "Interface_Utils.h"
-#include "Civ_Quotes.h"
-#include "Drugs_And_Alcohol.h"
-#include "History.h"
-#include "LOS.h"
-#include "Interface_Dialogue.h"
+#include "SmokeEffects.h"
+#include "Soldier_Ani.h"
+#include "Soldier_Control.h"
+#include "Soldier_Find.h"
+#include "Soldier_Functions.h"
+#include "Soldier_Macros.h"
+#include "Soldier_Profile.h"
+#include "Soldier_Tile.h"
+#include "Sound_Control.h"
+#include "Spread_Burst.h"
+#include "Squads.h"
 #include "Strategic_AI.h"
-#include "End_Game.h"
+#include "Strategic_Merc_Handler.h"
+#include "Strategic_Mines.h"
 #include "Strategic_Status.h"
-#include "PreBattle_Interface.h"
+#include "Strategic_Town_Loyalty.h"
+#include "Strategic_Turns.h"
+#include "StrategicMap.h"
+#include "Structure.h"
+#include "SysUtil.h"
+#include "Text.h"
+#include "Tile_Animation.h"
+#include "TileDef.h"
+#include "Timer_Control.h"
+#include "Town_Militia.h"
+#include "VObject.h"
+#include "WCheck.h"
+#include "Weapons.h"
+#include "World_Items.h"
+#include "WorldDef.h"
+#include "WorldMan.h"
 
 #include "ContentManager.h"
 #include "GameInstance.h"
+#include "GamePolicy.h"
+#include "Logger.h"
 #include "NewStrings.h"
 #include "Soldier.h"
-#include "Logger.h"
 
 #include <string_theory/string>
 
@@ -381,10 +376,7 @@ void InitTacticalEngine()
 	InitializeTacticalInterface();
 	InitializeGameVideoObjects();
 	LoadPaletteData();
-	LoadDialogueControlGraphics();
 	LoadFacesGraphics();
-	LoadInterfacePanelGraphics();
-	LoadSpreadBurstGraphics();
 
 	LoadLockTable();
 	InitPathAI();
@@ -399,7 +391,6 @@ void InitTacticalEngine()
 void ShutdownTacticalEngine(void)
 {
 	DeleteSpreadBurstGraphics();
-	DeleteInterfacePanelGraphics();
 	DeleteFacesGraphics();
 	DeleteDialogueControlGraphics();
 	DeletePaletteData();
@@ -555,19 +546,12 @@ static void HandleCreatureTenseQuote(void);
 
 void ExecuteOverhead(void)
 {
-	// Diagnostic Stuff
-	static INT32 iTimerTest = 0;
-
 	BOOLEAN fKeepMoving;
 
 	if (COUNTERDONE(TOVERHEAD))
 	{
-		RESETCOUNTER(TOVERHEAD);
-
 		// Diagnostic Stuff
 		UINT32 uiTimerVal = GetJA2Clock();
-		guiTimerDiag = uiTimerVal - iTimerTest;
-		iTimerTest  = uiTimerVal;
 
 		// ANIMATED TILE STUFF
 		UpdateAniTiles();
@@ -604,10 +588,6 @@ void ExecuteOverhead(void)
 		for (UINT32 cnt = 0; cnt < guiNumMercSlots; ++cnt)
 		{
 			SOLDIERTYPE* pSoldier = MercSlots[cnt];
-			SoldierSP soldier = GetSoldier(pSoldier);
-
-			// Syncronize for upcoming soldier counters
-			SYNCTIMECOUNTER();
 
 			if (pSoldier != NULL)
 			{
@@ -621,8 +601,6 @@ void ExecuteOverhead(void)
 						pSoldier->bDisplayDamageCount++;
 						pSoldier->sDamageX += 1;
 						pSoldier->sDamageY -= 1;
-
-						RESETTIMECOUNTER(pSoldier->DamageCounter, DAMAGE_DISPLAY_DELAY);
 					}
 
 					if (pSoldier->bDisplayDamageCount >= 8)
@@ -637,8 +615,6 @@ void ExecuteOverhead(void)
 				if (pSoldier->fBeginFade &&
 						TIMECOUNTERDONE(pSoldier->FadeCounter, NEW_FADE_DELAY))
 				{
-					RESETTIMECOUNTER(pSoldier->FadeCounter, NEW_FADE_DELAY);
-
 					// Fade out....
 					if (pSoldier->fBeginFade == 1)
 					{
@@ -760,8 +736,8 @@ void ExecuteOverhead(void)
 				// Handle animation update counters
 				// ATE: Added additional check here for special value of anispeed that pauses all updates
 #ifndef BOUNDS_CHECKER
-				if (TIMECOUNTERDONE(pSoldier->UpdateCounter, pSoldier->sAniDelay) &&
-					pSoldier->sAniDelay != 10000)
+				if (pSoldier->sAniDelay != 10000 &&
+				    TIMECOUNTERDONE(pSoldier->UpdateCounter, pSoldier->sAniDelay))
 #endif
 				{
 					// Check if we need to look for items
@@ -770,8 +746,6 @@ void ExecuteOverhead(void)
 						RevealRoofsAndItems(pSoldier, FALSE);
 						pSoldier->uiStatusFlags &= ~SOLDIER_LOOKFOR_ITEMS;
 					}
-
-					RESETTIMECOUNTER(pSoldier->UpdateCounter, pSoldier->sAniDelay);
 
 					BOOLEAN fNoAPsForPendingAction = FALSE;
 
@@ -799,7 +773,7 @@ void ExecuteOverhead(void)
 							&& (pSoldier->usAnimState == STANDING)
 							&& (pSoldier->ubPendingAction == MERC_GIVEITEM))
 						{
-							soldier->handlePendingAction(gTacticalStatus.uiFlags & INCOMBAT);
+							Soldier{pSoldier}.handlePendingAction(gTacticalStatus.uiFlags & INCOMBAT);
 						}
 						// Update world data with new position, etc
 						// Determine gameworld cells corrds of guy
@@ -910,7 +884,7 @@ void ExecuteOverhead(void)
 											}
 										}
 									}
-									else if (soldier->hasPendingAction())
+									else if (Soldier{pSoldier}.hasPendingAction())
 									{
 										SLOGD("We are inside the IF PENDING Animation with soldier #{}", pSoldier->ubID);
 
@@ -930,10 +904,10 @@ void ExecuteOverhead(void)
 											}
 											else
 											{
-												if (EnoughPoints(pSoldier, AP_OPEN_DOOR, BP_OPEN_DOOR, TRUE))
+												if (EnoughPoints(pSoldier, doorAPs[pSoldier->ubDoorHandleCode], BP_OPEN_DOOR, TRUE))
 												{
 													// avoid several problems due to a lack of global action queueing
-													if (DialogueQueueIsEmptyAndNobodyIsTalking() && gCurrentUIMode != LOCKUI_MODE && !soldier->anyoneHasPendingAction(MERC_GIVEITEM) && !gTacticalStatus.fAutoBandageMode && !gTacticalStatus.fAutoBandagePending)
+													if (DialogueQueueIsEmptyAndNobodyIsTalking() && gCurrentUIMode != LOCKUI_MODE && !Soldier::anyoneHasPendingAction(MERC_GIVEITEM) && !gTacticalStatus.fAutoBandageMode && !gTacticalStatus.fAutoBandagePending)
 													{
 														InteractWithOpenableStruct(*pSoldier, *pStructure, pSoldier->bPendingActionData3);
 													}
@@ -941,7 +915,7 @@ void ExecuteOverhead(void)
 													{
 														SLOGD("Aborting pending action due to other ongoing activities!");
 														fKeepMoving = FALSE;
-														soldier->removePendingAnimation();
+														Soldier{pSoldier}.removePendingAnimation();
 													}
 												}
 												else
@@ -951,7 +925,7 @@ void ExecuteOverhead(void)
 											}
 										}
 
-										if(soldier->handlePendingAction(gTacticalStatus.uiFlags & INCOMBAT))
+										if(Soldier{pSoldier}.handlePendingAction(gTacticalStatus.uiFlags & INCOMBAT))
 										{
 											continue;
 										}
@@ -1157,9 +1131,6 @@ void ExecuteOverhead(void)
 				guiAISlotToHandle == HANDLE_OFF_MAP_MERC
 				&& guiAIAwaySlotToHandle != RESET_HANDLE_OF_OFF_MAP_MERCS)
 		{
-			// Syncronize for upcoming soldier counters
-			SYNCTIMECOUNTER();
-
 			// the ONLY thing to do with away soldiers is process their schedule if they have one
 			// and there is an action for them to do (like go on-sector)
 			SOLDIERTYPE* const pSoldier = AwaySlots[guiAIAwaySlotToHandle];
@@ -1241,10 +1212,9 @@ void ExecuteOverhead(void)
 
 static void HaltGuyFromNewGridNoBecauseOfNoAPs(SOLDIERTYPE& s)
 {
-	SoldierSP soldier = GetSoldier(&s);
 
 	HaltMoveForSoldierOutOfPoints(s);
-	soldier->removePendingAnimation();
+	Soldier{&s}.removePendingAnimation();
 
 	UnMarkMovementReserved(s);
 
@@ -1551,37 +1521,22 @@ BOOLEAN HandleGotoNewGridNo(SOLDIERTYPE* pSoldier, BOOLEAN* pfKeepMoving, BOOLEA
 					bPosOfMask = NO_SLOT;
 				}
 
-				EXPLOSIVETYPE const* pExplosive = 0;
-				if (!AM_A_ROBOT(pSoldier))
-				{
-					if (gpWorldLevelData[pSoldier->sGridNo].ubExtFlags[pSoldier->bLevel] & MAPELEMENT_EXT_TEARGAS)
-					{
-						if (!(pSoldier->fHitByGasFlags & HIT_BY_TEARGAS) && bPosOfMask == NO_SLOT)
-						{
-							// check for gas mask
-							pExplosive = &Explosive[GCM->getItem(TEARGAS_GRENADE)->getClassIndex()];
-						}
-					}
-					if (gpWorldLevelData[pSoldier->sGridNo].ubExtFlags[pSoldier->bLevel] & MAPELEMENT_EXT_MUSTARDGAS)
-					{
-						if (!(pSoldier->fHitByGasFlags & HIT_BY_MUSTARDGAS) && bPosOfMask == NO_SLOT)
-						{
-							pExplosive = &Explosive[GCM->getItem(MUSTARD_GRENADE)->getClassIndex()];
-						}
-					}
+				auto smokeEffectID = GetSmokeEffectOnTile(pSoldier->sGridNo, pSoldier->bLevel);
+				auto smokeEffect = GCM->getSmokeEffect(smokeEffectID);
+				Assert(smokeEffect != nullptr);
+
+				// check the cases where we dont take damage
+				auto ignoredByGasMask = bPosOfMask != NO_SLOT && !smokeEffect->getIgnoresGasMask();
+				auto ignoredForRobot = AM_A_ROBOT(pSoldier) && !smokeEffect->getAffectsRobot();
+				if (ignoredByGasMask || ignoredForRobot) {
+					smokeEffect = nullptr;
 				}
-				if (gpWorldLevelData[pSoldier->sGridNo].ubExtFlags[pSoldier->bLevel] & MAPELEMENT_EXT_CREATUREGAS)
-				{
-					if (!(pSoldier->fHitByGasFlags & HIT_BY_CREATUREGAS)) // gas mask doesn't help vs creaturegas
-					{
-						pExplosive = &Explosive[GCM->getItem(SMALL_CREATURE_GAS)->getClassIndex()];
-					}
-				}
-				if (pExplosive)
+
+				if (smokeEffect && smokeEffect->dealsAnyDamage() && !IsSoldierAlreadyAffectedBySmokeEffect(pSoldier, smokeEffect))
 				{
 					EVENT_StopMerc(pSoldier);
 					fDontContinue = TRUE;
-					DishOutGasDamage(pSoldier, pExplosive, TRUE, FALSE, pExplosive->ubDamage + PreRandom(pExplosive->ubDamage), 100 * (pExplosive->ubStunDamage + PreRandom(pExplosive->ubStunDamage / 2)), NULL);
+					DishOutGasDamage(pSoldier, smokeEffect, TRUE, FALSE, NULL);
 				}
 			}
 
@@ -1822,8 +1777,6 @@ static void HandleJohnArrival(SOLDIERTYPE* pSoldier)
 
 static BOOLEAN HandleAtNewGridNo(SOLDIERTYPE* pSoldier, BOOLEAN* pfKeepMoving)
 {
-	SoldierSP soldier = GetSoldier(pSoldier);
-
 	// ATE; Handle bad guys, as they fade, to cancel it if
 	// too long...
 	// ONLY if fading IN!
@@ -1942,7 +1895,7 @@ static BOOLEAN HandleAtNewGridNo(SOLDIERTYPE* pSoldier, BOOLEAN* pfKeepMoving)
 		// ATE: Cancel only if our final destination
 		if (pSoldier->sGridNo == pSoldier->sFinalDestination)
 		{
-			soldier->removePendingAction();
+			Soldier{pSoldier}.removePendingAction();
 		}
 
 		// this flag is set only to halt the currently moving guy; reset it now
@@ -2023,7 +1976,7 @@ static BOOLEAN HandleAtNewGridNo(SOLDIERTYPE* pSoldier, BOOLEAN* pfKeepMoving)
 				if (CheckFact(FACT_JOEY_NEAR_MARTHA, 0))
 				{
 					EVENT_StopMerc(pSoldier);
-					TriggerNPCRecord(JOEY, 9);
+					TriggerNPCRecord(JOEY, 10);
 				}
 			}
 
@@ -2325,12 +2278,12 @@ void HandlePlayerTeamMemberDeath(SOLDIERTYPE* pSoldier)
 		{
 			if (s->bInSector && s->bLife >= OKLIFE)
 			{
-				const INT8 bBuddyIndex = WhichBuddy(s->ubProfile, pSoldier->ubProfile);
+				const BuddySlot bBuddyIndex = WhichBuddy(s->ubProfile, pSoldier->ubProfile);
 				switch (bBuddyIndex)
 				{
-					case 0:  TacticalCharacterDialogue(s, QUOTE_BUDDY_ONE_KILLED);            break;
-					case 1:  TacticalCharacterDialogue(s, QUOTE_BUDDY_TWO_KILLED);            break;
-					case 2:  TacticalCharacterDialogue(s, QUOTE_LEARNED_TO_LIKE_MERC_KILLED); break;
+					case BUDDY_SLOT1:           TacticalCharacterDialogue(s, QUOTE_BUDDY_ONE_KILLED);            break;
+					case BUDDY_SLOT2:           TacticalCharacterDialogue(s, QUOTE_BUDDY_TWO_KILLED);            break;
+					case LEARNED_TO_LIKE_SLOT:  TacticalCharacterDialogue(s, QUOTE_LEARNED_TO_LIKE_MERC_KILLED); break;
 					default: break;
 				}
 			}
@@ -2550,11 +2503,11 @@ void HandleNPCTeamMemberDeath(SOLDIERTYPE* const pSoldierOld)
 	}
 	else if (pSoldierOld->bTeam == MILITIA_TEAM)
 	{
-		const INT8 bMilitiaRank = SoldierClassToMilitiaRank(pSoldierOld->ubSoldierClass);
-		if (bMilitiaRank != -1)
+		auto const militiaRank = SoldierClassToMilitiaRank(pSoldierOld->ubSoldierClass);
+		if (militiaRank)
 		{
 			// remove this militia from the strategic records
-			StrategicRemoveMilitiaFromSector(gWorldSector, bMilitiaRank, 1);
+			StrategicRemoveMilitiaFromSector(gWorldSector, *militiaRank, 1);
 		}
 
 		// also treat this as murder - but player will never be blamed for militia death he didn't cause
@@ -3108,16 +3061,7 @@ INT16 NewOKDestination(const SOLDIERTYPE* pCurrSoldier, INT16 sGridNo, BOOLEAN f
 			for (INT8 i = 0; i < NUM_WORLD_DIRECTIONS; ++i)
 			{
 				// ATE: Only if we have a levelnode...
-				UINT16 usStructureID;
-				if (pCurrSoldier->pLevelNode != NULL &&
-					pCurrSoldier->pLevelNode->pStructureData != NULL)
-				{
-					usStructureID = pCurrSoldier->pLevelNode->pStructureData->usStructureID;
-				}
-				else
-				{
-					usStructureID = INVALID_STRUCTURE_ID;
-				}
+				UINT16 const usStructureID = GetStructureID(pCurrSoldier);
 
 				if (InternalOkayToAddStructureToWorld(sGridNo, bLevel, &pStructureFileRef->pDBStructureRef[i], usStructureID, !fPeopleToo))
 				{
@@ -3171,11 +3115,7 @@ static INT16 NewOKDestinationAndDirection(const SOLDIERTYPE* pCurrSoldier, INT16
 			// use the specified direction for checks
 			const INT8 bLoop = bDirection;
 			// ATE: Only if we have a levelnode...
-			UINT16 usStructureID = INVALID_STRUCTURE_ID;
-			if (pCurrSoldier->pLevelNode != NULL && pCurrSoldier->pLevelNode->pStructureData != NULL)
-			{
-				usStructureID = pCurrSoldier->pLevelNode->pStructureData->usStructureID;
-			}
+			UINT16 const usStructureID = GetStructureID(pCurrSoldier);
 
 			if (InternalOkayToAddStructureToWorld(sGridNo, pCurrSoldier->bLevel, &pStructureFileRef->pDBStructureRef[OneCDirection(bLoop)], usStructureID, !fPeopleToo))
 			{
@@ -3194,14 +3134,7 @@ static INT16 NewOKDestinationAndDirection(const SOLDIERTYPE* pCurrSoldier, INT16
 //Kris:
 BOOLEAN FlatRoofAboveGridNo(INT32 iMapIndex)
 {
-	for (const LEVELNODE* i = gpWorldLevelData[iMapIndex].pRoofHead; i; i = i->pNext)
-	{
-		if (i->usIndex == NO_TILE) continue;
-
-		const UINT32 uiTileType = GetTileType(i->usIndex);
-		if (uiTileType >= FIRSTROOF && uiTileType <= LASTROOF) return TRUE;
-	}
-	return FALSE;
+	return TypeRangeExistsInRoofLayer(iMapIndex, FIRSTROOF, LASTROOF) != nullptr;
 }
 
 
@@ -3275,6 +3208,124 @@ BOOLEAN TeamMemberNear(INT8 bTeam, INT16 sGridNo, INT32 iRange)
 	return FALSE;
 }
 
+struct IntStructAdjTileInfo {
+	StructureFlags doorType;
+	struct RelativeDefines
+	{
+		int16_t incRelToBase; // increment to the grid number of the base tile to get an adjacent tile the door is interactable from
+		WorldDirections dirToTurnTo; // direction to turn to when interacting from this tile
+		WorldDirections dirToTest; // direction tested (using movement costs) for an interaction-preventing obstacle
+		int16_t offset; // relative to base
+		WorldDirections offsetDirToTest;
+	};
+	RelativeDefines relativeTo[4];
+	uint8_t open_AP;
+	uint8_t close_AP;
+	bool isDiagonal;
+};
+const IntStructAdjTileInfo adjacentTiles[] = {
+	//                         INSIDE_TOP_LEFT                                 INSIDE_TOP_RIGHT                                  OUTSIDE_TOP_LEFT                                    OUTSIDE_TOP_RIGHT                                 opening mode                 closing mode                 is interaction diagonal?
+	{ STRUCTURE_DOOR,        {{0,            SOUTH,    DIRECTION_IRRELEVANT}, {0,            EAST,     DIRECTION_IRRELEVANT},   {WORLD_COLS,    NORTH,    DIRECTION_IRRELEVANT},    {1,              WEST,     DIRECTION_IRRELEVANT}    }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN,            false}, // exterior, directly in front of the threshold
+	{ STRUCTURE_DOOR,        {{WORLD_COLS,   NORTH,    DIRECTION_IRRELEVANT}, {1,            WEST,     DIRECTION_IRRELEVANT},   {0,             SOUTH,    DIRECTION_IRRELEVANT},    {0,              EAST,     DIRECTION_IRRELEVANT}    }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN_DIAG_LONG,  false}, // interior, directly in front of the threshold
+	{ STRUCTURE_DOOR,        {{1,            SOUTHWEST,EAST},                 {WORLD_COLS,   NORTHEAST,SOUTH},                  {WORLD_COLS+1,  NORTHWEST,EAST},                    {WORLD_COLS+1,   NORTHWEST,SOUTH}                   }, HANDLE_DOOR_OPEN_DIAG_SHORT, HANDLE_DOOR_DENIED,          true}, // exterior, on the latch side
+	{ STRUCTURE_DOOR,        {{WORLD_COLS+1, NORTHWEST,EAST},                 {WORLD_COLS+1, NORTHWEST,SOUTH},                  {1,             SOUTHWEST,EAST},                    {WORLD_COLS,     NORTHEAST,SOUTH}                   }, HANDLE_DOOR_OPEN_DIAG_SHORT, HANDLE_DOOR_DENIED,          true}, // interior, on the latch side
+	{ STRUCTURE_DOOR,        {{-1,           SOUTHEAST,WEST},                 {-WORLD_COLS,  SOUTHEAST,NORTH},                  {WORLD_COLS-1,  NORTHEAST,WEST},                    {-WORLD_COLS+1,  SOUTHWEST,NORTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN,            true}, // exterior, on the hinge side
+	{ STRUCTURE_DOOR,        {{WORLD_COLS-1, NORTHEAST,WEST},                 {-WORLD_COLS+1,SOUTHWEST,NORTH},                  {-1,            SOUTHEAST,WEST},                    {-WORLD_COLS,    SOUTHEAST,NORTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_DENIED,          true}, // interior, on the hinge side, opening
+	{ STRUCTURE_DOOR,        {{WORLD_COLS-1, NORTHEAST,SOUTH, -1, WEST},      {-WORLD_COLS+1,SOUTHWEST,EAST,-WORLD_COLS,NORTH}, {-1,            SOUTHEAST,NORTH,WORLD_COLS-1,WEST}, {-WORLD_COLS,    SOUTHEAST,WEST,-WORLD_COLS+1,NORTH}}, HANDLE_DOOR_DENIED,          HANDLE_DOOR_OPEN_DIAG_SHORT, true}, // interior, on the hinge side, closing
+	{ STRUCTURE_DOOR,        {{-WORLD_COLS,  SOUTHWEST,NORTH},                {-1,           NORTHEAST,WEST},                   {WORLD_COLS*2,  NORTHWEST,SOUTH},                   {2,              NORTHWEST,EAST}                    }, HANDLE_DOOR_DENIED,          HANDLE_DOOR_OPEN_DIAG_SHORT, true}, // exterior, pull-closing the lock side
+	{ STRUCTURE_DOOR,        {{-WORLD_COLS-1,SOUTHEAST,NORTH, -1, WEST},      {-WORLD_COLS-1,SOUTHEAST,WEST,-WORLD_COLS,NORTH}, {WORLD_COLS*2-1,NORTHEAST,SOUTH,WORLD_COLS-1,WEST}, {-WORLD_COLS+2,  SOUTHWEST,EAST,-WORLD_COLS+1,NORTH}}, HANDLE_DOOR_DENIED,          HANDLE_DOOR_OPEN_DIAG_SHORT, true}, // exterior, push-closing the lock side
+	{ STRUCTURE_GARAGEDOOR,  {{DIRECTION_IRRELEVANT},                         {DIRECTION_IRRELEVANT},                           {WORLD_COLS,    NORTH,    DIRECTION_IRRELEVANT},    {1,              WEST,     DIRECTION_IRRELEVANT}    }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN,            false},
+	{ STRUCTURE_GARAGEDOOR,  {{DIRECTION_IRRELEVANT},                         {DIRECTION_IRRELEVANT},                           {0,             SOUTH,    DIRECTION_IRRELEVANT},    {0,              EAST,     DIRECTION_IRRELEVANT}    }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN,            false},
+	{ STRUCTURE_GARAGEDOOR,  {{DIRECTION_IRRELEVANT},                         {DIRECTION_IRRELEVANT},                           {WORLD_COLS-1,  NORTH,    DIRECTION_IRRELEVANT},    {-WORLD_COLS+1,  WEST,     DIRECTION_IRRELEVANT}    }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN,            false},
+	{ STRUCTURE_GARAGEDOOR,  {{DIRECTION_IRRELEVANT},                         {DIRECTION_IRRELEVANT},                           {-1,            SOUTH,    DIRECTION_IRRELEVANT},    {-WORLD_COLS,    EAST,     DIRECTION_IRRELEVANT}    }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN,            false},
+	{ STRUCTURE_GARAGEDOOR,  {{DIRECTION_IRRELEVANT},                         {DIRECTION_IRRELEVANT},                           {-2,            SOUTHEAST,EAST},                    {-WORLD_COLS*2,  SOUTHEAST,NORTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN_DIAG_LONG,  true},
+	{ STRUCTURE_GARAGEDOOR,  {{DIRECTION_IRRELEVANT},                         {DIRECTION_IRRELEVANT},                           {1,             SOUTHWEST,WEST},                    {-WORLD_COLS*2+1,SOUTHWEST,NORTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN_DIAG_LONG,  true},
+	{ STRUCTURE_GARAGEDOOR,  {{DIRECTION_IRRELEVANT},                         {DIRECTION_IRRELEVANT},                           {WORLD_COLS-2,  NORTHEAST,WEST},                    {WORLD_COLS,     NORTHEAST,SOUTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN_DIAG_LONG,  true},
+	{ STRUCTURE_GARAGEDOOR,  {{DIRECTION_IRRELEVANT},                         {DIRECTION_IRRELEVANT},                           {WORLD_COLS+1,  NORTHWEST,EAST},                    {WORLD_COLS+1,   NORTHWEST,SOUTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN_DIAG_LONG,  true},
+	{ STRUCTURE_DDOOR_LEFT,  {{0,            SOUTH,    DIRECTION_IRRELEVANT}, {0,            EAST,     DIRECTION_IRRELEVANT},   {WORLD_COLS,    NORTH,    DIRECTION_IRRELEVANT},    {1,              DIRECTION_IRRELEVANT}              }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN,            false}, // exterior, directly in front of the threshold
+	{ STRUCTURE_DDOOR_LEFT,  {{WORLD_COLS,   NORTH,    DIRECTION_IRRELEVANT}, {1,            WEST,     DIRECTION_IRRELEVANT},   {0,             SOUTH,    DIRECTION_IRRELEVANT},    {0,              DIRECTION_IRRELEVANT}              }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN_DIAG_LONG,  false}, // interior, directly in front of the threshold
+	{ STRUCTURE_DDOOR_LEFT,  {{1,            SOUTHWEST,EAST},                 {-WORLD_COLS,  SOUTHEAST,NORTH},                  {WORLD_COLS+1,  NORTHWEST,EAST},                    {-WORLD_COLS+1,  SOUTHWEST,NORTH}                   }, HANDLE_DOOR_OPEN_DIAG_SHORT, HANDLE_DOOR_DENIED,          true}, // exterior, on the latch side
+	{ STRUCTURE_DDOOR_LEFT,  {{WORLD_COLS+1, NORTHWEST,EAST},                 {-WORLD_COLS+1,SOUTHWEST,NORTH},                  {1,             SOUTHWEST,EAST},                    {-WORLD_COLS,    SOUTHEAST,NORTH}                   }, HANDLE_DOOR_OPEN_DIAG_SHORT, HANDLE_DOOR_DENIED,          true}, // interior, on the latch side
+	{ STRUCTURE_DDOOR_LEFT,  {{-1,           SOUTHEAST,WEST},                 {WORLD_COLS,   NORTHEAST,SOUTH},                  {WORLD_COLS-1,  NORTHEAST,WEST},                    {WORLD_COLS+1,   NORTHWEST,SOUTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN,            true}, // exterior, on the hinge side
+	{ STRUCTURE_DDOOR_LEFT,  {{WORLD_COLS-1, NORTHEAST,WEST},                 {WORLD_COLS+1, NORTHWEST,SOUTH},                  {-1,            SOUTHEAST,WEST},                    {WORLD_COLS,     NORTHEAST,SOUTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_DENIED,          true}, // interior, on the hinge side, opening
+	{ STRUCTURE_DDOOR_LEFT,  {{WORLD_COLS-1, NORTHEAST,SOUTH, -1, WEST},      {WORLD_COLS+1, NORTHWEST,EAST,WORLD_COLS,SOUTH},  {-1,            SOUTHEAST,NORTH,WORLD_COLS-1,WEST}, {WORLD_COLS,     NORTHEAST,WEST,WORLD_COLS+1,SOUTH} }, HANDLE_DOOR_DENIED,  HANDLE_DOOR_OPEN_DIAG_SHORT,         true}, // interior, on the hinge side, closing
+	{ STRUCTURE_DDOOR_LEFT,  {{-WORLD_COLS,  SOUTHWEST,NORTH},                {-1,           SOUTHEAST,WEST},                   {WORLD_COLS*2,  NORTHWEST,SOUTH},                   {2,              SOUTHWEST,EAST}                    }, HANDLE_DOOR_DENIED,          HANDLE_DOOR_OPEN_DIAG_SHORT, true}, // exterior, pull-closing the lock side
+	{ STRUCTURE_DDOOR_LEFT,  {{-WORLD_COLS-1,SOUTHEAST,NORTH, -1, WEST},      {WORLD_COLS-1, NORTHEAST,WEST,WORLD_COLS,SOUTH},  {WORLD_COLS*2-1,NORTHEAST,SOUTH,WORLD_COLS-1,WEST}, {WORLD_COLS+2,   NORTHWEST,EAST,WORLD_COLS+1,SOUTH} }, HANDLE_DOOR_DENIED,          HANDLE_DOOR_OPEN_DIAG_SHORT, true}, // exterior, push-closing the lock side
+	{ STRUCTURE_DDOOR_RIGHT, {{0,            SOUTH,    DIRECTION_IRRELEVANT}, {0,            EAST,     DIRECTION_IRRELEVANT},   {WORLD_COLS,    NORTH,    DIRECTION_IRRELEVANT},    {1,              WEST,     DIRECTION_IRRELEVANT}    }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN,            false}, // exterior, directly in front of the threshold
+	{ STRUCTURE_DDOOR_RIGHT, {{WORLD_COLS,   NORTH,    DIRECTION_IRRELEVANT}, {1,            WEST,     DIRECTION_IRRELEVANT},   {0,             SOUTH,    DIRECTION_IRRELEVANT},    {0,              EAST,     DIRECTION_IRRELEVANT}    }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN_DIAG_LONG,  false}, // interior, directly in front of the threshold
+	{ STRUCTURE_DDOOR_RIGHT, {{-1,           SOUTHEAST,WEST},                 {WORLD_COLS,   NORTHEAST,SOUTH},                  {WORLD_COLS-1,  NORTHEAST,WEST},                    {WORLD_COLS+1,   NORTHWEST,SOUTH}                   }, HANDLE_DOOR_OPEN_DIAG_SHORT, HANDLE_DOOR_DENIED,          true}, // exterior, on the latch side
+	{ STRUCTURE_DDOOR_RIGHT, {{WORLD_COLS-1, NORTHEAST,WEST},                 {WORLD_COLS+1, NORTHWEST,SOUTH},                  {-1,            SOUTHEAST,WEST},                    {WORLD_COLS,     NORTHEAST,SOUTH}                   }, HANDLE_DOOR_OPEN_DIAG_SHORT, HANDLE_DOOR_DENIED,          true}, // interior, on the latch side
+	{ STRUCTURE_DDOOR_RIGHT, {{1,            SOUTHWEST,EAST},                 {-WORLD_COLS,  SOUTHEAST,NORTH},                  {WORLD_COLS+1,  NORTHWEST,EAST},                    {-WORLD_COLS+1,  SOUTHWEST,NORTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN,            true}, // exterior, on the hinge side
+	{ STRUCTURE_DDOOR_RIGHT, {{WORLD_COLS+1, NORTHWEST,EAST},                 {-WORLD_COLS+1,SOUTHWEST,NORTH},                  {1,             SOUTHWEST,EAST},                    {-WORLD_COLS,    SOUTHEAST,NORTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_DENIED,          true}, // interior, on the hinge side, opening
+	{ STRUCTURE_DDOOR_RIGHT, {{WORLD_COLS+1, NORTHWEST,SOUTH, 1, EAST},       {-WORLD_COLS+1,SOUTHWEST,EAST,-WORLD_COLS,NORTH}, {1,             SOUTHWEST,NORTH,WORLD_COLS+1,EAST}, {-WORLD_COLS,    SOUTHEAST,WEST,-WORLD_COLS+1,NORTH}}, HANDLE_DOOR_DENIED,          HANDLE_DOOR_OPEN_DIAG_SHORT, true}, // interior, on the hinge side, closing
+	{ STRUCTURE_DDOOR_RIGHT, {{-WORLD_COLS,  SOUTHEAST,NORTH},                {-1,           NORTHEAST,WEST},                   {WORLD_COLS*2,  NORTHEAST,SOUTH},                   {2,              NORTHWEST,EAST}                    }, HANDLE_DOOR_DENIED,          HANDLE_DOOR_OPEN_DIAG_SHORT, true}, // exterior, pull-closing the lock side
+	{ STRUCTURE_DDOOR_RIGHT, {{-WORLD_COLS+1,SOUTHWEST,NORTH, 1, EAST},       {-WORLD_COLS-1,SOUTHEAST,WEST,-WORLD_COLS,NORTH}, {WORLD_COLS*2+1,NORTHWEST,SOUTH,WORLD_COLS+1,EAST}, {-WORLD_COLS+2,  SOUTHWEST,EAST,-WORLD_COLS+1,NORTH}}, HANDLE_DOOR_DENIED,          HANDLE_DOOR_OPEN_DIAG_SHORT, true}, // exterior, push-closing the lock side
+	{ STRUCTURE_SLIDINGDOOR, {{0,            SOUTH,    DIRECTION_IRRELEVANT}, {0,            EAST,     DIRECTION_IRRELEVANT},   {WORLD_COLS,    NORTH,    DIRECTION_IRRELEVANT},    {1,              WEST,     DIRECTION_IRRELEVANT}    }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN,            false},
+	{ STRUCTURE_SLIDINGDOOR, {{WORLD_COLS,   NORTH,    DIRECTION_IRRELEVANT}, {1,            WEST,     DIRECTION_IRRELEVANT},   {0,             SOUTH,    DIRECTION_IRRELEVANT},    {0,              EAST,     DIRECTION_IRRELEVANT}    }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN,            false},
+	{ STRUCTURE_SLIDINGDOOR, {{-1,           SOUTHEAST,WEST},                 {-WORLD_COLS,  SOUTHEAST,NORTH},                  {-1,            SOUTHEAST,WEST},                    {-WORLD_COLS,    SOUTHEAST,NORTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN_DIAG_LONG,  true},
+	{ STRUCTURE_SLIDINGDOOR, {{WORLD_COLS-1, NORTHEAST,WEST},                 {-WORLD_COLS+1,SOUTHWEST,NORTH},                  {WORLD_COLS-1,  NORTHEAST,WEST},                    {-WORLD_COLS+1,  SOUTHWEST,NORTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN_DIAG_LONG,  true},
+	{ STRUCTURE_SLIDINGDOOR, {{1,            SOUTHWEST,EAST},                 {WORLD_COLS,   NORTHEAST,SOUTH},                  {1,             SOUTHWEST,EAST},                    {WORLD_COLS,     NORTHEAST,SOUTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN_DIAG_LONG,  true},
+	{ STRUCTURE_SLIDINGDOOR, {{WORLD_COLS+1, NORTHWEST,EAST},                 {WORLD_COLS+1, NORTHWEST,SOUTH},                  {WORLD_COLS+1,  NORTHWEST,EAST},                    {WORLD_COLS+1,   NORTHWEST,SOUTH}                   }, HANDLE_DOOR_OPEN_DIAG_LONG,  HANDLE_DOOR_OPEN_DIAG_LONG,  true},
+	{ STRUCTURE_SWITCH,      {{WORLD_COLS,   NORTH,    DIRECTION_IRRELEVANT}, {1,            WEST,     DIRECTION_IRRELEVANT},   {DIRECTION_IRRELEVANT},                             {DIRECTION_IRRELEVANT},                             }, HANDLE_DOOR_OPEN,            HANDLE_DOOR_OPEN,            false},
+	{ STRUCTURE_SWITCH,      {{WORLD_COLS-1, NORTHEAST,WEST},                 {WORLD_COLS+1, NORTHWEST,SOUTH},                  {DIRECTION_IRRELEVANT},                             {DIRECTION_IRRELEVANT},                             }, HANDLE_DOOR_OPEN_DIAG_SHORT, HANDLE_DOOR_OPEN_DIAG_SHORT, true},
+	{ STRUCTURE_SWITCH,      {{WORLD_COLS+1, NORTHWEST,EAST},                 {-WORLD_COLS+1,SOUTHWEST,NORTH},                  {DIRECTION_IRRELEVANT},                             {DIRECTION_IRRELEVANT},                             }, HANDLE_DOOR_OPEN_DIAG_SHORT, HANDLE_DOOR_OPEN_DIAG_SHORT, true},
+};
+
+GridNo FindAdjacentGridExAdvanced(SOLDIERTYPE* soldier, STRUCTURE& intStruct, GridNo baseGridNo, uint8_t* dirToTurnTo)
+{
+	GridNo adjGridNo;
+	int16_t distance = 0;
+	int16_t closest = NOWHERE;
+	GridNo closeGridNo = NOWHERE;
+	IntStructAdjTileInfo::RelativeDefines wallRelDefs;
+
+	// Set default direction
+	if (dirToTurnTo) *dirToTurnTo = soldier->bDirection;
+
+	for (const IntStructAdjTileInfo& tile : adjacentTiles) {
+		if (!(intStruct.fFlags & tile.doorType)) continue;
+		if (!gamepolicy(diagonally_interactable_doors)) {
+			if (tile.isDiagonal) continue;
+			soldier->ubDoorHandleCode = HANDLE_DOOR_OPEN;
+		}
+		else {
+			if (intStruct.fFlags & STRUCTURE_OPEN) {
+				if (tile.close_AP == HANDLE_DOOR_DENIED) continue;
+				soldier->ubDoorHandleCode = tile.close_AP;
+			}
+			else {
+				if (tile.open_AP == HANDLE_DOOR_DENIED) continue;
+				soldier->ubDoorHandleCode = tile.open_AP;
+			}
+		}
+
+		wallRelDefs = tile.relativeTo[intStruct.ubWallOrientation - 1];
+		adjGridNo = baseGridNo + wallRelDefs.incRelToBase;
+		if (wallRelDefs.dirToTest != DIRECTION_IRRELEVANT) {
+			if (gubWorldMovementCosts[adjGridNo][wallRelDefs.dirToTest][soldier->bLevel] >= TRAVELCOST_BLOCKED) continue;
+			if (wallRelDefs.offset != 0) {
+				if (gubWorldMovementCosts[baseGridNo + wallRelDefs.offset][wallRelDefs.offsetDirToTest][soldier->bLevel] >= TRAVELCOST_BLOCKED) continue;
+			}
+		}
+		if (adjGridNo == soldier->sGridNo) {
+			if (dirToTurnTo) *dirToTurnTo = wallRelDefs.dirToTurnTo;
+			return adjGridNo;
+		}
+		if (tile.isDiagonal) continue;
+
+		if (NewOKDestination(soldier, adjGridNo, true, soldier->bLevel) > 0 &&
+			(distance = PlotPath(soldier, adjGridNo, NO_COPYROUTE, NO_PLOT, soldier->usUIMovementMode, soldier->bActionPoints)) > 0) {
+			if (distance <= closest) {
+				closest = distance;
+				closeGridNo = adjGridNo;
+				if (dirToTurnTo) *dirToTurnTo = wallRelDefs.dirToTurnTo;
+			}
+		}
+	}
+
+	if (closeGridNo == NOWHERE) return -1;
+	return closeGridNo;
+}
 
 INT16 FindAdjacentGridEx(SOLDIERTYPE* pSoldier, INT16 sGridNo, UINT8* pubDirection, INT16* psAdjustedGridNo, BOOLEAN fForceToPerson, BOOLEAN fDoor)
 {
@@ -4077,7 +4128,6 @@ void ExitCombatMode( )
 
 	FOR_EACH_SOLDIER(pSoldier)
 	{
-		SoldierSP soldier = GetSoldier(pSoldier);
 		if ( pSoldier->bInSector )
 		{
 			// Reset some flags
@@ -4087,7 +4137,7 @@ void ExitCombatMode( )
 				SoldierGotoStationaryStance( pSoldier );
 			}
 
-			soldier->removePendingAnimation();
+			Soldier{pSoldier}.removePendingAnimation();
 
 			// Reset moved flag
 			pSoldier->bMoved = FALSE;
@@ -4101,8 +4151,6 @@ void ExitCombatMode( )
 	}
 
 	// Change music modes
-	gfForceMusicToTense = TRUE;
-
 	SetMusicMode( MUSIC_TACTICAL_ENEMYPRESENT );
 
 	BetweenTurnsVisibilityAdjustments();
@@ -4392,7 +4440,6 @@ BOOLEAN CheckForEndOfCombatMode( BOOLEAN fIncrementTurnsNotSeen )
 		}*/
 
 		// Begin tense music....
-		gfForceMusicToTense = TRUE;
 		SetMusicMode( MUSIC_TACTICAL_ENEMYPRESENT );
 
 		return( TRUE );
@@ -4501,7 +4548,7 @@ BOOLEAN CheckForEndOfBattle( BOOLEAN fAnEnemyRetreated )
 
 		// Play death music
 		SetMusicMode( MUSIC_TACTICAL_DEFEAT );
-		SetCustomizableTimerCallbackAndDelay( 10000, DeathNoMessageTimerCallback, FALSE );
+		SetCustomizableTimerCallbackAndDelay(10s, DeathNoMessageTimerCallback, false);
 
 		if ( CheckFact( FACT_FIRST_BATTLE_BEING_FOUGHT, 0 ) )
 		{
@@ -4717,7 +4764,7 @@ BOOLEAN CheckForEndOfBattle( BOOLEAN fAnEnemyRetreated )
 			}
 		}
 
-		SetCustomizableTimerCallbackAndDelay(3000, HandleThePlayerBeNotifiedOfSomeoneElseInSector, FALSE);
+		SetCustomizableTimerCallbackAndDelay(3s, HandleThePlayerBeNotifiedOfSomeoneElseInSector, false);
 
 		//Whenever returning TRUE, make sure you clear gfBlitBattleSectorLocator;
 		gfBlitBattleSectorLocator = FALSE;
@@ -5089,11 +5136,11 @@ static BOOLEAN CheckForLosingEndOfBattle(void)
 			if ( fDoCapture )
 			{
 				EndCaptureSequence( );
-				SetCustomizableTimerCallbackAndDelay( 3000, CaptureTimerCallback, FALSE );
+				SetCustomizableTimerCallbackAndDelay(3s, CaptureTimerCallback, false);
 			}
 			else
 			{
-				SetCustomizableTimerCallbackAndDelay( 10000, DeathTimerCallback, FALSE );
+				SetCustomizableTimerCallbackAndDelay(10s, DeathTimerCallback, false);
 			}
 
 		}
@@ -5321,12 +5368,7 @@ static void HandleSuppressionFire(const SOLDIERTYPE* const targeted_merc, SOLDIE
 				{
 					pSoldier->usQuoteSaidFlags |= SOLDIER_QUOTE_SAID_BEING_PUMMELED;
 					// say we're under heavy fire!
-
-					// ATE: For some reason, we forgot #53!
-					if ( pSoldier->ubProfile != 53 )
-					{
-						TacticalCharacterDialogue( pSoldier, QUOTE_UNDER_HEAVY_FIRE );
-					}
+					TacticalCharacterDialogue(pSoldier, QUOTE_UNDER_HEAVY_FIRE);
 				}
 			}
 
@@ -6239,7 +6281,7 @@ void HandleThePlayerBeNotifiedOfSomeoneElseInSector(void)
 		AreWeInAUIMenu()
 		)
 	{
-		SetCustomizableTimerCallbackAndDelay(2000, HandleThePlayerBeNotifiedOfSomeoneElseInSector, FALSE);
+		SetCustomizableTimerCallbackAndDelay(2s, HandleThePlayerBeNotifiedOfSomeoneElseInSector, false);
 		return;
 	}
 
@@ -6262,7 +6304,6 @@ static void HandleBrothelWallDestroyed(INT16 const sSectorX, INT16 const sSector
 }
 
 #ifdef WITH_UNITTESTS
-#undef FAIL
 #include "gtest/gtest.h"
 
 TEST(Overhead, asserts)

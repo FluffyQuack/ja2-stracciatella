@@ -83,18 +83,6 @@ enum
 	AMMO_FLAME,
 };
 
-enum
-{
-	EXPLOSV_NORMAL,
-	EXPLOSV_STUN,
-	EXPLOSV_TEARGAS,
-	EXPLOSV_MUSTGAS,
-	EXPLOSV_FLARE,
-	EXPLOSV_NOISE,
-	EXPLOSV_SMOKE,
-	EXPLOSV_CREATUREGAS,
-};
-
 #define AMMO_DAMAGE_ADJUSTMENT_BUCKSHOT( x )	(x / 4)
 #define NUM_BUCKSHOT_PELLETS			9
 
@@ -149,25 +137,18 @@ struct ARMOURTYPE
 	UINT8 ubDegradePercent;
 };
 
-struct EXPLOSIVETYPE
+enum class FireWeaponResult
 {
-	UINT8 ubType; // type of explosive
-	UINT8 ubDamage; // damage value
-	UINT8 ubStunDamage; // stun amount / 100
-	UINT8 ubRadius; // radius of effect
-	UINT8 ubVolume; // sound radius of explosion
-	UINT8 ubVolatility; // maximum chance of accidental explosion
-	UINT8 ubAnimationID; // Animation enum to use
+	FAILED, FIRED, FIREABLE, JAMMED, UNJAMMED
 };
 
 //GLOBALS
 
 extern ARMOURTYPE    const Armour[];
-extern EXPLOSIVETYPE const Explosive[];
 
 INT8 EffectiveArmour(const OBJECTTYPE* pObj);
 extern INT8 ArmourVersusExplosivesPercent( SOLDIERTYPE * pSoldier );
-extern BOOLEAN FireWeapon( SOLDIERTYPE *pSoldier , INT16 sTargetGridNo );
+FireWeaponResult FireWeapon(SOLDIERTYPE * pSoldier, GridNo sTargetGridNo);
 void WeaponHit(SOLDIERTYPE* target, UINT16 usWeaponIndex, INT16 sDamage, INT16 sBreathLoss, UINT16 usDirection, INT16 sXPos, INT16 sYPos, INT16 sZPos, INT16 sRange, SOLDIERTYPE* attacker, UINT8 ubSpecial, UINT8 ubHitLocation);
 void StructureHit(BULLET* b, UINT16 usStructureID, INT32 iImpact, BOOLEAN fStopped);
 extern void WindowHit( INT16 sGridNo, UINT16 usStructureID, BOOLEAN fBlowWindowSouth, BOOLEAN fLargeForce );
@@ -188,8 +169,8 @@ INT8 ArmourPercent(const SOLDIERTYPE* pSoldier);
 
 extern void GetTargetWorldPositions( SOLDIERTYPE *pSoldier, INT16 sTargetGridNo, FLOAT *pdXPos, FLOAT *pdYPos, FLOAT *pdZPos );
 
-extern BOOLEAN	OKFireWeapon( SOLDIERTYPE *pSoldier );
-extern BOOLEAN CheckForGunJam( SOLDIERTYPE * pSoldier );
+FireWeaponResult OKFireWeapon(SOLDIERTYPE *);
+FireWeaponResult CheckForGunJam(SOLDIERTYPE *);
 
 INT32 CalcMaxTossRange(const SOLDIERTYPE* pSoldier, UINT16 usItem, BOOLEAN fArmed);
 extern UINT32 CalcThrownChanceToHit(SOLDIERTYPE *pSoldier, INT16 sGridNo, UINT8 ubAimTime, UINT8 ubAimPos );

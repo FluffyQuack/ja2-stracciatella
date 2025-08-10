@@ -9,11 +9,6 @@
 #include "UILayout.h"
 #include <string_theory/string>
 
-class SGPVObject;
-class SGPVSurface;
-struct GROUP;
-struct OBJECTTYPE;
-
 
 // char breath and life position
 #define BAR_INFO_X (STD_SCREEN_X + 66)
@@ -226,8 +221,12 @@ extern BOOLEAN fDisableDueToBattleRoster;
 
 extern BOOLEAN gfAtLeastOneMercWasHired;
 
-// curtrent map sector z that is being displayed in the mapscreen
-extern INT32 iCurrentMapSectorZ;
+// selected sector
+inline SGPSector sSelMap(9, 1);
+
+// Current map sector z that is being displayed in the mapscreen.
+// Formerly a separate variable which explains the i prefix.
+inline auto & iCurrentMapSectorZ{ sSelMap.z };
 
 // y position of the pop up box
 extern INT32 giBoxY;
@@ -336,9 +335,6 @@ void UpdateCharRegionHelpText( void );
 // find this soldier in mapscreen character list and set as contract
 void FindAndSetThisContractSoldier( SOLDIERTYPE *pSoldier );
 
-// lose the cursor, re-render
-void HandleMAPUILoseCursorFromOtherScreen( void );
-
 void RenderMapRegionBackground( void );
 
 // update mapscreen assignment positions
@@ -391,7 +387,7 @@ void SetUpFastHelpRegion(INT32 x, INT32 y, INT32 width, const ST::string& str);
 void ResetAssignmentOfMercsThatWereTrainingMilitiaInThisSector(const SGPSector& sSector);
 
 // the sector move box
-void CreateDestroyMovementBox( INT16 sSectorX, INT16 sSectorY, INT16 sSectorZ );
+void CreateDestroyMovementBox(const SGPSector& sSector = {});
 void SetUpMovingListsForSector(const SGPSector& sSector);
 void ReBuildMoveBox( void );
 BOOLEAN IsCharacterSelectedForAssignment( INT16 sCharNumber );
@@ -478,7 +474,6 @@ void RandomMercInGroupSaysQuote(GROUP const&, UINT16 quote_num);
 
 void MakeDialogueEventShowContractMenu(SOLDIERTYPE&);
 
-void LoadMapScreenInterfaceGraphics();
 void DeleteMapScreenInterfaceGraphics();
 
 #endif

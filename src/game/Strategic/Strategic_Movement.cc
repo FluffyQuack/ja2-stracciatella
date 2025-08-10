@@ -6,7 +6,6 @@
 #include "ContentManager.h"
 #include "Dialogue_Control.h"
 #include "Faces.h"
-#include "FileMan.h"
 #include "Font_Control.h"
 #include "Game_Clock.h"
 #include "Game_Events.h"
@@ -22,6 +21,7 @@
 #include "Map_Screen_Interface_Border.h"
 #include "Map_Screen_Interface_Bottom.h"
 #include "MapScreen.h"
+#include "Map_Screen_Interface_Map.h"
 #include "Meanwhile.h"
 #include "MercProfile.h"
 #include "Message.h"
@@ -31,9 +31,12 @@
 #include "PreBattle_Interface.h"
 #include "Queen_Command.h"
 #include "Quests.h"
+#include "SAM_Sites.h"
+#include "Soldier_Control.h"
 #include "Soldier_Macros.h"
 #include "Squads.h"
 #include "Strategic.h"
+#include "StrategicMap.h"
 #include "StrategicMap_Secrets.h"
 #include "Strategic_AI.h"
 #include "Strategic_Pathing.h"
@@ -398,18 +401,22 @@ BOOLEAN AddWaypointToPGroup(GROUP *g, const SGPSector& sMap)
 	{
 		if (n_aligned_axes == 0)
 		{
-			AssertMsg(FALSE, ST::format("Invalid DIAGONAL waypoint being added for groupID {}. AM-0", g->ubGroupID));
+			SLOGE("Invalid DIAGONAL waypoint being added for groupID {}. AM-0", g->ubGroupID);
 			return FALSE;
 		}
 
 		if (n_aligned_axes >= 2)
 		{
-			AssertMsg(FALSE, ST::format("Invalid IDENTICAL waypoint being added for groupID {}. AM-0", g->ubGroupID));
+			SLOGE("Invalid IDENTICAL waypoint being added for groupID {}. AM-0", g->ubGroupID);
 			return FALSE;
 		}
 
 		// Has to be different in exactly 1 axis to be a valid new waypoint
-		Assert(n_aligned_axes == 1);
+		if (n_aligned_axes != 1)
+		{
+			SLOGE("n_aligned_axes should be 1, is {}", n_aligned_axes);
+			return false;
+		}
 	}
 
 	WAYPOINT* const new_wp = new WAYPOINT{};
@@ -610,7 +617,7 @@ static void PrepareForPreBattleInterface(GROUP* pPlayerDialogGroup, GROUP* pInit
 	}
 
 	// Pipe up with quote...
-	AssertMsg( pPlayerDialogGroup, "Didn't get a player dialog group for prebattle interface." );
+	Assert(pPlayerDialogGroup); // Didn't get a player dialog group for prebattle interface?
 
 	AssertMsg(pPlayerDialogGroup->pPlayerList, ST::format("Player group {} doesn't have *any* players in it!  (Finding dialog group)", pPlayerDialogGroup->ubGroupID));
 
@@ -1018,8 +1025,7 @@ static void AwardExperienceForTravelling(GROUP& g)
 
 static void AddCorpsesToBloodcatLair(const SGPSector& sSector)
 {
-	ROTTING_CORPSE_DEFINITION		Corpse;
-	Corpse = ROTTING_CORPSE_DEFINITION{};
+	ROTTING_CORPSE_DEFINITION Corpse{};
 
 	// Setup some values!
 	Corpse.ubBodyType        = REGMALE;
@@ -1081,7 +1087,8 @@ void GroupArrivedAtSector(GROUP& g, BOOLEAN const check_for_battle, BOOLEAN cons
 		if (g.fVehicle)
 		{
 			VEHICLETYPE const& v = GetVehicleFromMvtGroup(g);
-			if (!IsHelicopter(v) && !g.pPlayerList)
+			// Group size of 1 means the vehicle is the only member of this group.
+			if (!IsHelicopter(v) && g.ubGroupSize <= 1)
 			{ /* Nobody here, better just get out now. With vehicles, arriving empty
 				* is probably ok, since passengers might have been killed but vehicle
 				* lived. */
@@ -1120,18 +1127,13 @@ void GroupArrivedAtSector(GROUP& g, BOOLEAN const check_for_battle, BOOLEAN cons
 	{ /* Queue battle! Delay arrival by a random value ranging from 3-5 minutes,
 		* so it doesn't get the player too suspicious after it happens to him a few
 		* times, which, by the way, is a rare occurrence. */
-		if (AreInMeanwhile())
-		{ /* Tack on only 1 minute if we are in a meanwhile scene. This effectively
-			* prevents any battle from occurring while inside a meanwhile scene. */
-			++g.uiArrivalTime;
-		}
-		else
-		{
-			g.uiArrivalTime += Random(3) + 3;
-		}
+
+		/* Tack on only 1 minute if we are in a meanwhile scene. This effectively
+		 * prevents any battle from occurring while inside a meanwhile scene. */
+		g.setArrivalTime(g.uiArrivalTime + (AreInMeanwhile() ? 1 : (Random(3) + 3)));
 
 		if (!AddStrategicEvent(EVENT_GROUP_ARRIVAL, g.uiArrivalTime, g.ubGroupID))
-			SLOGA("Failed to add movement event.");
+			SLOGA("GroupArrivedAtSector: Failed to add movement event.");
 
 		if (g.fPlayer && g.uiArrivalTime - ABOUT_TO_ARRIVE_DELAY > GetWorldTotalMin())
 		{
@@ -1394,7 +1396,7 @@ static void HandleNonCombatGroupArrival(GROUP& g, bool const main_group, bool co
 		if (GroupAtFinalDestination(&g))
 		{
 			// If currently selected sector has nobody in it
-			if (PlayerMercsInSector(SGPSector(sSelMap.x, sSelMap.y, iCurrentMapSectorZ)) == 0)
+			if (PlayerMercsInSector(sSelMap) == 0)
 			{ // Make this sector strategically selected
 				ChangeSelectedMapSector(g.ubSector);
 			}
@@ -1627,7 +1629,7 @@ static void DelayEnemyGroupsIfPathsCross(GROUP& player_group)
 		 * values to figure out how far along its route a group is! */
 		g.setArrivalTime(player_group.uiArrivalTime + 1 + Random(10));
 		if (!AddStrategicEvent(EVENT_GROUP_ARRIVAL, g.uiArrivalTime, g.ubGroupID))
-			SLOGA("Failed to add movement event.");
+			SLOGA("DelayEnemyGroupsIfPathsCross: Failed to add movement event.");
 	}
 }
 
@@ -1770,7 +1772,7 @@ static void InitiateGroupMovementToNextSector(GROUP* pGroup)
 
 	//Post the event!
 	if( !AddStrategicEvent( EVENT_GROUP_ARRIVAL, pGroup->uiArrivalTime, pGroup->ubGroupID ) )
-		SLOGA("Failed to add movement event.");
+		SLOGA("InitiateGroupMovementToNextSector: Failed to add movement event.");
 
 	//For the case of player groups, we need to update the information of the soldiers.
 	if( pGroup->fPlayer )
@@ -2528,13 +2530,20 @@ void LoadStrategicMovementGroupsFromSavedGameFile(HWFILE const f)
 	f->seek(32, FILE_SEEK_FROM_CURRENT);
 }
 
+namespace {
+UINT8 PlayerGroupSize(GROUP const& group)
+{
+	UINT8 size{ 0 };
+	CFOR_EACH_PLAYER_IN_GROUP(unused, &group) ++size;
+	return size;
+}
+}
 
 // Saves the Player's group list to the saved game file
 static void SavePlayerGroupList(HWFILE const f, GROUP const* const g)
 {
 	// Save the number of nodes in the list
-	UINT32 uiNumberOfNodesInList = 0;
-	CFOR_EACH_PLAYER_IN_GROUP(p, g) ++uiNumberOfNodesInList;
+	UINT32 const uiNumberOfNodesInList{PlayerGroupSize(*g) };
 	f->write(&uiNumberOfNodesInList, sizeof(UINT32));
 
 	// Loop through and save only the players profile id
@@ -2565,11 +2574,42 @@ static void LoadPlayerGroupList(HWFILE const f, GROUP* const g)
 		SOLDIERTYPE* const s = FindSoldierByProfileIDOnPlayerTeam(profile_id);
 		//Should never happen
 		//Assert(s != NULL);
+
+		// Sanity check because apparently a vehicle can somehow end up
+		// in the wrong group (issue #2037).
+		if (s->ubGroupID != g->ubGroupID)
+		{
+			SLOGE("{} found in wrong group {}, ignored!", s->name, g->ubGroupID);
+			// We have to set this vehicle's between sectors flag from its
+			// correct group but that group might not have been loaded yet.
+			// so we delay this until the game is fully loaded.
+			auto const * const correctGroup{ GetGroup(s->ubGroupID) };
+			s->fBetweenSectors = correctGroup
+				// If the correct group was already loaded we copy its
+				// between sectors flag to this vehicle.
+				? correctGroup->fBetweenSectors
+				// Clear the flag; losing a movement command is easier
+				// to fix for the player than a vehicle that is stuck
+				// between sectors.
+				: FALSE;
+
+			delete pg;
+			continue;
+		}
+
 		pg->pSoldier = s;
 		pg->next     = NULL;
 
 		*anchor = pg;
 		anchor  = &pg->next;
+	}
+
+	// We might have to correct the group size.
+	auto const actualSize{ PlayerGroupSize(*g) };
+	if (actualSize != g->ubGroupSize)
+	{
+		SLOGW("Fixed size for group {}: old {} new {}", g->ubGroupID, g->ubGroupSize, actualSize);
+		g->ubGroupSize = actualSize;
 	}
 }
 
@@ -2762,7 +2802,7 @@ void RetreatGroupToPreviousSector(GROUP& g)
 	}
 
 	if (!AddStrategicEvent(EVENT_GROUP_ARRIVAL, g.uiArrivalTime, g.ubGroupID))
-		SLOGA("Failed to add movement event.");
+		SLOGA("RetreatGroupToPreviousSector: Failed to add movement event.");
 
 	// For the case of player groups, we need to update the information of the soldiers.
 	if (g.fPlayer)

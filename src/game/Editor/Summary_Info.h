@@ -1,6 +1,8 @@
 #ifndef __SUMMARY_INFO_H
 #define __SUMMARY_INFO_H
 
+#include "Exit_Grids.h"
+#include "Map_Information.h"
 #include "Types.h"
 
 #define GLOBAL_SUMMARY_VERSION	14
@@ -95,7 +97,7 @@ struct SUMMARYFILE
 
 extern BOOLEAN gfAutoLoadA9;
 
-extern BOOLEAN EvaluateWorld(const char* pSector, UINT8 ubLevel);
+extern BOOLEAN EvaluateWorld(const ST::string& pSector, UINT8 ubLevel);
 void WriteSectorSummaryUpdate(const ST::string &filename, UINT8 ubLevel, SUMMARYFILE*);
 
 extern BOOLEAN gfMustForceUpdateAllMaps;

@@ -1,13 +1,12 @@
 #include "ModPackContentManager.h"
 
 #include "JsonUtility.h"
-#include "sgp/FileMan.h"
 
-#include "Debug.h"
 #include "Logger.h"
+#include <utility>
 
 ModPackContentManager::ModPackContentManager(RustPointer<EngineOptions> engineOptions)
-	:DefaultContentManager(move(engineOptions))
+	:DefaultContentManager(std::move(engineOptions))
 {
 	uint32_t nMods = EngineOptions_getModsLength(m_engineOptions.get());
 	std::vector<ST::string> modNames;
@@ -17,10 +16,6 @@ ModPackContentManager::ModPackContentManager(RustPointer<EngineOptions> engineOp
 		modNames.emplace_back(modName.get());
 	}
 	m_modNames = modNames;
-}
-
-ModPackContentManager::~ModPackContentManager()
-{
 }
 
 void ModPackContentManager::logConfiguration() const {
@@ -35,25 +30,25 @@ void ModPackContentManager::logConfiguration() const {
 }
 
 /** Load dialogue quote from file. */
-ST::string* ModPackContentManager::loadDialogQuoteFromFile(const ST::string& filename, int quote_number)
+ST::string ModPackContentManager::loadDialogQuoteFromFile(const ST::string& filename, unsigned quote_number)
 {
 	ST::string jsonFileName = ST::string(filename) + ".json";
 	std::map<ST::string, std::vector<ST::string> >::iterator it = m_dialogQuotesMap.find(jsonFileName);
 	if(it != m_dialogQuotesMap.end())
 	{
 		SLOGD("cached quote {} {}", quote_number, jsonFileName);
-		return new ST::string(it->second[quote_number].c_str());
+		return it->second[quote_number];
 	}
 	else
 	{
-		if(doesGameResExists(jsonFileName.c_str()))
+		if(doesGameResExists(jsonFileName))
 		{
 			AutoSGPFile f(openGameResForReading(jsonFileName));
 			ST::string jsonQuotes = f->readStringToEnd();
 			std::vector<ST::string> quotes;
 			JsonUtility::parseJsonToListStrings(jsonQuotes.c_str(), quotes);
 			m_dialogQuotesMap[jsonFileName] = quotes;
-			return new ST::string(quotes[quote_number].c_str());
+			return quotes[quote_number];
 		}
 		else
 		{

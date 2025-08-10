@@ -1,46 +1,34 @@
 #pragma once
 
-#include <string_theory/string>
+#include "Json.h"
 
 #include <map>
-#include <stdexcept>
 #include <stdint.h>
-
-class JsonObject;
-class JsonObjectReader;
-
-#define NOAMMO (0)
+#include <string_theory/string>
 
 struct CalibreModel
 {
-	CalibreModel(uint16_t index,
-			ST::string internalName,
-			ST::string sound,
-			ST::string burstSound,
-			ST::string silencedSound,
-			ST::string silencedBurstSound,
-			bool showInHelpText,
-			bool monsterWeapon
-	);
+	static constexpr uint16_t NOAMMO = 0;
 
-	// This could be default in C++11
-	virtual ~CalibreModel();
+	[[nodiscard]] const ST::string* getName() const;
 
-	const ST::string* getName() const;
+	[[nodiscard]] JsonValue serialize() const;
+	[[nodiscard]] static CalibreModel* deserialize(const JsonValue &json);
 
-	virtual void serializeTo(JsonObject &obj) const;
-	static CalibreModel* deserialize(JsonObjectReader &obj);
+	[[nodiscard]] static const CalibreModel* getNoCalibreObject();
 
-	static const CalibreModel* getNoCalibreObject();
-
-	uint16_t index;
-	ST::string internalName;
+	uint16_t index{ NOAMMO };
+	ST::string internalName{ "NO_CALIBRE" };
 	ST::string sound;
 	ST::string burstSound;
 	ST::string silencedSound;
 	ST::string silencedBurstSound;
-	bool showInHelpText;
-	bool monsterWeapon;
+	bool showInHelpText{ false };
+	bool monsterWeapon{ false };
+
+private:
+	CalibreModel() = default;
+	CalibreModel(JsonObject jsonObj);
 };
 
 const CalibreModel* getCalibre(const ST::string& calibreName,

@@ -3,7 +3,6 @@
 #include "Animation_Cache.h"
 #include "Animation_Control.h"
 #include "Animation_Data.h"
-#include "Arms_Dealer_Init.h"
 #include "Boxing.h"
 #include "Campaign.h"
 #include "Campaign_Types.h"
@@ -16,7 +15,6 @@
 #include "Event_Pump.h"
 #include "Explosion_Control.h"
 #include "Faces.h"
-#include "FileMan.h"
 #include "Font_Control.h"
 #include "GameInstance.h"
 #include "GameSettings.h"
@@ -50,8 +48,6 @@
 #include "RT_Time_Defines.h"
 #include "Random.h"
 #include "RenderWorld.h"
-#include "Render_Dirty.h"
-#include "Render_Fun.h"
 #include "Rotting_Corpses.h"
 #include "ScreenIDs.h"
 #include "SkillCheck.h"
@@ -91,8 +87,6 @@
 #include <string_theory/string>
 
 #define PALETTEFILENAME			BINARYDATADIR "/ja2pal.dat"
-
-#define LOW_MORALE_BATTLE_SND_THREASHOLD	35
 
 
 #define TURNING_FROM_PRONE_OFF			0
@@ -137,7 +131,7 @@ struct BATTLESNDS_STRUCT
 	UINT8   ubRandomVal;
 	BOOLEAN fBadGuy;
 	BOOLEAN fDontAllowTwoInRow;
-	BOOLEAN fStopDialogue;
+	INT8    stopDialogue;
 };
 
 
@@ -704,7 +698,7 @@ static BOOLEAN CreateSoldierLight(SOLDIERTYPE* pSoldier)
 	if (pSoldier->light == NULL)
 	{
 		// ATE: Check for goggles in headpos....
-		char const* light_file = IsWearingHeadGear(*pSoldier, UVGOGGLES)    ? "Light4" :
+		ST::string light_file = IsWearingHeadGear(*pSoldier, UVGOGGLES) ? "Light4" :
 						IsWearingHeadGear(*pSoldier, NIGHTGOGGLES) ? "Light3" :
 						"Light2";
 
@@ -898,8 +892,6 @@ void EVENT_InitNewSoldierAnim(SOLDIERTYPE* const pSoldier, UINT16 usNewState, UI
 	BOOLEAN fTryingToRestart = FALSE;
 
 	CHECKV(usNewState < NUMANIMATIONSTATES);
-
-	SoldierSP soldier = GetSoldier(pSoldier);
 
 	///////////////////////////////////////////////////////////////////////
 	//			DO SOME CHECKS ON OUR NEW ANIMATION!
@@ -1692,7 +1684,7 @@ void EVENT_InitNewSoldierAnim(SOLDIERTYPE* const pSoldier, UINT16 usNewState, UI
 					GetMan(pSoldier->uiPendingActionData4).uiStatusFlags &= ~SOLDIER_ENGAGEDINACTION;
 					break;
 			}
-			soldier->removePendingAction();
+			Soldier{pSoldier}.removePendingAction();
 		}
 		else
 		{
@@ -2075,7 +2067,7 @@ static void SetSoldierGridNo(SOLDIERTYPE& s, GridNo new_grid_no, BOOLEAN const f
 	}
 
 	// Are we now standing in tear gas without a decently working gas mask?
-	if (GetSmokeEffectOnTile(new_grid_no, s.bLevel) != NO_SMOKE_EFFECT &&
+	if (GetSmokeEffectOnTile(new_grid_no, s.bLevel) != SmokeEffectID::NOTHING &&
 		(s.inv[HEAD1POS].usItem != GASMASK || s.inv[HEAD1POS].bStatus[0] < GASMASK_MIN_STATUS) &&
 		(s.inv[HEAD2POS].usItem != GASMASK || s.inv[HEAD2POS].bStatus[0] < GASMASK_MIN_STATUS))
 	{
@@ -2145,7 +2137,8 @@ void EVENT_FireSoldierWeapon( SOLDIERTYPE *pSoldier, INT16 sTargetGridNo )
 	//pSoldier->sLastTarget = sTargetGridNo;
 	pSoldier->target = WhoIsThere2(sTargetGridNo, pSoldier->bTargetLevel);
 
-	if (GCM->getItem(pSoldier->inv[HANDPOS].usItem)->isGun())
+	auto item = GCM->getItem(pSoldier->inv[HANDPOS].usItem);
+	if (item->isGun())
 	{
 		if (pSoldier->bDoBurst)
 		{
@@ -2198,13 +2191,8 @@ void EVENT_FireSoldierWeapon( SOLDIERTYPE *pSoldier, INT16 sTargetGridNo )
 				}
 
 				// Check if our weapon has no intermediate anim...
-				switch( pSoldier->inv[ HANDPOS ].usItem )
-				{
-					case ROCKET_LAUNCHER:
-					case MORTAR:
-					case GLAUNCHER:
-						fDoFireRightAway = TRUE;
-						break;
+				if (item->isLauncher() || item->getItemIndex() == ROCKET_LAUNCHER) {
+					fDoFireRightAway = TRUE;
 				}
 
 				if ( fDoFireRightAway )
@@ -2516,8 +2504,8 @@ UINT16 PickSoldierReadyAnimation(SOLDIERTYPE* pSoldier, BOOLEAN fEndReady)
 	}
 
 	// Check if we have a gun.....
-	if ( GCM->getItem(pSoldier->inv[ HANDPOS ].usItem)->getItemClass() != IC_GUN &&
-		pSoldier->inv[ HANDPOS ].usItem != GLAUNCHER )
+	auto item = GCM->getItem(pSoldier->inv[ HANDPOS ].usItem);
+	if (item->getItemClass() != IC_GUN && !item->isLauncher())
 	{
 		return( INVALID_ANIMATION );
 	}
@@ -3270,7 +3258,8 @@ static void SoldierGotHitExplosion(SOLDIERTYPE* const pSoldier, const UINT16 usW
 
 	if ( gGameSettings.fOptions[ TOPTION_BLOOD_N_GORE ] )
 	{
-		if ( Explosive[ GCM->getItem(usWeaponIndex)->getClassIndex() ].ubRadius >= 3 &&
+		auto blastEffect = GCM->getExplosive(usWeaponIndex)->getBlastEffect();
+		if ( blastEffect && blastEffect->radius >= 3 &&
 			pSoldier->bLife == 0 && gAnimControl[ pSoldier->usAnimState ].ubEndHeight != ANIM_PRONE )
 		{
 			if ( sRange >= 2 && sRange <= 4 )
@@ -3772,13 +3761,12 @@ static INT8 MultiTiledTurnDirection(SOLDIERTYPE* pSoldier, INT8 bStartDirection,
 	INT8 bTurningIncrement;
 	INT8 bCurrentDirection;
 	INT8 bLoop;
-	UINT16 usStructureID, usAnimSurface;
 	BOOLEAN fOk = FALSE;
 
 	// start by trying to turn in quickest direction
 	bTurningIncrement = QuickestDirection( bStartDirection, bDesiredDirection );
 
-	usAnimSurface = DetermineSoldierAnimationSurface( pSoldier, pSoldier->usUIMovementMode );
+	UINT16 const usAnimSurface = DetermineSoldierAnimationSurface(pSoldier, pSoldier->usUIMovementMode);
 
 	const STRUCTURE_FILE_REF* const pStructureFileRef = GetAnimationStructureRef(pSoldier, usAnimSurface, pSoldier->usUIMovementMode);
 	if ( !pStructureFileRef )
@@ -3788,14 +3776,7 @@ static INT8 MultiTiledTurnDirection(SOLDIERTYPE* pSoldier, INT8 bStartDirection,
 	}
 
 	// ATE: Only if we have a levelnode...
-	if ( pSoldier->pLevelNode != NULL && pSoldier->pLevelNode->pStructureData != NULL )
-	{
-		usStructureID = pSoldier->pLevelNode->pStructureData->usStructureID;
-	}
-	else
-	{
-		usStructureID = INVALID_STRUCTURE_ID;
-	}
+	UINT16 const usStructureID = GetStructureID(pSoldier);
 
 	bLoop = 0;
 	bCurrentDirection = bStartDirection;
@@ -4058,7 +4039,7 @@ void EVENT_BeginMercTurn(SOLDIERTYPE& s)
 	{
 		// Must get a gas mask or leave the gassed area to get over it
 		if (IsWearingHeadGear(s, GASMASK) ||
-			GetSmokeEffectOnTile(s.sGridNo, s.bLevel) == NO_SMOKE_EFFECT)
+			GetSmokeEffectOnTile(s.sGridNo, s.bLevel) == SmokeEffectID::NOTHING)
 		{
 			// Turn off gassed flag
 			s.uiStatusFlags &= ~SOLDIER_GASSED;
@@ -5038,16 +5019,19 @@ void LoadPaletteData()
 void SetPaletteReplacement(SGPPaletteEntry* p8BPPPalette, const ST::string& aPalRep)
 {
 	UINT32 cnt2;
-	UINT8  ubType;
 
-	const UINT8 ubPalIndex = GetPaletteRepIndexFromID(aPalRep);
+	auto const ubPalIndex = GetPaletteRepIndexFromID(aPalRep);
+	if (!ubPalIndex)
+	{
+		return;
+	}
 
 	// Get range type
-	ubType = gpPalRep[ ubPalIndex ].ubType;
+	auto const ubType = gpPalRep[*ubPalIndex].ubType;
 
 	for ( cnt2 = gpPaletteSubRanges[ ubType ].ubStart; cnt2 <= gpPaletteSubRanges[ ubType ].ubEnd; cnt2++ )
 	{
-		p8BPPPalette[cnt2] = gpPalRep[ubPalIndex].rgb[cnt2 - gpPaletteSubRanges[ubType].ubStart];
+		p8BPPPalette[cnt2] = gpPalRep[*ubPalIndex].rgb[cnt2 - gpPaletteSubRanges[ubType].ubStart];
 	}
 }
 
@@ -5084,7 +5068,7 @@ void DeletePaletteData()
 }
 
 
-UINT8 GetPaletteRepIndexFromID(const ST::string& pal_rep)
+std::optional<UINT8> GetPaletteRepIndexFromID(const ST::string& pal_rep)
 {
 	// Check if type exists
 	for (UINT32 i = 0; i < guiNumReplacements; ++i)
@@ -5092,7 +5076,7 @@ UINT8 GetPaletteRepIndexFromID(const ST::string& pal_rep)
 		if (pal_rep.compare(gpPalRep[i].ID) == 0) return i;
 	}
 
-	throw std::logic_error("Invalid Palette Replacement ID given");
+	return {};
 }
 
 
@@ -5872,8 +5856,10 @@ UINT8 SoldierTakeDamage(SOLDIERTYPE* const pSoldier, INT16 sLifeDeduct, INT16 sB
 }
 
 
-BOOLEAN InternalDoMercBattleSound(SOLDIERTYPE* s, BattleSound battle_snd_id, INT8 const bSpecialCode)
+BOOLEAN InternalDoMercBattleSound(SOLDIERTYPE* s, BattleSound battle_snd_id, bool const lowerVolume)
 {
+	constexpr INT8 LOW_MORALE_BATTLE_SND_THRESHOLD = 35;
+
 	CHECKF (battle_snd_id < NUM_MERC_BATTLE_SOUNDS);
 
 	if (s->uiStatusFlags & SOLDIER_VEHICLE)
@@ -5956,11 +5942,11 @@ BOOLEAN InternalDoMercBattleSound(SOLDIERTYPE* s, BattleSound battle_snd_id, INT
 	return TRUE;
 
 no_sub:
-	BATTLESNDS_STRUCT const* battle_snd = &gBattleSndsData[battle_snd_id];
+	auto const& battle_snd = gBattleSndsData[battle_snd_id];
 
 	// Check if this is the same one we just played and we are below the min delay
 	if (s->bOldBattleSnd == battle_snd_id &&
-		battle_snd->fDontAllowTwoInRow &&
+		battle_snd.fDontAllowTwoInRow &&
 		GetJA2Clock() - s->uiTimeSameBattleSndDone < MIN_SUBSEQUENT_SNDS_DELAY)
 	{
 		return TRUE;
@@ -5970,7 +5956,7 @@ no_sub:
 	if (SoundIsPlaying(s->uiBattleSoundID))
 	{
 		// If this is not crucial, skip it
-		if (battle_snd->fStopDialogue != 1) return TRUE;
+		if (battle_snd.stopDialogue != 1) return TRUE;
 
 		// Stop playing original
 		SoundStop(s->uiBattleSoundID);
@@ -5979,7 +5965,7 @@ no_sub:
 	// If we are talking now....
 	if (IsMercSayingDialogue(s->ubProfile))
 	{
-		switch (battle_snd->fStopDialogue)
+		switch (battle_snd.stopDialogue)
 		{
 			case 1: DialogueAdvanceSpeech(); break; // Stop dialogue
 			case 2: return TRUE;                    // Skip battle snd
@@ -5990,18 +5976,6 @@ no_sub:
 	s->bOldBattleSnd           = battle_snd_id;
 	s->uiTimeSameBattleSndDone = GetJA2Clock();
 
-	// Adjust based on morale...
-	if (s->bMorale < LOW_MORALE_BATTLE_SND_THREASHOLD)
-	{
-		switch (battle_snd_id)
-		{
-			case BATTLE_SOUND_OK1:   battle_snd_id = BATTLE_SOUND_LOWMARALE_OK1;   break;
-			case BATTLE_SOUND_ATTN1: battle_snd_id = BATTLE_SOUND_LOWMARALE_ATTN1; break;
-			default:
-				break;
-		}
-	}
-
 	//if the sound to be played is a confirmation, check to see if we are to play it
 	if (battle_snd_id == BATTLE_SOUND_OK1 &&
 		gGameSettings.fOptions[TOPTION_MUTE_CONFIRMATIONS])
@@ -6009,37 +5983,44 @@ no_sub:
 		return TRUE;
 	}
 
-	// Randomize between sounds, if appropriate
-	if (battle_snd->ubRandomVal != 0)
+	// Adjust based on morale...
+	if (s->bMorale < LOW_MORALE_BATTLE_SND_THRESHOLD)
 	{
-		battle_snd_id = static_cast<BattleSound>(battle_snd_id + Random(battle_snd->ubRandomVal));
-		battle_snd    = &gBattleSndsData[battle_snd_id];
+		switch (battle_snd_id)
+		{
+			case BATTLE_SOUND_OK1:   battle_snd_id = BATTLE_SOUND_LOWMORALE_OK1;   break;
+			case BATTLE_SOUND_ATTN1: battle_snd_id = BATTLE_SOUND_LOWMORALE_ATTN1; break;
+			default:
+				break;
+		}
 	}
 
-	char basename[16];
+	// Randomize between sounds, if applicable (Random(0) returns 0).
+	battle_snd_id = static_cast<BattleSound>(battle_snd_id + Random(battle_snd.ubRandomVal));
+	auto const& adjusted_battle_snd = gBattleSndsData[battle_snd_id];
+
+	ST::string basename;
 	if (s->ubProfile != NO_PROFILE)
 	{
-		sprintf(basename, "%03d", s->ubProfile);
+		basename = ST::format("{03d}", s->ubProfile);
 	}
 	else
 	{
 		// Check if we can play this!
-		if (!battle_snd->fBadGuy) return FALSE;
+		if (!adjusted_battle_snd.fBadGuy) return FALSE;
 
 		char const* const prefix = s->ubBodyType == HATKIDCIV ||
 						s->ubBodyType == KIDCIV ? "kid" : "bad";
-		sprintf(basename, "%s%d", prefix, s->ubBattleSoundID);
+		basename = ST::format("{}{d}", prefix, s->ubBattleSoundID);
 	}
 
-	SGPFILENAME filename;
-	sprintf(filename, BATTLESNDSDIR "/%s_%s.wav", basename, battle_snd->zName);
-
+	ST::string filename = ST::format(BATTLESNDSDIR "/{}_{}.wav", basename, adjusted_battle_snd.zName);
 	if (!GCM->doesGameResExists(filename))
 	{
 		if (battle_snd_id == BATTLE_SOUND_DIE1)
 		{
 			// The "die" sound filenames differs between profiles and languages
-			sprintf(filename, BATTLESNDSDIR "/%s_dying.wav", basename);
+			filename = ST::format(BATTLESNDSDIR "/{}_dying.wav", basename);
 			if (GCM->doesGameResExists(filename)) goto file_exists;
 		}
 
@@ -6047,13 +6028,13 @@ no_sub:
 
 		// Generic replacement voices
 		char const prefix = s->ubBodyType == REGFEMALE ? 'f' : 'm';
-		sprintf(filename, BATTLESNDSDIR "/%c_%s.wav", prefix, battle_snd->zName);
+		filename = ST::format(BATTLESNDSDIR "/{c}_{}.wav", prefix, adjusted_battle_snd.zName);
 	}
 file_exists:;
 
 	// ATE: Reduce volume for OK sounds...
 	// (Only for all-moves or multi-selection cases)
-	UINT32 const base_volume = bSpecialCode == BATTLE_SND_LOWER_VOLUME ? MIDVOLUME : HIGHVOLUME;
+	UINT32 const base_volume = lowerVolume == BATTLE_SND_LOWER_VOLUME ? MIDVOLUME : HIGHVOLUME;
 	UINT32       volume      = CalculateSpeechVolume(base_volume);
 
 	// If we are an enemy.....reduce due to volume
@@ -6063,7 +6044,7 @@ file_exists:;
 	}
 
 	UINT32 const pan       = SoundDir(s->sGridNo);
-	UINT32 const uiSoundID = SoundPlay(filename, volume, pan, 1, NULL, NULL);
+	UINT32 const uiSoundID = SoundPlay(filename.c_str(), volume, pan, 1, NULL, NULL);
 	if (uiSoundID == SOUND_ERROR) return FALSE;
 	s->uiBattleSoundID = uiSoundID;
 
@@ -6113,7 +6094,7 @@ void MakeCharacterDialogueEventDoBattleSound(SOLDIERTYPE& s, BattleSound const s
 BOOLEAN DoMercBattleSound(SOLDIERTYPE* const s, BattleSound const battle_snd_id)
 {
 	// We WANT to play some RIGHT AWAY or merc is not saying anything right now
-	if (gBattleSndsData[battle_snd_id].fStopDialogue == 1 ||
+	if (gBattleSndsData[battle_snd_id].stopDialogue == 1 ||
 		s->ubProfile == NO_PROFILE ||
 		InOverheadMap() ||
 		!IsMercSayingDialogue(s->ubProfile))
@@ -6670,7 +6651,7 @@ void EVENT_SoldierBeginBladeAttack( SOLDIERTYPE *pSoldier, INT16 sGridNo, UINT8 
 					else
 					{
 						// WE ARE SEEN
-						if ( Random( 50 ) > 25 )
+						if (CoinToss())
 						{
 							EVENT_InitNewSoldierAnim( pSoldier, STAB, 0 , FALSE );
 						}
@@ -7292,8 +7273,6 @@ void GivingSoldierCancelServices( SOLDIERTYPE *pSoldier )
 
 void HaultSoldierFromSighting( SOLDIERTYPE *pSoldier, BOOLEAN fFromSightingEnemy )
 {
-	SoldierSP soldier = GetSoldier(pSoldier);
-
 	// If we are a 'specialmove... ignore...
 	if ( ( gAnimControl[ pSoldier->usAnimState ].uiFlags & ANIM_SPECIALMOVE ) )
 	{
@@ -7366,9 +7345,10 @@ void HaultSoldierFromSighting( SOLDIERTYPE *pSoldier, BOOLEAN fFromSightingEnemy
 		// OK, if we are stopped at our destination, cancel pending action...
 		if ( fFromSightingEnemy )
 		{
-			if ( soldier->hasPendingAction() && pSoldier->sGridNo == pSoldier->sFinalDestination )
+			Soldier soldier{pSoldier};
+			if (soldier.hasPendingAction() && pSoldier->sGridNo == pSoldier->sFinalDestination)
 			{
-				soldier->removePendingAction();
+				soldier.removePendingAction();
 			}
 
 			// Stop pending animation....
@@ -7402,11 +7382,9 @@ void EVENT_StopMerc(SOLDIERTYPE* const s)
 // Halt event is used to stop a merc - networking should check / adjust to gridno?
 void EVENT_StopMerc(SOLDIERTYPE* const s, GridNo const grid_no, INT8 const direction)
 {
-	SoldierSP soldier = GetSoldier(s);
-
 	if (!s->fDelayedMovement)
 	{
-		soldier->removePendingAnimation();
+		Soldier{s}.removePendingAnimation();
 	}
 
 	s->bEndDoorOpenCode          = 0;
@@ -7631,7 +7609,6 @@ bool CheckForBreathCollapse(SOLDIERTYPE& s)
 
 BOOLEAN InternalIsValidStance(const SOLDIERTYPE* pSoldier, INT8 bDirection, INT8 bNewStance)
 {
-	UINT16 usOKToAddStructID=0;
 	UINT16 usAnimSurface=0;
 	UINT16 usAnimState;
 
@@ -7679,16 +7656,6 @@ BOOLEAN InternalIsValidStance(const SOLDIERTYPE* pSoldier, INT8 bDirection, INT8
 		}
 	}
 
-	// Check if we can do this....
-	if ( pSoldier->pLevelNode && pSoldier->pLevelNode->pStructureData != NULL )
-	{
-		usOKToAddStructID = pSoldier->pLevelNode->pStructureData->usStructureID;
-	}
-	else
-	{
-		usOKToAddStructID = INVALID_STRUCTURE_ID;
-	}
-
 	switch( bNewStance )
 	{
 		case ANIM_STAND:
@@ -7720,6 +7687,9 @@ BOOLEAN InternalIsValidStance(const SOLDIERTYPE* pSoldier, INT8 bDirection, INT8
 	const STRUCTURE_FILE_REF* const pStructureFileRef = GetAnimationStructureRef(pSoldier, usAnimSurface, usAnimState);
 	if ( pStructureFileRef != NULL )
 	{
+		// Check if we can do this....
+		UINT16 const usOKToAddStructID = GetStructureID(pSoldier);
+
 		// Can we add structure data for this stance...?
 		if (!OkayToAddStructureToWorld(pSoldier->sGridNo, pSoldier->bLevel, &pStructureFileRef->pDBStructureRef[OneCDirection(bDirection)], usOKToAddStructID))
 		{
@@ -7792,6 +7762,17 @@ static ETRLEObject const& GetActualSoldierAnimDims(SOLDIERTYPE const* const s)
 	// vary thusly. However, for the uses of this function, we should be able to
 	// use just the first frame...
 	return vo->SubregionProperties(s->usAniFrame);
+}
+
+
+UINT16 GetStructureID(SOLDIERTYPE const * const pSoldier)
+{
+	if (pSoldier->pLevelNode && pSoldier->pLevelNode->pStructureData)
+	{
+		return pSoldier->pLevelNode->pStructureData->usStructureID;
+	}
+
+	return INVALID_STRUCTURE_ID;
 }
 
 
@@ -8338,15 +8319,12 @@ void EVENT_SoldierBeginRefuel( SOLDIERTYPE *pSoldier, INT16 sGridNo, UINT8 ubDir
 
 void EVENT_SoldierBeginTakeBlood( SOLDIERTYPE *pSoldier, INT16 sGridNo, UINT8 ubDirection )
 {
-	ROTTING_CORPSE *pCorpse;
-
-
 	// See if these is a corpse here....
-	pCorpse = GetCorpseAtGridNo( sGridNo , pSoldier->bLevel );
+	ROTTING_CORPSE const * const pCorpse = GetCorpseAtGridNo(sGridNo , pSoldier->bLevel);
 
 	if ( pCorpse != NULL )
 	{
-		pSoldier->uiPendingActionData4 = CORPSE2ID(pCorpse);
+		pSoldier->uiPendingActionData4 = pCorpse->ID();
 
 		// CHANGE DIRECTION AND GOTO ANIMATION NOW
 		EVENT_SetSoldierDesiredDirection( pSoldier, ubDirection );
@@ -8437,13 +8415,12 @@ void EVENT_SoldierBeginReloadRobot( SOLDIERTYPE *pSoldier, INT16 sGridNo, UINT8 
 static void ChangeToFlybackAnimation(SOLDIERTYPE* pSoldier, INT8 bDirection)
 {
 	UINT16 usNewGridNo;
-	SoldierSP soldier = GetSoldier(pSoldier);
 
 	// Get dest gridno, convert to center coords
 	usNewGridNo = NewGridNo(pSoldier->sGridNo, DirectionInc(OppositeDirection(bDirection)));
 	usNewGridNo = NewGridNo(usNewGridNo,       DirectionInc(OppositeDirection(bDirection)));
 
-	soldier->removePendingAction();
+	Soldier{pSoldier}.removePendingAction();
 
 	// Set path....
 	pSoldier->ubPathDataSize = 0;
@@ -8462,13 +8439,12 @@ static void ChangeToFlybackAnimation(SOLDIERTYPE* pSoldier, INT8 bDirection)
 void ChangeToFallbackAnimation( SOLDIERTYPE *pSoldier, INT8 bDirection )
 {
 	UINT16 usNewGridNo;
-	SoldierSP soldier = GetSoldier(pSoldier);
 
 	// Get dest gridno, convert to center coords
 	usNewGridNo = NewGridNo(pSoldier->sGridNo, DirectionInc(OppositeDirection(bDirection)));
 	//usNewGridNo = NewGridNo( (UINT16)usNewGridNo, (UINT16)(-1 * DirectionInc( bDirection ) ) );
 
-	soldier->removePendingAction();
+	Soldier{pSoldier}.removePendingAction();
 
 	// Set path....
 	pSoldier->ubPathDataSize = 0;
@@ -8523,8 +8499,6 @@ void MercStealFromMerc(SOLDIERTYPE* const pSoldier, const SOLDIERTYPE* const pTa
 	INT16 sActionGridNo, sGridNo, sAdjustedGridNo;
 	UINT8	ubDirection;
 
-	SoldierSP soldier = GetSoldier(pSoldier);
-
 	// OK, find an adjacent gridno....
 	sGridNo = pTarget->sGridNo;
 
@@ -8532,9 +8506,8 @@ void MercStealFromMerc(SOLDIERTYPE* const pSoldier, const SOLDIERTYPE* const pTa
 	sActionGridNo =  FindAdjacentGridEx( pSoldier, sGridNo, &ubDirection, &sAdjustedGridNo, TRUE, FALSE );
 	if ( sActionGridNo != -1 )
 	{
-		soldier->setPendingAction(MERC_STEAL);
-		pSoldier->sPendingActionData2  = pTarget->sGridNo;
-		pSoldier->bPendingActionData3  = ubDirection;
+		Soldier{pSoldier}.setPendingAction(MERC_STEAL, pTarget->sGridNo, ubDirection);
+		pSoldier->bTargetLevel = pTarget->bLevel;
 
 		// CHECK IF WE ARE AT THIS GRIDNO NOW
 		if ( pSoldier->sGridNo != sActionGridNo )
@@ -8800,8 +8773,6 @@ static void HandleSoldierTakeDamageFeedback(SOLDIERTYPE* const s)
 
 void HandleSystemNewAISituation(SOLDIERTYPE* const pSoldier)
 {
-	SoldierSP soldier = GetSoldier(pSoldier);
-
 	// Are we an AI guy?
 	if ( gTacticalStatus.ubCurrentTeam != OUR_TEAM && pSoldier->bTeam != OUR_TEAM )
 	{
@@ -8811,7 +8782,7 @@ void HandleSystemNewAISituation(SOLDIERTYPE* const pSoldier)
 			pSoldier->usPendingAnimation = NO_PENDING_ANIMATION;
 			pSoldier->fTurningFromPronePosition = FALSE;
 			pSoldier->ubPendingDirection = NO_PENDING_DIRECTION;
-			soldier->removePendingAction();
+			Soldier{pSoldier}.removePendingAction();
 			pSoldier->bEndDoorOpenCode = 0;
 
 			// if this guy isn't under direct AI control, WHO GIVES A FLYING FLICK?
@@ -9020,7 +8991,6 @@ static void SetSoldierPersonalLightLevel(SOLDIERTYPE* const s)
 
 
 #ifdef WITH_UNITTESTS
-#undef FAIL
 #include "gtest/gtest.h"
 
 TEST(SoldierControl, asserts)

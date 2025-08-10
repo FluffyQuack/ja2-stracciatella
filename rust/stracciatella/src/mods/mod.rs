@@ -192,7 +192,7 @@ pub struct ModManager {
     available_mods: Vec<Mod>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModManagerInitError {
     /// There are some mods enabled that dont exist on disk
     MissingEnabledMods(Vec<String>),
@@ -297,7 +297,7 @@ impl ModManager {
         }
 
         let mut available_mods: Vec<_> = available_mods.into_iter().map(|(_, v)| v).collect();
-        available_mods.sort_by(|v1, v2| v1.name().to_lowercase().cmp(&v2.name().to_lowercase()));
+        available_mods.sort_by_key(|v1| v1.name().to_lowercase());
 
         ModManager { available_mods }
     }

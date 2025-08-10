@@ -1,5 +1,6 @@
 #include "Directories.h"
 #include "Font.h"
+#include "ItemModel.h"
 #include "Laptop.h"
 #include "BobbyR.h"
 #include "BobbyRGuns.h"
@@ -7,15 +8,13 @@
 #include "VObject.h"
 #include "WordWrap.h"
 #include "Cursors.h"
-#include "Interface_Items.h"
-#include "Weapons.h"
 #include "Store_Inventory.h"
 #include "Game_Event_Hook.h"
 #include "Game_Clock.h"
 #include "LaptopSave.h"
 #include "Random.h"
 #include "Text.h"
-#include "Multi_Language_Graphic_Utils.h"
+#include "GameRes.h"
 #include "ArmsDealerInvInit.h"
 #include "Video.h"
 #include "VSurface.h"
@@ -188,11 +187,8 @@ void EnterBobbyR()
 
 	InitBobbyRWoodBackground();
 
-	const char* ImageFile;
-
 	// load the Bobbyname graphic and add it
-	ImageFile = GetMLGFilename(MLG_BOBBYNAME);
-	guiBobbyName = AddVideoObjectFromFile(ImageFile);
+	guiBobbyName = AddVideoObjectFromFile(MLG_BOBBYNAME);
 
 	// load the plaque graphic and add it
 	guiPlaque = AddVideoObjectFromFile(LAPTOPDIR "/bobbyplaques.sti");
@@ -204,8 +200,7 @@ void EnterBobbyR()
 	guiBottomHinge = AddVideoObjectFromFile(LAPTOPDIR "/bobbybottomhinge.sti");
 
 	// load the Store Plaque graphic and add it
-	ImageFile = GetMLGFilename(MLG_STOREPLAQUE);
-	guiStorePlaque = AddVideoObjectFromFile(ImageFile);
+	guiStorePlaque = AddVideoObjectFromFile(MLG_STOREPLAQUE);
 
 	// load the Handle graphic and add it
 	guiHandle = AddVideoObjectFromFile(LAPTOPDIR "/bobbyhandle.sti");
@@ -442,20 +437,20 @@ void InitBobbyRayInventory()
 
 static void InitBobbyRayNewInventory(void)
 {
-	UINT16	i;
 	UINT16	usBobbyrIndex = 0;
 
 
 	std::fill_n(LaptopSaveInfo.BobbyRayInventory, static_cast<size_t>(MAXITEMS), STORE_INVENTORY{});
 
 	// add all the NEW items he can ever sell into his possible inventory list, for now in order by item #
-	for( i = 0; i < MAXITEMS; i++ )
+	for (auto item : GCM->getItems())
 	{
-		const ItemModel *item = GCM->getItem(i);
+		const auto itemIndex = item->getItemIndex();
+
 		//if Bobby Ray sells this, it can be sold, and it's allowed into this game (some depend on e.g. gun-nut option)
-		if( (GCM->getBobbyRayNewInventory()->getMaxItemAmount(item) != 0) && !(item->getFlags() & ITEM_NOT_BUYABLE) && ItemIsLegal( i ) )
+		if( (GCM->getBobbyRayNewInventory()->getMaxItemAmount(item) != 0) && !(item->getFlags() & ITEM_NOT_BUYABLE) && ItemIsLegal(itemIndex) )
 		{
-			LaptopSaveInfo.BobbyRayInventory[ usBobbyrIndex ].usItemIndex = i;
+			LaptopSaveInfo.BobbyRayInventory[ usBobbyrIndex ].usItemIndex = itemIndex;
 			usBobbyrIndex++;
 		}
 	}
@@ -476,24 +471,23 @@ static void InitBobbyRayNewInventory(void)
 
 static void InitBobbyRayUsedInventory(void)
 {
-	UINT16	i;
 	UINT16	usBobbyrIndex = 0;
 
 
 	std::fill_n(LaptopSaveInfo.BobbyRayUsedInventory, static_cast<size_t>(MAXITEMS), STORE_INVENTORY{});
 
 	// add all the NEW items he can ever sell into his possible inventory list, for now in order by item #
-	for( i = 0; i < MAXITEMS; i++ )
+	for (auto item : GCM->getItems())
 	{
-		const ItemModel *item = GCM->getItem(i);
+		const auto itemIndex = item->getItemIndex();
 
 		//if Bobby Ray sells this, it can be sold, and it's allowed into this game (some depend on e.g. gun-nut option)
-		if( (GCM->getBobbyRayUsedInventory()->getMaxItemAmount(item) != 0) && !(item->getFlags() & ITEM_NOT_BUYABLE) && ItemIsLegal( i ) )
+		if( (GCM->getBobbyRayUsedInventory()->getMaxItemAmount(item) != 0) && !(item->getFlags() & ITEM_NOT_BUYABLE) && ItemIsLegal(itemIndex) )
 		{
 			// in case his store inventory list is wrong, make sure this category of item can be sold used
-			if ( CanDealerItemBeSoldUsed( i ) )
+			if ( CanDealerItemBeSoldUsed(itemIndex) )
 			{
-				LaptopSaveInfo.BobbyRayUsedInventory[ usBobbyrIndex ].usItemIndex = i;
+				LaptopSaveInfo.BobbyRayUsedInventory[ usBobbyrIndex ].usItemIndex = itemIndex;
 				usBobbyrIndex++;
 			}
 		}
@@ -519,22 +513,15 @@ static void SimulateBobbyRayCustomer(STORE_INVENTORY* pInventoryArray, BOOLEAN f
 
 void DailyUpdateOfBobbyRaysNewInventory()
 {
-	INT16 i;
-	UINT16 usItemIndex;
-	BOOLEAN fPrevElig;
-
-
 	//simulate other buyers by reducing the current quantity on hand
 	SimulateBobbyRayCustomer(LaptopSaveInfo.BobbyRayInventory, BOBBY_RAY_NEW);
 
 	//loop through all items BR can stock to see what needs reordering
-	for(i = 0; i < LaptopSaveInfo.usInventoryListLength[BOBBY_RAY_NEW]; i++)
+	for(auto i = 0; i < LaptopSaveInfo.usInventoryListLength[BOBBY_RAY_NEW]; i++)
 	{
 		// the index is NOT the item #, get that from the table
-		usItemIndex = LaptopSaveInfo.BobbyRayInventory[ i ].usItemIndex;
-		const ItemModel *item = GCM->getItem(usItemIndex);
-
-		Assert(usItemIndex < MAXITEMS);
+		auto usItemIndex = LaptopSaveInfo.BobbyRayInventory[ i ].usItemIndex;
+		auto item = GCM->getItem(usItemIndex);
 
 		// make sure this item is still sellable in the latest version of the store inventory
 		if (GCM->getBobbyRayNewInventory()->getMaxItemAmount(item) == 0 )
@@ -549,7 +536,7 @@ void DailyUpdateOfBobbyRaysNewInventory()
 			if( LaptopSaveInfo.BobbyRayInventory[ i ].ubQtyOnHand <= (GCM->getBobbyRayNewInventory()->getMaxItemAmount(item) / 2 ) )
 			{
 				// remember value of the "previously eligible" flag
-				fPrevElig = LaptopSaveInfo.BobbyRayInventory[ i ].fPreviouslyEligible;
+				auto fPrevElig = LaptopSaveInfo.BobbyRayInventory[ i ].fPreviouslyEligible;
 
 				//determine if any can/should be ordered, and how many
 				LaptopSaveInfo.BobbyRayInventory[ i ].ubQtyOnOrder = HowManyBRItemsToOrder( usItemIndex, LaptopSaveInfo.BobbyRayInventory[ i ].ubQtyOnHand, BOBBY_RAY_NEW);
@@ -577,15 +564,10 @@ void DailyUpdateOfBobbyRaysNewInventory()
 
 void DailyUpdateOfBobbyRaysUsedInventory()
 {
-	INT16 i;
-	UINT16 usItemIndex;
-	BOOLEAN fPrevElig;
-
-
 	//simulate other buyers by reducing the current quantity on hand
 	SimulateBobbyRayCustomer(LaptopSaveInfo.BobbyRayUsedInventory, BOBBY_RAY_USED);
 
-	for(i = 0; i < LaptopSaveInfo.usInventoryListLength[BOBBY_RAY_USED]; i++)
+	for(auto i = 0; i < LaptopSaveInfo.usInventoryListLength[BOBBY_RAY_USED]; i++)
 	{
 		//if the used item isn't already on order
 		if( LaptopSaveInfo.BobbyRayUsedInventory[ i ].ubQtyOnOrder == 0 )
@@ -594,17 +576,17 @@ void DailyUpdateOfBobbyRaysUsedInventory()
 			if( LaptopSaveInfo.BobbyRayUsedInventory[ i ].ubQtyOnHand == 0 )
 			{
 				// the index is NOT the item #, get that from the table
-				usItemIndex = LaptopSaveInfo.BobbyRayUsedInventory[ i ].usItemIndex;
-				Assert(usItemIndex < MAXITEMS);
+				auto usItemIndex = LaptopSaveInfo.BobbyRayUsedInventory[ i ].usItemIndex;
+				auto item = GCM->getItem(usItemIndex);
 
 				// make sure this item is still sellable in the latest version of the store inventory
-				if (GCM->getBobbyRayUsedInventory()->getMaxItemAmount(GCM->getItem(usItemIndex)) == 0 )
+				if (GCM->getBobbyRayUsedInventory()->getMaxItemAmount(item) == 0 )
 				{
 					continue;
 				}
 
 				// remember value of the "previously eligible" flag
-				fPrevElig = LaptopSaveInfo.BobbyRayUsedInventory[ i ].fPreviouslyEligible;
+				auto fPrevElig = LaptopSaveInfo.BobbyRayUsedInventory[ i ].fPreviouslyEligible;
 
 				//determine if any can/should be ordered, and how many
 				LaptopSaveInfo.BobbyRayUsedInventory[ i ].ubQtyOnOrder = HowManyBRItemsToOrder(usItemIndex, LaptopSaveInfo.BobbyRayUsedInventory[ i ].ubQtyOnHand, BOBBY_RAY_USED);
@@ -635,10 +617,9 @@ static UINT8 HowManyBRItemsToOrder(UINT16 usItemIndex, UINT8 ubCurrentlyOnHand, 
 {
 	UINT8	ubItemsOrdered = 0;
 
-	const DealerInventory *inv = ubBobbyRayNewUsed ? GCM->getBobbyRayUsedInventory() : GCM->getBobbyRayNewInventory();
-	const ItemModel *item = GCM->getItem(usItemIndex);
+	auto inv = ubBobbyRayNewUsed ? GCM->getBobbyRayUsedInventory() : GCM->getBobbyRayNewInventory();
+	auto item = GCM->getItem(usItemIndex);
 
-	Assert(usItemIndex < MAXITEMS);
 	// formulas below will fail if there are more items already in stock than optimal
 	Assert(ubCurrentlyOnHand <= inv->getMaxItemAmount(item));
 	Assert(ubBobbyRayNewUsed < BOBBY_RAY_LISTS);

@@ -8,6 +8,7 @@ set(JA2_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Debug_Pages.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/Event_Pump.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/Font_Control.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/MapUtility.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/MercTextBox.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/Message.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/Music_Control.cc
@@ -22,14 +23,6 @@ set(JA2_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Timer_Control.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/Utilities.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/WordWrap.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/_DutchText.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/_EnglishText.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/_FrenchText.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/_GermanText.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/_ItalianText.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/_PolishText.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/_RussianText.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/_ChineseText.cc
     PARENT_SCOPE
 )
 set(JA2_INCLUDES

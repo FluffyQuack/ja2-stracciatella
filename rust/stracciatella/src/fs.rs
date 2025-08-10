@@ -29,10 +29,6 @@ pub use tempfile::{Builder as TempBuilder, NamedTempFile, TempDir};
 // replacements
 //--------------
 
-/// A reliable implementation of remove_dir_all for Windows.
-/// For other systems it re-exports std::fs::remove_dir_all.
-pub use remove_dir_all::remove_dir_all;
-
 /// Returns the canonical, absolute form of a path with all intermediate
 /// components normalized and symbolic links resolved.
 ///
@@ -176,7 +172,7 @@ pub fn find_all_dirs_in_dir(
         if entry_result.path().is_dir() {
             vec.push(entry_result.path().to_owned());
             if recursive {
-                let mut subdir_results = find_all_dirs_in_dir(&dir, sort_results, recursive)?;
+                let mut subdir_results = find_all_dirs_in_dir(dir, sort_results, recursive)?;
                 vec.append(&mut subdir_results);
             }
         }

@@ -1,11 +1,11 @@
 #ifndef STRUCTURE_H
 #define STRUCTURE_H
 
-#include "AutoObj.h"
 #include "JA2Types.h"
 #include "Structure_Internals.h"
 #include "Overhead_Types.h"
 #include "Sound_Control.h"
+#include "string_theory/string"
 
 #define NOTHING_BLOCKING			0
 #define BLOCKING_REDUCE_RANGE			1
@@ -26,9 +26,9 @@ enum StructureDamageResult
 };
 
 // ATE: Increased to allow corpses to not collide with soldiers
-// 100 == MAX_CORPSES
-#define INVALID_STRUCTURE_ID			( TOTAL_SOLDIERS + 100 )
-#define IGNORE_PEOPLE_STRUCTURE_ID		(TOTAL_SOLDIERS+101)
+// 200 == MAX_ROTTING_CORPSES, see Rotting_Corpses.h
+constexpr UINT16 INVALID_STRUCTURE_ID = TOTAL_SOLDIERS + 200;
+constexpr UINT16 IGNORE_PEOPLE_STRUCTURE_ID = INVALID_STRUCTURE_ID + 1;
 
 enum StructureDamageReason
 {
@@ -38,9 +38,8 @@ enum StructureDamageReason
 
 
 // functions at the structure database level
-STRUCTURE_FILE_REF* LoadStructureFile(const char* szFileName);
+STRUCTURE_FILE_REF* LoadStructureFile(ST::string const& fileName);
 void FreeAllStructureFiles( void );
-void FreeStructureFile(STRUCTURE_FILE_REF*);
 
 //
 // functions at the structure instance level
@@ -137,7 +136,5 @@ UINT8				StructureFlagToType( UINT32 uiFlag );
 SoundID GetStructureOpenSound(STRUCTURE const*, bool closing);
 
 extern const UINT8 gubMaterialArmour[];
-
-typedef SGP::AutoObj<STRUCTURE_FILE_REF, FreeStructureFile> AutoStructureFileRef;
 
 #endif

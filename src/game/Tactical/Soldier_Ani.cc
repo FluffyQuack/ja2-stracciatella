@@ -5,10 +5,8 @@
 #include "Merc_Hiring.h"
 #include "Overhead.h"
 #include "Soldier_Find.h"
-#include "Debug.h"
 #include "Overhead_Types.h"
 #include "Soldier_Control.h"
-#include "Animation_Cache.h"
 #include "Animation_Data.h"
 #include "Animation_Control.h"
 #include "Structure.h"
@@ -27,7 +25,6 @@
 #include "Interactive_Tiles.h"
 #include "Points.h"
 #include "Message.h"
-#include "World_Items.h"
 #include "Physics.h"
 #include "Soldier_Create.h"
 #include "Dialogue_Control.h"
@@ -39,7 +36,6 @@
 #include "Interface.h"
 #include "QArray.h"
 #include "Soldier_Macros.h"
-#include "Strategic_Town_Loyalty.h"
 #include "WorldMan.h"
 #include "Structure_Wrap.h"
 #include "PathAI.h"
@@ -48,8 +44,6 @@
 #include "NPC.h"
 #include "Meanwhile.h"
 #include "Explosion_Control.h"
-#include "FOV.h"
-#include "Campaign.h"
 #include "LOS.h"
 #include "GameSettings.h"
 #include "Boxing.h"
@@ -110,11 +104,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 	UINT16 usItem;
 	RANDOM_ANI_DEF *pAnimDef;
 	UINT8 ubDesiredHeight;
-	BOOLEAN bOKFireWeapon;
-	BOOLEAN bWeaponJammed;
 	UINT16 usUIMovementMode;
-
-	SoldierSP soldier = GetSoldier(pSoldier);
 
 	do
 	{
@@ -661,8 +651,8 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 					else if (pSoldier->bDoBurst == 1)
 					{
 						// CHECK FOR GUN JAM
-						bWeaponJammed = CheckForGunJam( pSoldier );
-						if ( bWeaponJammed == TRUE )
+						auto const weaponJammed = CheckForGunJam(pSoldier);
+						if (weaponJammed == FireWeaponResult::JAMMED)
 						{
 							fStop = TRUE;
 							// stop shooting!
@@ -683,7 +673,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 							SLOGD("Freeing up attacker - aborting start of attack due to burst gun jam");
 							FreeUpAttacker(pSoldier);
 						}
-						else if ( bWeaponJammed == 255 )
+						else if (weaponJammed == FireWeaponResult::UNJAMMED)
 						{
 							// Play intermediate animation...
 							if ( HandleUnjamAnimation( pSoldier ) )
@@ -745,7 +735,6 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 					//CODE: FINISH BURST
 					pSoldier->fDoSpread = FALSE;
 					pSoldier->bDoBurst = 1;
-					//pSoldier->fBurstCompleted = TRUE;
 					break;
 
 				case 450:
@@ -1043,16 +1032,16 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 					return( TRUE );
 
 				case 470:
-
+				{
 					// CODE: CHECK FOR OK WEAPON SHOT!
-					bOKFireWeapon =  OKFireWeapon( pSoldier );
-
-					if ( bOKFireWeapon == FALSE )
+					auto const okFireWeapon = OKFireWeapon(pSoldier);
+					if (okFireWeapon == FireWeaponResult::JAMMED)
 					{
 						SLOGD("Fire Weapon: Gun Cannot fire, code 470");
 
 						// OK, SKIP x # OF FRAMES
 						// Skip 3 frames, ( a third ia added at the end of switch.. ) For a total of 4
+						// XXX Code and comment do not match. Should we really skip 5 frames in total?
 						pSoldier->usAniCode += 4;
 
 						// Reduce by a bullet...
@@ -1064,7 +1053,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 						SLOGD("Freeing up attacker - gun failed to fire");
 						FreeUpAttacker(pSoldier);
 					}
-					else if ( bOKFireWeapon == 255 )
+					else if (okFireWeapon == FireWeaponResult::UNJAMMED)
 					{
 						// Play intermediate animation...
 						if ( HandleUnjamAnimation( pSoldier ) )
@@ -1073,6 +1062,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 						}
 					}
 					break;
+				}
 
 				case 471:
 
@@ -1544,7 +1534,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 						// DROP ITEM
 						HandleSoldierPickupItem( pSoldier, pSoldier->uiPendingActionData1, (INT16)(pSoldier->uiPendingActionData4 ), pSoldier->bPendingActionData3 );
 						// EVENT HAS BEEN HANDLED
-						soldier->removePendingAction();
+						Soldier{pSoldier}.removePendingAction();
 
 					//}
 					//else
@@ -1562,7 +1552,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 						SoldierHandleInteractiveObject(*pSoldier);
 
 						// EVENT HAS BEEN HANDLED
-						soldier->removePendingAction();
+						Soldier{pSoldier}.removePendingAction();
 
 					//}
 					//else
@@ -1576,7 +1566,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 					if (pSoldier->bAction == AI_ACTION_UNLOCK_DOOR || (pSoldier->bAction == AI_ACTION_LOCK_DOOR && !(pSoldier->fAIFlags & AI_LOCK_DOOR_INCLUDES_CLOSE) ) )
 					{
 						// EVENT HAS BEEN HANDLED
-						soldier->removePendingAction();
+						Soldier{pSoldier}.removePendingAction();
 
 						// do nothing here
 					}
@@ -1602,8 +1592,7 @@ BOOLEAN AdjustToNextAnimationFrame( SOLDIERTYPE *pSoldier )
 						}
 
 						// EVENT HAS BEEN HANDLED
-						soldier->removePendingAction();
-
+						Soldier{pSoldier}.removePendingAction();
 					}
 
 
@@ -2569,8 +2558,8 @@ static BOOLEAN ShouldMercSayHappyWithGunQuote(SOLDIERTYPE* pSoldier)
 
 static void SayBuddyWitnessedQuoteFromKill(SOLDIERTYPE* pKillerSoldier, INT16 sGridNo, INT8 bLevel)
 {
-	INT8  bBuddyIndex[ 20 ] = { -1 };
-	INT8  bTempBuddyIndex;
+	BuddySlot  bBuddyIndex[ 20 ] = { BUDDY_NOT_FOUND };
+	BuddySlot  bTempBuddyIndex;
 	UINT8 ubNumMercs = 0;
 	UINT8 ubChosenMerc;
 	INT16 sDistVisible = FALSE;
@@ -2590,30 +2579,34 @@ static void SayBuddyWitnessedQuoteFromKill(SOLDIERTYPE* pKillerSoldier, INT16 sG
 			// Are we a buddy of killer?
 			bTempBuddyIndex = WhichBuddy(s->ubProfile, pKillerSoldier->ubProfile);
 
-			if ( bTempBuddyIndex != -1 )
+			if ( bTempBuddyIndex != BUDDY_NOT_FOUND )
 			{
 				switch( bTempBuddyIndex )
 				{
-					case 0:
+					case BUDDY_SLOT1:
 						if (s->usQuoteSaidExtFlags & SOLDIER_QUOTE_SAID_BUDDY_1_WITNESSED)
 						{
 							continue;
 						}
 						break;
 
-					case 1:
+					case BUDDY_SLOT2:
 						if (s->usQuoteSaidExtFlags & SOLDIER_QUOTE_SAID_BUDDY_2_WITNESSED)
 						{
 							continue;
 						}
 						break;
 
-					case 2:
+					case LEARNED_TO_LIKE_SLOT:
 						if (s->usQuoteSaidExtFlags & SOLDIER_QUOTE_SAID_BUDDY_3_WITNESSED)
 						{
 							continue;
 						}
 						break;
+
+					default:
+						// C++23: std::unreachable();
+						continue;
 				}
 
 				// TO LOS check to killed
@@ -2651,17 +2644,17 @@ static void SayBuddyWitnessedQuoteFromKill(SOLDIERTYPE* pKillerSoldier, INT16 sG
 			UINT16 usQuoteNum; // XXX HACK000E
 			switch( bBuddyIndex[ ubChosenMerc ] )
 			{
-				case 0:
+				case BUDDY_SLOT1:
 					usQuoteNum = QUOTE_BUDDY_1_GOOD;
 					chosen->usQuoteSaidExtFlags |= SOLDIER_QUOTE_SAID_BUDDY_1_WITNESSED;
 					break;
 
-				case 1:
+				case BUDDY_SLOT2:
 					usQuoteNum = QUOTE_BUDDY_2_GOOD;
 					chosen->usQuoteSaidExtFlags |= SOLDIER_QUOTE_SAID_BUDDY_2_WITNESSED;
 					break;
 
-				case 2:
+				case LEARNED_TO_LIKE_SLOT:
 					usQuoteNum = QUOTE_LEARNED_TO_LIKE_WITNESSED;
 					chosen->usQuoteSaidExtFlags |= SOLDIER_QUOTE_SAID_BUDDY_3_WITNESSED;
 					break;
@@ -2819,7 +2812,7 @@ void HandleKilledQuote(SOLDIERTYPE* pKilledSoldier, SOLDIERTYPE* pKillerSoldier,
 						}
 						else
 						{
-							BattleSound const snd = Random(50) == 25 ?
+							BattleSound const snd = CoinToss() ?
 								BATTLE_SOUND_LAUGH1 : BATTLE_SOUND_COOL1;
 							DoMercBattleSound(pKillerSoldier, snd);
 						}
@@ -2944,10 +2937,7 @@ BOOLEAN HandleSoldierDeath( SOLDIERTYPE *pSoldier , BOOLEAN *pfMadeCorpse )
 			}
 		}
 
-		if (TurnSoldierIntoCorpse(*pSoldier))
-		{
-			*pfMadeCorpse = TRUE;
-		}
+		*pfMadeCorpse = TurnSoldierIntoCorpse(*pSoldier);
 
 		// Remove mad as target, one he has died!
 		RemoveManAsTarget( pSoldier );

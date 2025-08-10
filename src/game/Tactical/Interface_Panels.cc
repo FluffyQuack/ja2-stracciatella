@@ -4,7 +4,6 @@
 #include "Boxing.h"
 #include "Button_System.h"
 #include "ContentManager.h"
-#include "Cursor_Control.h"
 #include "Cursors.h"
 #include "Debug.h"
 #include "Dialogue_Control.h"
@@ -37,10 +36,10 @@
 #include "Logger.h"
 #include "MapScreen.h"
 #include "Map_Screen_Interface.h"
-#include "Map_Screen_Interface_Map.h"
 #include "Message.h"
 #include "MessageBoxScreen.h"
 #include "MouseSystem.h"
+#include "Object_Cache.h"
 #include "OppList.h"
 #include "Options_Screen.h"
 #include "Overhead.h"
@@ -48,14 +47,11 @@
 #include "PathAI.h"
 #include "Points.h"
 #include "Radar_Screen.h"
-#include "RenderWorld.h"
 #include "Render_Dirty.h"
 #include "ScreenIDs.h"
 #include "ShopKeeper_Interface.h"
-#include "Soldier_Add.h"
-#include "Soldier_Ani.h"
-#include "Soldier_Control.h"
 #include "Soldier_Functions.h"
+#include "Soldier_Ani.h"
 #include "Soldier_Macros.h"
 #include "Sound_Control.h"
 #include "Squads.h"
@@ -76,6 +72,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <memory>
 #include <string_theory/format>
 #include <string_theory/string>
 
@@ -306,16 +303,16 @@ GUIButtonRef iSMPanelButtons[NUM_SM_BUTTONS];
 GUIButtonRef iTEAMPanelButtons[NUM_TEAM_BUTTONS];
 
 // Video Surface for Single Merc Panel
-static SGPVSurfaceAuto* guiSMPanel;
+static SGPVSurface* guiSMPanel;
 static SGPVObject* guiSMObjects;
 static SGPVObject* guiSMObjects2;
 
 // Video surface for Team panel
-static SGPVSurfaceAuto* guiTEAMPanel;
+static SGPVSurface* guiTEAMPanel;
 static SGPVObject* guiTEAMObjects;
 static SGPVObject* guiVEHINV;
 
-static SGPVObject* guiCLOSE;
+static cache_key_t const guiCLOSE{ INTERFACEDIR "/p_close.sti" };
 
 // Globals for various mouse regions
 static MOUSE_REGION gSM_SELMERCPanelRegion;
@@ -324,7 +321,7 @@ MOUSE_REGION        gSM_SELMERCMoneyRegion;
 static MOUSE_REGION gSM_SELMERCEnemyIndicatorRegion;
 static MOUSE_REGION gTEAM_PanelRegion;
 
-static SGPVSurfaceAuto* CreateVideoSurfaceFromObjectFile(const ST::string& filename, UINT16 usRegionIndex);
+static std::unique_ptr<SGPVSurface> CreateVideoSurfaceFromObjectFile(const ST::string& filename, UINT16 usRegionIndex);
 
 // Globals - for one - the current merc here
 SOLDIERTYPE *gpSMCurrentMerc = NULL;
@@ -864,13 +861,11 @@ static void FillEmptySpaceAtBottom()
 /** Fill up some space with a textured space filler */
 static void DrawFillerOnSurface(SGPVSurface* vsSurface, SGPBox const &dest)
 {
-	SGPVSurfaceAuto* vsFiller = CreateVideoSurfaceFromObjectFile(INTERFACEDIR "/overheadinterface.sti", 0);
+	auto vsFiller = CreateVideoSurfaceFromObjectFile(INTERFACEDIR "/overheadinterface.sti", 0);
 
 	// clip and blit the big panel from the overheadinterface graphics
 	SGPBox const src  = {80, 42, (UINT16) std::min(int(dest.w), 560), (UINT16) std::min(int(dest.h), 112)};
-	BltStretchVideoSurface(vsSurface, vsFiller, &src, &dest);
-
-	delete vsFiller;
+	BltStretchVideoSurface(vsSurface, vsFiller.get(), &src, &dest);
 }
 
 void InitializeSMPanel()
@@ -879,7 +874,7 @@ void InitializeSMPanel()
 	// For visual consistency, the SMPanel should fill up the same width as the TEAMPanel, that the buttons and
 	// minimap are in the bottom-right corner.
 	SGPVObject* voSMPanel = AddVideoObjectFromFile(INTERFACEDIR "/inventory_bottom_panel.sti");
-	guiSMPanel = new SGPVSurfaceAuto(g_ui.m_teamPanelWidth, INV_INTERFACE_HEIGHT, PIXEL_DEPTH);
+	guiSMPanel = new SGPVSurface(g_ui.m_teamPanelWidth, INV_INTERFACE_HEIGHT, PIXEL_DEPTH);
 	if (g_ui.m_teamPanelWidth > 640)
 	{
 		// The team panel is longer than default
@@ -924,7 +919,7 @@ void InitializeSMPanel()
 	x = dx + SM_SELMERC_FACE_X;
 	y = dy + SM_SELMERC_FACE_Y;
 
-	MOUSE_CALLBACK selectedMercButtonCallback = MouseCallbackPrimarySecondary<MOUSE_REGION>(SelectedMercButtonCallbackPrimary, SelectedMercButtonCallbackSecondary, MSYS_NO_CALLBACK, true);
+	MOUSE_CALLBACK selectedMercButtonCallback = MouseCallbackPrimarySecondary(SelectedMercButtonCallbackPrimary, SelectedMercButtonCallbackSecondary, MSYS_NO_CALLBACK, true);
 	//DEfine region for selected guy panel
 	MSYS_DefineRegion(&gSM_SELMERCPanelRegion, x, y, x + SM_SELMERC_FACE_WIDTH, y + SM_SELMERC_FACE_HEIGHT, MSYS_PRIORITY_NORMAL, MSYS_NO_CURSOR, SelectedMercButtonMoveCallback, selectedMercButtonCallback);
 
@@ -948,7 +943,7 @@ void InitializeSMPanel()
 	//DEfine region for selected guy panel
 	MSYS_DefineRegion(&gSM_SELMERCBarsRegion, dx + 62, dy + 2, dx + 85, dy + 51, MSYS_PRIORITY_NORMAL, MSYS_NO_CURSOR, MSYS_NO_CALLBACK, selectedMercButtonCallback);
 
-	MOUSE_CALLBACK smInvClickCallback = MouseCallbackPrimarySecondary<MOUSE_REGION>(SMInvClickCallbackPrimary, SMInvClickCallbackSecondary, MSYS_NO_CALLBACK, true);
+	MOUSE_CALLBACK smInvClickCallback = MouseCallbackPrimarySecondary(SMInvClickCallbackPrimary, SMInvClickCallbackSecondary, MSYS_NO_CALLBACK, true);
 	InitInvSlotInterface(g_ui.m_invSlotPositionTac, &g_ui.m_invCamoRegion, SMInvMoveCallback, smInvClickCallback, SMInvMoveCamoCallback, SMInvClickCamoCallback);
 	InitKeyRingInterface(KeyRingItemPanelButtonCallback);
 
@@ -1147,11 +1142,7 @@ static void PrintAP(SOLDIERTYPE* const s, INT16 const x, INT16 const y, INT16 co
 	SetFontAttributes(TINYFONT1, foreground);
 
 	RestoreExternBackgroundRect(x, y, w, h);
-	ST::string buf = ST::format("{}", ap);
-	INT16 sFontX;
-	INT16 sFontY;
-	FindFontCenterCoordinates(x, y, w, h, buf, TINYFONT1, &sFontX, &sFontY);
-	MPrint(sFontX, sFontY, buf);
+	MPrint(x, y, ST::string::from_int(ap), HCenterVCenterAlign(w, h));
 }
 
 
@@ -1356,10 +1347,7 @@ no_plate:
 		INT16 const w = SM_SELMERCNAME_WIDTH;
 		INT16 const h = SM_SELMERCNAME_HEIGHT;
 		RestoreExternBackgroundRect(x, y, w, h);
-		INT16 sFontX;
-		INT16 sFontY;
-		FindFontCenterCoordinates(x, y, w, h, s.name, BLOCKFONT2, &sFontX, &sFontY);
-		MPrint(sFontX, sFontY, s.name);
+		MPrint(x, y, s.name, HCenterVCenterAlign(w, h));
 	}
 
 	if (*dirty_level != DIRTYLEVEL0)
@@ -1401,7 +1389,7 @@ static void SMInvMoveCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 	if ( gpSMCurrentMerc->inv[ uiHandPos ].usItem == NOTHING )
 		return;
 
-	if (iReason == MSYS_CALLBACK_REASON_GAIN_MOUSE)
+	if (iReason & MSYS_CALLBACK_REASON_GAIN_MOUSE)
 	{
 		if ( gpItemPointer == NULL )
 		{
@@ -1411,7 +1399,7 @@ static void SMInvMoveCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 			gbCheckForMouseOverItemPos = (INT8)uiHandPos;
 		}
 	}
-	if (iReason == MSYS_CALLBACK_REASON_LOST_MOUSE )
+	else if (iReason & MSYS_CALLBACK_REASON_LOST_MOUSE )
 	{
 		if ( gpItemPointer == NULL )
 		{
@@ -1425,14 +1413,14 @@ static void SMInvMoveCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 
 static void SMInvMoveCamoCallback(MOUSE_REGION* const pRegion, const UINT32 iReason)
 {
-	if (iReason == MSYS_CALLBACK_REASON_GAIN_MOUSE )
+	if (iReason & MSYS_CALLBACK_REASON_GAIN_MOUSE )
 	{
 		// Setup a timer....
 		guiMouseOverItemTime = GetJA2Clock( );
 		gfCheckForMouseOverItem = TRUE;
 		gbCheckForMouseOverItemPos = NO_SLOT;
 	}
-	if (iReason == MSYS_CALLBACK_REASON_LOST_MOUSE )
+	else if (iReason & MSYS_CALLBACK_REASON_LOST_MOUSE )
 	{
 		HandleCompatibleAmmoUI( gpSMCurrentMerc, (INT8)NO_SLOT, FALSE );
 		gfCheckForMouseOverItem = FALSE;
@@ -2257,17 +2245,16 @@ void InitializeTEAMPanel()
 	MSYS_DefineRegion(&gViewportRegion, 0, 0, gsVIEWPORT_END_X, gsVIEWPORT_END_Y, MSYS_PRIORITY_NORMAL, VIDEO_NO_CURSOR, TacticalViewPortMovementCallback, TacticalViewPortTouchCallback);
 
 	// Create the TEAMpanel from graphic objects.
-	guiTEAMPanel = new SGPVSurfaceAuto(g_ui.m_teamPanelWidth, TEAMPANEL_HEIGHT, PIXEL_DEPTH);
+	guiTEAMPanel = new SGPVSurface(g_ui.m_teamPanelWidth, TEAMPANEL_HEIGHT, PIXEL_DEPTH);
 
-	SGPVSurfaceAuto* vsTEAMPanel = CreateVideoSurfaceFromObjectFile(INTERFACEDIR "/bottom_bar.sti", 0);
-	BltVideoSurface(guiTEAMPanel, vsTEAMPanel, 0, 0, NULL);
+	auto vsTEAMPanel = CreateVideoSurfaceFromObjectFile(INTERFACEDIR "/bottom_bar.sti", 0);
+	BltVideoSurface(guiTEAMPanel, vsTEAMPanel.get(), 0, 0, NULL);
 	for (int i = 6; i < NUM_TEAM_SLOTS; i++)
 	{	// extend the panel if needed
 		SGPBox const rect = {5 * TEAMPANEL_SLOT_WIDTH, 0,
 					TEAMPANEL_SLOT_WIDTH + TEAMPANEL_BUTTONSBOX_WIDTH, TEAMPANEL_HEIGHT};
-		BltVideoSurface(guiTEAMPanel, vsTEAMPanel, i * TEAMPANEL_SLOT_WIDTH, 0, &rect);
+		BltVideoSurface(guiTEAMPanel, vsTEAMPanel.get(), i * TEAMPANEL_SLOT_WIDTH, 0, &rect);
 	}
-	delete vsTEAMPanel;
 
 	guiTEAMObjects = AddVideoObjectFromFile(INTERFACEDIR "/gold_front.sti");
 	guiVEHINV      = AddVideoObjectFromFile(INTERFACEDIR "/inventor.sti");
@@ -2287,7 +2274,7 @@ void InitializeTEAMPanel()
 	{
 		INT32 const face_x = dx + TM_FACE_X;
 		INT32 const face_y = dy + TM_FACE_Y;
-		MOUSE_CALLBACK mercFacePanelCallback = MouseCallbackPrimarySecondary<MOUSE_REGION>(MercFacePanelCallbackPrimary, MercFacePanelCallbackSecondary, MSYS_NO_CALLBACK, true);
+		MOUSE_CALLBACK mercFacePanelCallback = MouseCallbackPrimarySecondary(MercFacePanelCallbackPrimary, MercFacePanelCallbackSecondary, MSYS_NO_CALLBACK, true);
 
 		MakeRegion(tp, tp.face, face_x, face_y, TM_FACE_WIDTH, TM_FACE_HEIGHT,
 				MercFacePanelMoveCallback, mercFacePanelCallback);
@@ -2308,9 +2295,9 @@ void InitializeTEAMPanel()
 		INT32 const hand_x = dx + TM_INV_HAND1STARTX;
 		INT32 const hand_y = dy + TM_INV_HAND1STARTY;
 		MakeRegion(tp, tp.first_hand, hand_x, hand_y, TM_INV_WIDTH, TM_INV_HEIGHT,
-				MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(TMClickFirstHandInvCallbackPrimary, TMClickFirstHandInvCallbackSecondary));
+				MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(TMClickFirstHandInvCallbackPrimary, TMClickFirstHandInvCallbackSecondary));
 		MakeRegion(tp, tp.second_hand, hand_x, hand_y + TM_INV_HAND_SEPY, TM_INV_WIDTH,
-				TM_INV_HEIGHT, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(TMClickSecondHandInvCallbackPrimary, TMClickSecondHandInvCallbackSecondary));
+				TM_INV_HEIGHT, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(TMClickSecondHandInvCallbackPrimary, TMClickSecondHandInvCallbackSecondary));
 
 		dx += TM_INV_HAND_SEP;
 	}
@@ -2409,7 +2396,7 @@ void RenderTEAMPanel(DirtyLevel const dirty_level)
 				}
 				else if (s->uiStatusFlags & SOLDIER_DEAD)
 				{
-					help = ST::null;
+					help.clear();
 				}
 				else
 				{
@@ -2425,7 +2412,7 @@ void RenderTEAMPanel(DirtyLevel const dirty_level)
 				}
 				else if (s->uiStatusFlags & SOLDIER_DEAD)
 				{
-					help = ST::null;
+					help.clear();
 				}
 				else
 				{
@@ -2442,11 +2429,8 @@ void RenderTEAMPanel(DirtyLevel const dirty_level)
 
 				// RENDER ON SAVE BUFFER!
 				SetFontDestBuffer(guiSAVEBUFFER);
-				INT16 sFontX;
-				INT16 sFontY;
-				FindFontCenterCoordinates(dx + TM_NAME_X, dy + TM_NAME_Y, TM_NAME_WIDTH, TM_NAME_HEIGHT,
-								s->name, BLOCKFONT2, &sFontX, &sFontY);
-				MPrint(sFontX, sFontY, s->name);
+				MPrint(dx + TM_NAME_X, dy + TM_NAME_Y, s->name,
+					HCenterVCenterAlign(TM_NAME_WIDTH, TM_NAME_HEIGHT));
 				// reset to frame buffer!
 				SetFontDestBuffer(FRAME_BUFFER);
 			}
@@ -2947,8 +2931,7 @@ void HandlePanelFaceAnimations(SOLDIERTYPE* pSoldier)
 						RestoreExternBackgroundRect( pSoldier->sPanelFaceX, pSoldier->sPanelFaceY, TM_FACE_WIDTH, TM_FACE_HEIGHT );
 					}
 				}
-				}
-			RESETTIMECOUNTER( pSoldier->PanelAnimateCounter, 160 );
+			}
 		}
 	}
 
@@ -3003,7 +2986,6 @@ void HandlePanelFaceAnimations(SOLDIERTYPE* pSoldier)
 				HandlePlayerTeamMemberDeathAfterSkullAnimation( pSoldier );
 
 			}
-			RESETTIMECOUNTER( pSoldier->PanelAnimateCounter, 160 );
 		}
 	}
 
@@ -3198,14 +3180,12 @@ static void RemovePlayerFromInterfaceTeamSlot(TeamPanelSlot& tp)
 
 void RenderTownIDString(void)
 {
-	INT16 sFontX, sFontY;
-
 	// Render town, position
 	SetFontAttributes(COMPFONT, 183);
 	ST::string zTownIDString = GetSectorIDString(gWorldSector, TRUE);
 	zTownIDString = ReduceStringLength(zTownIDString, 80, COMPFONT);
-	FindFontCenterCoordinates(INTERFACE_START_X + g_ui.m_teamPanelSlotsTotalWidth + 50, SCREEN_HEIGHT - 55, 80, 16, zTownIDString, COMPFONT, &sFontX, &sFontY);
-	MPrint(sFontX, sFontY, zTownIDString);
+	MPrint(INTERFACE_START_X + g_ui.m_teamPanelSlotsTotalWidth + 50,
+		SCREEN_HEIGHT - 55, zTownIDString, HCenterVCenterAlign(80, 16));
 }
 
 
@@ -3577,7 +3557,7 @@ void KeyRingSlotInvClickCallbackSecondary( MOUSE_REGION * pRegion, UINT32 iReaso
 	}
 }
 
-MOUSE_CALLBACK KeyRingSlotInvClickCallback = MouseCallbackPrimarySecondary<MOUSE_REGION>(KeyRingSlotInvClickCallbackPrimary, KeyRingSlotInvClickCallbackSecondary, MSYS_NO_CALLBACK, true);
+MOUSE_CALLBACK KeyRingSlotInvClickCallback = MouseCallbackPrimarySecondary(KeyRingSlotInvClickCallbackPrimary, KeyRingSlotInvClickCallbackSecondary, MSYS_NO_CALLBACK, true);
 
 void ShopKeeperInterface_SetSMpanelButtonsState(bool const enabled)
 {
@@ -3626,7 +3606,7 @@ static void ConfirmationToDepositMoneyToPlayersAccount(MessageBoxReturnValue);
 
 static void SMInvMoneyButtonCallback(MOUSE_REGION* pRegion, UINT32 iReason)
 {
-	if (iReason == MSYS_CALLBACK_REASON_POINTER_DWN )
+	if (iReason & MSYS_CALLBACK_REASON_POINTER_DWN )
 	{
 		//If the current merc is to far away, dont allow anything to be done
 		if( gfSMDisableForItems )
@@ -3783,24 +3763,12 @@ void HandleTacticalEffectsOfEquipmentChange(SOLDIERTYPE* pSoldier, UINT32 uiInvP
 }
 
 
-void LoadInterfacePanelGraphics()
+static std::unique_ptr<SGPVSurface> CreateVideoSurfaceFromObjectFile(const ST::string& filename, UINT16 usRegionIndex)
 {
-	guiCLOSE = AddVideoObjectFromFile(INTERFACEDIR "/p_close.sti");
-}
-
-
-void DeleteInterfacePanelGraphics()
-{
-	DeleteVideoObject(guiCLOSE);
-}
-
-static SGPVSurfaceAuto* CreateVideoSurfaceFromObjectFile(const ST::string& filename, UINT16 usRegionIndex)
-{
-	SGPVObject* vo = AddVideoObjectFromFile(filename.c_str());
+	AutoSGPVObject vo(AddVideoObjectFromFile(filename));
 	auto r = vo->SubregionProperties(usRegionIndex);
-	auto* sf = new SGPVSurfaceAuto(r.usWidth, r.usHeight, PIXEL_DEPTH);
-	BltVideoObject(sf, vo, usRegionIndex, 0, 0);
-	DeleteVideoObject(vo);
+	auto sf = std::make_unique<SGPVSurface>(r.usWidth, r.usHeight, PIXEL_DEPTH);
+	BltVideoObject(sf.get(), vo.get(), usRegionIndex, 0, 0);
 
 	return sf;
 }

@@ -123,6 +123,11 @@ static inline bool IsOnOurTeam(SOLDIERTYPE const& s)
 	return s.bTeam == OUR_TEAM;
 }
 
+constexpr bool IsOnOurOrMilitiaTeam(SOLDIERTYPE const& s)
+{
+	return s.bTeam == OUR_TEAM || s.bTeam == MILITIA_TEAM;
+}
+
 extern SOLDIERTYPE* g_selected_man;
 
 extern const char* const gzActionStr[];
@@ -135,8 +140,6 @@ static inline SOLDIERTYPE& GetMan(UINT const idx)
 	Assert(idx < lengthof(Menptr));
 	return Menptr[idx];
 }
-
-typedef UINT8 SoldierID;
 
 static inline SoldierID Soldier2ID(const SOLDIERTYPE* const s)
 {
@@ -261,6 +264,7 @@ void HandleNPCTeamMemberDeath( SOLDIERTYPE *pSoldier );
 BOOLEAN UIOKMoveDestination(const SOLDIERTYPE* pSoldier, UINT16 usMapPos);
 
 INT16 FindAdjacentGridEx(SOLDIERTYPE* pSoldier, INT16 sGridNo, UINT8* pubDirection, INT16* psAdjustedGridNo, BOOLEAN fForceToPerson, BOOLEAN fDoor);
+GridNo FindAdjacentGridExAdvanced(SOLDIERTYPE* soldier, STRUCTURE& intStruct, GridNo gridNo, uint8_t* dirToTurnTo);
 INT16 FindNextToAdjacentGridEx( SOLDIERTYPE *pSoldier, INT16 sGridNo, UINT8 *pubDirection, INT16 *psAdjustedGridNo, BOOLEAN fForceToPerson, BOOLEAN fDoor );
 
 

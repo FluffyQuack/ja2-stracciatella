@@ -2,7 +2,6 @@
 #define __EDITORDEFINES_H
 
 #include "Button_System.h"
-#include "Local.h"
 #include "Types.h"
 #include "Button_Defines.h"
 
@@ -17,6 +16,7 @@ enum ToolbarMode
 	TBAR_MODE_NEW_MAP,
 	TBAR_MODE_SAVE,
 	TBAR_MODE_LOAD,
+	TBAR_MODE_RADARMAP,
 	TBAR_MODE_SET_BGRND,
 	TBAR_MODE_CHANGE_BRUSH,
 	TBAR_MODE_ERASE_OFF,
@@ -90,7 +90,7 @@ enum TaskMode
 	TASK_OPTIONS
 };
 
-enum
+enum EditorActions
 {
 	ACTION_NULL,
 	ACTION_SUB_INDEX_UP,
@@ -111,6 +111,7 @@ enum
 	ACTION_SET_FNAME,
 	ACTION_SAVE_MAP,
 	ACTION_LOAD_MAP,
+	ACTION_RADARMAP,
 	ACTION_UNDO,
 	ACTION_NEXT_BANK,
 	ACTION_NEXT_ROAD,

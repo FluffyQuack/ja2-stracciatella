@@ -1,3 +1,4 @@
+#include "Campaign_Types.h"
 #include "MapScreen.h"
 #include "MessageBoxScreen.h"
 #include "Overhead.h"
@@ -15,24 +16,17 @@
 #include "Map_Screen_Interface.h"
 #include "StrategicMap.h"
 #include "Quests.h"
-#include "WorldDef.h"
-#include "Rotting_Corpses.h"
-#include "Strategic_Merc_Handler.h"
 #include "GameScreen.h"
 #include "JAScreens.h"
 #include "Random.h"
 #include "Assignments.h"
 #include "Strategic_Movement.h"
-#include "Squads.h"
 #include "Text.h"
 #include "Strategic_Status.h"
-#include "Mercs.h"
 #include "Insurance_Contract.h"
 #include "Vehicles.h"
 #include "EMail.h"
-#include "Debug.h"
 #include "ScreenIDs.h"
-#include "FileMan.h"
 #include "ContentManager.h"
 #include "GameInstance.h"
 #include "ShippingDestinationModel.h"
@@ -422,9 +416,9 @@ BOOLEAN WillMercRenew(SOLDIERTYPE* const s, BOOLEAN const say_quote)
 	UINT16 buddy_quote;
 	switch (GetFirstBuddyOnTeam(p))
 	{
-		case 0:  buddy_quote = QUOTE_RENEWING_CAUSE_BUDDY_1_ON_TEAM;               break;
-		case 1:  buddy_quote = QUOTE_RENEWING_CAUSE_BUDDY_2_ON_TEAM;               break;
-		case 2:  buddy_quote = QUOTE_RENEWING_CAUSE_LEARNED_TO_LIKE_BUDDY_ON_TEAM; break;
+		case BUDDY_SLOT1:           buddy_quote = QUOTE_RENEWING_CAUSE_BUDDY_1_ON_TEAM;               break;
+		case BUDDY_SLOT2:           buddy_quote = QUOTE_RENEWING_CAUSE_BUDDY_2_ON_TEAM;               break;
+		case LEARNED_TO_LIKE_SLOT:  buddy_quote = QUOTE_RENEWING_CAUSE_LEARNED_TO_LIKE_BUDDY_ON_TEAM; break;
 		default: buddy_quote = QUOTE_NONE;                                         break;
 	}
 

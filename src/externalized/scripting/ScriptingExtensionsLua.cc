@@ -10,7 +10,6 @@
 #include "Arms_Dealer_Init.h"
 #include "Campaign_Types.h"
 #include "ContentManager.h"
-#include "FileMan.h"
 #include "FunctionsLibrary.h"
 #include "Game_Events.h"
 #include "GameInstance.h"
@@ -18,10 +17,10 @@
 #include "Logger.h"
 #include "Overhead.h"
 #include "Quests.h"
-#include "Soldier_Profile.h"
+#include "SAM_Sites.h"
 #include "Soldier_Profile_Type.h"
 #include "StrategicMap.h"
-#include "Structure.h"
+#include "Structure_Internals.h"
 #include <stdexcept>
 #include <string>
 #include <string_theory/format>
@@ -74,17 +73,21 @@ void RunEntryPoint()
 {
 	auto luaName = ENTRYPOINT_SCRIPT;
 	auto fileName = SCRIPTS_DIR "/" ENTRYPOINT_SCRIPT;
-	
-	SLOGD("Loading LUA script file: {}", luaName);
-	AutoSGPFile f{GCM->openGameResForReading(fileName)};
-	std::string scriptbody = f->readStringToEnd().to_std_string();
-	auto result = lua.safe_script(scriptbody, ST::format("@{}", luaName).to_std_string());
-	if (!result.valid())
-	{
-		sol::error err = result;
-		SLOGE("Lua script had an error. Scripting engine is now DISABLED. The error was:");
-		SLOGE(err.what());
-		isLuaDisabled = true;
+
+	SLOGD("Loading LUA script files: {}", luaName);
+	auto files = GCM->openGameResForReadingOnAllLayers(fileName);
+	for (auto it = files.rbegin(); it != files.rend(); ++it) {
+		std::string scriptbody = (*it)->readStringToEnd().to_std_string();
+
+		auto result = lua.safe_script(scriptbody, ST::format("@{}", luaName).to_std_string());
+		if (!result.valid())
+		{
+			sol::error err = result;
+			SLOGE("Lua script had an error. Scripting engine is now DISABLED. The error was:");
+			SLOGE(err.what());
+			isLuaDisabled = true;
+			break;
+		}
 	}
 }
 
@@ -122,7 +125,7 @@ void InitScriptingEngine()
 		RunEntryPoint();
 
 		isLuaInitialized = true;
-	} 
+	}
 	catch (const std::exception &ex)
 	{
 		SLOGE("Lua script engine has failed to initialize:\n {}", ex.what());
@@ -189,7 +192,7 @@ static void RegisterUserTypes()
 		"fTurnTimeLimit", &GAME_OPTIONS::fTurnTimeLimit,
 		"ubGameSaveMode", &GAME_OPTIONS::ubGameSaveMode
 		);
-	
+
 	lua.new_usertype<SOLDIERTYPE>("SOLDIERTYPE",
 		"ubID", &SOLDIERTYPE::ubID,
 		"ubProfile", &SOLDIERTYPE::ubProfile,
@@ -312,7 +315,7 @@ static void RegisterGlobals()
 	lua.set_function("GetCurrentSector", GetCurrentSector);
 	lua.set_function("GetSectorInfo", GetSectorInfo);
 	lua.set_function("GetUndergroundSectorInfo", GetUndergroundSectorInfo);
-	
+
 	lua.set_function("CreateItem", CreateItem);
 	lua.set_function("CreateMoney", CreateMoney);
 	lua.set_function("PlaceItem", PlaceItem);
@@ -321,6 +324,18 @@ static void RegisterGlobals()
 	lua.set_function("ExecuteTacticalTextBox", ExecuteTacticalTextBox_);
 
 	lua.set_function("GetMercProfile", GetMercProfile);
+
+	lua.set_function("GetWorldTotalMin", GetWorldTotalMin);
+	lua.set_function("GetWorldTotalSeconds", GetWorldTotalSeconds);
+	lua.set_function("GetWorldDay", GetWorldDay);
+	lua.set_function("AddEveryDayStrategicEvent", AddEveryDayStrategicEvent_);
+	lua.set_function("AddStrategicEvent", AddStrategicEvent_);
+
+	lua.set_function("StartQuest", StartQuest_);
+	lua.set_function("EndQuest", EndQuest_);
+	lua.set_function("SetFactTrue", SetFactTrue);
+	lua.set_function("SetFactFalse", SetFactFalse);
+	lua.set_function("CheckFact", CheckFact);
 
 	lua.set_function("GetGameStates", GetGameStates);
 	lua.set_function("PutGameStates", PutGameStates);
@@ -369,7 +384,7 @@ static void InvokeFunction(ST::string functionName, A... args)
 {
 	if (isLuaDisabled)
 	{
-		SLOGE("Scripting engine has been disabled due to a previous error"); 
+		SLOGE("Scripting engine has been disabled due to a previous error");
 		return;
 	}
 
@@ -381,7 +396,7 @@ static void InvokeFunction(ST::string functionName, A... args)
 		isLuaDisabled = true;
 		return;
 	}
-	
+
 	auto result = func.call(args...);
 	if (!result.valid())
 	{
@@ -401,7 +416,7 @@ static std::function<void(A...)> wrap(std::string luaFunc)
 	};
 }
 
-static void _RegisterListener(std::string observable, std::string luaFunc, ST::string key)
+static void _RegisterListener(const std::string& observable, const std::string& luaFunc, const ST::string& key)
 {
 	if (isLuaInitialized)
 	{
@@ -413,6 +428,10 @@ static void _RegisterListener(std::string observable, std::string luaFunc, ST::s
 	else if (observable == "OnAirspaceControlUpdated")   OnAirspaceControlUpdated.addListener(key, wrap<>(luaFunc));
 	else if (observable == "BeforePrepareSector")        BeforePrepareSector.addListener(key, wrap<>(luaFunc));
 	else if (observable == "OnSoldierCreated")           OnSoldierCreated.addListener(key, wrap<SOLDIERTYPE*>(luaFunc));
+	else if (observable == "OnStrategicEvent")           OnStrategicEvent.addListener(key, wrap<STRATEGICEVENT*, BOOLEAN_S*>(luaFunc));
+	else if (observable == "OnCalcPlayerProgress")       OnCalcPlayerProgress.addListener(key, wrap<UINT8_S*>(luaFunc));
+	else if (observable == "OnCheckQuests")              OnCheckQuests.addListener(key, wrap<UINT32, BOOLEAN_S*>(luaFunc));
+	else if (observable == "OnQuestEnded")               OnQuestEnded.addListener(key, wrap<UINT8, INT16, INT16, BOOLEAN>(luaFunc));
 	else if (observable == "BeforeGameSaved")            BeforeGameSaved.addListener(key, wrap<>(luaFunc));
 	else if (observable == "OnGameLoaded")               OnGameLoaded.addListener(key, wrap<>(luaFunc));
 	else if (observable == "OnDealerInventoryUpdated")   OnDealerInventoryUpdated.addListener(key, wrap<>(luaFunc));

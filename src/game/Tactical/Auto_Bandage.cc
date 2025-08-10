@@ -2,14 +2,12 @@
 #include "Font.h"
 #include "Font_Control.h"
 #include "HImage.h"
-#include "Local.h"
 #include "Medical.h"
 #include "MercPortrait.h"
 #include "Overhead.h"
 #include "MessageBoxScreen.h"
 #include "ScreenIDs.h"
 #include "Handle_UI.h"
-#include "Message.h"
 #include "Game_Clock.h"
 #include "Items.h"
 #include "Tactical_Placement_GUI.h"
@@ -28,7 +26,6 @@
 #include "Soldier_Profile.h"
 #include "Assignments.h"
 #include "Cursors.h"
-#include "English.h"
 #include "VObject.h"
 #include "Video.h"
 #include "VSurface.h"
@@ -152,12 +149,11 @@ void HandleAutoBandagePending( )
 		}
 
 		// Do any guys have pending actions...?
-		CFOR_EACH_IN_TEAM(s, OUR_TEAM)
+		FOR_EACH_IN_TEAM(s, OUR_TEAM)
 		{
-			std::shared_ptr<const Soldier> soldier = GetSoldier(s);
 			if (s->sSector == gWorldSector &&
 				!s->fBetweenSectors &&
-				soldier->hasPendingAction())
+				Soldier{s}.hasPendingAction())
 			{
 				return;
 			}
@@ -221,12 +217,9 @@ BOOLEAN HandleAutoBandage( )
 			//Shadow area
 			FRAME_BUFFER->ShadowRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 			InvalidateScreen( );
-			RefreshScreen();
 		}
 
 		DisplayAutoBandageUpdatePanel( );
-
-		EndFrameBufferRender( );
 
 		// Handle strategic engine
 		HandleStrategicTurn( );

@@ -1,78 +1,80 @@
 #include "MovementCostsModel.h"
 #include "Debug.h"
-#include "JsonObject.h"
 
 #include <string_theory/string>
 
 #include <map>
+#include <utility>
 
 
 // helper functions
-void readTraversibiltyIntoVector(const rapidjson::Value& jsonArray, IntIntVector& vec, const TraversibilityMap& mapping, size_t expectedRows, size_t expectedCols);
-void readIntIntoVector(const rapidjson::Value& jsonArray, IntIntVector& vec, size_t expectedRows, size_t expectedCols);
+void readTraversibiltyIntoVector(const JsonValue& jsonArray, IntIntVector& vec, const TraversibilityMap& mapping, size_t expectedRows, size_t expectedCols);
+void readIntIntoVector(const JsonValue& jsonArray, IntIntVector& vec, size_t expectedRows, size_t expectedCols);
 
+MovementCostsModel::MovementCostsModel(IntIntVector&& traverseWE_,
+                                       IntIntVector&& traverseNS_,
+                                       IntIntVector&& traverseThrough_,
+                                       IntIntVector&& travelRatings_)
+    : traverseWE(std::move(traverseWE_)), traverseNS(std::move(traverseNS_)),
+      traverseThrough(std::move(traverseThrough_)),
+      travelRatings(std::move(travelRatings_)) {}
 
-MovementCostsModel::MovementCostsModel(IntIntVector traverseWE_, IntIntVector traverseNS_, IntIntVector traverseThrough_, IntIntVector travelRatings_)
-	:traverseWE(traverseWE_), traverseNS(traverseNS_), traverseThrough(traverseThrough_), travelRatings(travelRatings_) {}
-
-const uint8_t MovementCostsModel::getTraversibilityWestEast(const SGPSector& sSector) const
+uint8_t MovementCostsModel::getTraversibilityWestEast(const SGPSector& sSector) const
 {
 	Assert(sSector.x == 17 || sSector.IsValid());
 	return traverseWE[sSector.y - 1][sSector.x - 1];
 }
 
-const uint8_t MovementCostsModel::getTraversibilityNorthSouth(const SGPSector& sSector) const
+uint8_t MovementCostsModel::getTraversibilityNorthSouth(const SGPSector& sSector) const
 {
 	Assert(sSector.y == 17 || sSector.IsValid());
 	return traverseNS[sSector.y - 1][sSector.x - 1];
 }
 
-const uint8_t MovementCostsModel::getTraversibilityThrough(const SGPSector& sSector) const
+uint8_t MovementCostsModel::getTraversibilityThrough(const SGPSector& sSector) const
 {
 	Assert(sSector.IsValid());
 	return traverseThrough[sSector.y - 1][sSector.x - 1];
 }
 
-const uint8_t MovementCostsModel::getTravelRating(const SGPSector& sSector) const
+uint8_t MovementCostsModel::getTravelRating(const SGPSector& sSector) const
 {
 	Assert(sSector.IsValid());
 	return travelRatings[sSector.y - 1][sSector.x - 1];
 }
 
-MovementCostsModel* MovementCostsModel::deserialize(const rapidjson::Document& root, const TraversibilityMap& mapToEnum)
+MovementCostsModel* MovementCostsModel::deserialize(const JsonValue& json, const TraversibilityMap& mapToEnum)
 {
-	Assert(root.HasMember("traverseWE") && root["traverseWE"].IsArray());
+	auto root = json.toObject();
+
 	IntIntVector traverseWE_;
 	readTraversibiltyIntoVector(root["traverseWE"], traverseWE_, mapToEnum, 16, 17);
 
-	Assert(root.HasMember("traverseNS") && root["traverseNS"].IsArray());
 	IntIntVector traverseNS_;
 	readTraversibiltyIntoVector(root["traverseNS"], traverseNS_, mapToEnum, 17, 16);
 
-	Assert(root.HasMember("traverseThrough") && root["traverseThrough"].IsArray());
 	IntIntVector traverseThrough_;
 	readTraversibiltyIntoVector(root["traverseThrough"], traverseThrough_, mapToEnum, 16, 16);
 
-	Assert(root.HasMember("travelRatings") && root["travelRatings"].IsArray());
 	IntIntVector travelRatings_;
 	readIntIntoVector(root["travelRatings"], travelRatings_, 16, 16);
 
 	return new MovementCostsModel(
-		traverseWE_,
-		traverseNS_,
-		traverseThrough_,
-		travelRatings_
+		std::move(traverseWE_),
+		std::move(traverseNS_),
+		std::move(traverseThrough_),
+		std::move(travelRatings_)
 	);
 }
 
-void readTraversibiltyIntoVector(const rapidjson::Value& jsonArray, IntIntVector& vec, const TraversibilityMap& mapping, size_t expectedRows, size_t expectedCols)
+void readTraversibiltyIntoVector(const JsonValue& jsonArray, IntIntVector& vec, const TraversibilityMap& mapping, size_t expectedRows, size_t expectedCols)
 {
-	for (auto& r : jsonArray.GetArray())
+	for (auto& r : jsonArray.toVec())
 	{
 		auto row = std::vector<uint8_t>();
-		for (auto& c : r.GetArray())
+		for (auto& c : r.toVec())
 		{
-			row.push_back(mapping.at(ST::string(c.GetString())));
+			row.push_back(mapping.at(ST::string(c.toString())));
 		}
 
 		if (row.size() != expectedCols) {
@@ -87,14 +89,14 @@ void readTraversibiltyIntoVector(const rapidjson::Value& jsonArray, IntIntVector
 	}
 }
 
-void readIntIntoVector(const rapidjson::Value& jsonArray, IntIntVector& vec, size_t expectedRows, size_t expectedCols)
+void readIntIntoVector(const JsonValue& jsonArray, IntIntVector& vec, size_t expectedRows, size_t expectedCols)
 {
-	for (auto& r : jsonArray.GetArray())
+	for (auto& r : jsonArray.toVec())
 	{
 		auto row = std::vector<uint8_t>();
-		for (auto& c : r.GetArray())
+		for (auto& c : r.toVec())
 		{
-			row.push_back(c.GetInt());
+			row.push_back(c.toInt());
 		}
 
 		if (row.size() != expectedCols) {

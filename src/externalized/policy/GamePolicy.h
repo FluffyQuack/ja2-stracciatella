@@ -29,8 +29,8 @@ public:
 
 	bool f_draw_item_shadow;              /**< Draw shadows from the inventory items. */
 
-	int32_t ms_per_game_cycle;            /**< Milliseconds per game cycle. */
-	int32_t ms_per_time_slice;            /**< Milliseconds per time slice. */
+	int32_t target_fps;
+	double game_durations_multiplier;
 
 	int32_t starting_cash_easy;
 	int32_t starting_cash_medium;
@@ -83,6 +83,8 @@ public:
 	bool show_hit_chance;                 //Fluffy (ShowChanceToHit): Show chance-to-hit when pressing 'F' and next to mouse cursor when preparing an attack
 
 	float website_loading_time_scale;     //Fluffy (UpgradeFromDialUp): Scales the loading time of websites on the laptop. Lower value means faster loading. Setting this to 0.0 removes the loading entirely.
+
+	bool diagonally_interactable_doors;   // Open doors without exposing your mercs too much. Also affects switches.
 
 	/* IMP */
 	int8_t imp_attribute_max;             // IMP character attribute maximum 0 to 100, vanilla 85

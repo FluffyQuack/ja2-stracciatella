@@ -5,19 +5,18 @@
 #include "Mercs_Account.h"
 #include "Mercs.h"
 #include "MessageBoxScreen.h"
-#include "VObject.h"
+#include "Object_Cache.h"
 #include "WordWrap.h"
 #include "Cursors.h"
 #include "Soldier_Profile.h"
 #include "Finances.h"
 #include "Game_Clock.h"
 #include "Soldier_Add.h"
-#include "Overhead.h"
 #include "History.h"
 #include "LaptopSave.h"
 #include "Text.h"
 #include "Speck_Quotes.h"
-#include "Multi_Language_Graphic_Utils.h"
+#include "GameRes.h"
 #include "Button_System.h"
 #include "Video.h"
 #include "VSurface.h"
@@ -67,9 +66,7 @@
 #define MERC_AC_ROW_SIZE		16
 
 
-static SGPVObject* guiMercOrderGrid;
-static SGPVObject* guiAccountNumberGrid;
-
+static constexpr MultiLanguageGraphic guiMercOrderGrid{ MLG_ORDERGRID };
 
 INT32		giMercTotalContractCharge;
 
@@ -83,6 +80,9 @@ GUIButtonRef guiMercAuthorizeBoxButton;
 // The Back button
 GUIButtonRef guiMercBackBoxButton;
 
+namespace {
+cache_key_t guiAccountNumberGrid{ LAPTOPDIR "/accountnumber.sti" };
+}
 
 static GUIButtonRef MakeButton(const ST::string& text, INT16 x, GUI_CALLBACK click)
 {
@@ -101,13 +101,6 @@ void EnterMercsAccount()
 {
 	InitMercBackGround();
 
-	// load the Arrow graphic and add it
-	const char* const ImageFile = GetMLGFilename(MLG_ORDERGRID);
-	guiMercOrderGrid = AddVideoObjectFromFile(ImageFile);
-
-	// load the Arrow graphic and add it
-	guiAccountNumberGrid = AddVideoObjectFromFile(LAPTOPDIR "/accountnumber.sti");
-
 	guiMercAuthorizeButtonImage = LoadButtonImage(LAPTOPDIR "/bigbuttons.sti", 0, 1);
 	guiMercAuthorizeBoxButton   = MakeButton(MercAccountText[MERC_ACCOUNT_AUTHORIZE], MERC_AC_AUTHORIZE_BUTTON_X, BtnMercAuthorizeButtonCallback);
 	guiMercAuthorizeBoxButton->SpecifyDisabledStyle(GUI_BUTTON::DISABLED_STYLE_SHADED);
@@ -122,8 +115,8 @@ void EnterMercsAccount()
 
 void ExitMercsAccount()
 {
-	DeleteVideoObject(guiMercOrderGrid);
-	DeleteVideoObject(guiAccountNumberGrid);
+	RemoveVObject(guiMercOrderGrid);
+	RemoveVObject(guiAccountNumberGrid);
 
 	UnloadButtonImage( guiMercAuthorizeButtonImage );
 	RemoveButton( guiMercAuthorizeBoxButton );

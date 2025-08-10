@@ -4,14 +4,12 @@
 #include "Laptop.h"
 #include "Insurance.h"
 #include "Insurance_Contract.h"
-#include "Local.h"
 #include "VObject.h"
 #include "WordWrap.h"
 #include "Cursors.h"
 #include "Line.h"
 #include "Insurance_Text.h"
-#include "Text.h"
-#include "Multi_Language_Graphic_Utils.h"
+#include "GameRes.h"
 #include "Button_System.h"
 #include "Video.h"
 #include "VSurface.h"
@@ -81,7 +79,6 @@
 
 static SGPVObject* guiInsuranceBackGround;
 static SGPVObject* guiInsuranceTitleImage;
-static SGPVObject* guiInsuranceSmallTitleImage;
 static SGPVObject* guiInsuranceRedBarImage;
 static SGPVObject* guiInsuranceBigRedLineImage;
 static SGPVObject* guiInsuranceBulletImage;
@@ -106,8 +103,7 @@ void EnterInsurance()
 	InitInsuranceDefaults();
 
 	// load the Insurance title graphic and add it
-	const char* const ImageFile = GetMLGFilename(MLG_INSURANCETITLE);
-	guiInsuranceTitleImage = AddVideoObjectFromFile(ImageFile);
+	guiInsuranceTitleImage = AddVideoObjectFromFile(MLG_INSURANCETITLE);
 
 	// load the red bar on the side of the page and add it
 	guiInsuranceBulletImage = AddVideoObjectFromFile(LAPTOPDIR "/bullet.sti");
@@ -226,10 +222,6 @@ void InitInsuranceDefaults()
 	//if it is not the first page, display the small title
 	if( guiCurrentLaptopMode != LAPTOP_MODE_INSURANCE )
 	{
-		// load the small title for the every page other then the first page
-		const char* const ImageFile = GetMLGFilename(MLG_SMALLTITLE);
-		guiInsuranceSmallTitleImage = AddVideoObjectFromFile(ImageFile);
-
 		//create the link to the home page on the small titles
 		MSYS_DefineRegion(&gSelectedInsuranceTitleLinkRegion, INSURANCE_SMALL_TITLE_X+85,
 					INSURANCE_SMALL_TITLE_Y,
@@ -277,7 +269,7 @@ void DisplayInsuranceDefaults()
 	//if it is not the first page, display the small title
 	if( guiCurrentLaptopMode != LAPTOP_MODE_INSURANCE )
 	{
-		BltVideoObject(FRAME_BUFFER, guiInsuranceSmallTitleImage, 0, INSURANCE_SMALL_TITLE_X, INSURANCE_SMALL_TITLE_Y);
+		BltVideoObject(FRAME_BUFFER, MLG_SMALLTITLE, 0, INSURANCE_SMALL_TITLE_X, INSURANCE_SMALL_TITLE_Y);
 	}
 }
 
@@ -290,7 +282,7 @@ void RemoveInsuranceDefaults()
 	//if it is not the first page, display the small title
 	if( guiPreviousLaptopMode != LAPTOP_MODE_INSURANCE )
 	{
-		DeleteVideoObject(guiInsuranceSmallTitleImage);
+		RemoveVObject(MLG_SMALLTITLE);
 		MSYS_RemoveRegion( &gSelectedInsuranceTitleLinkRegion );
 	}
 }

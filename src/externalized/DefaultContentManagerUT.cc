@@ -1,16 +1,14 @@
 #include "DefaultContentManagerUT.h"
 
-#include "sgp/FileMan.h"
-#include "externalized/TestUtils.h"
+#include "DefaultContentManager.h"
+#include "ItemStrings.h"
+#include "FileMan.h"
+#include "TestUtils.h"
+#include <utility>
 
 DefaultContentManagerUT::DefaultContentManagerUT(RustPointer<EngineOptions> engineOptions)
-	: DefaultContentManager(move(engineOptions))
+	: DefaultContentManager(std::move(engineOptions))
 {
-}
-
-std::unique_ptr<rapidjson::Document> DefaultContentManagerUT::_readJsonDataFile(const char* fileName) const
-{
-	return DefaultContentManager::readJsonDataFile(fileName);
 }
 
 DefaultContentManagerUT* DefaultContentManagerUT::createDefaultCMForTesting()
@@ -21,7 +19,10 @@ DefaultContentManagerUT* DefaultContentManagerUT::createDefaultCMForTesting()
 
 	EngineOptions_setVanillaGameDir(engineOptions.get(), gameResRootPath.c_str());
 
-	DefaultContentManagerUT* cm = new DefaultContentManagerUT(move(engineOptions));
+	return new DefaultContentManagerUT(std::move(engineOptions));
+}
 
-	return cm;
+bool DefaultContentManagerUT::loadGameData()
+{
+	return DefaultContentManager::loadGameData(BinaryData{});
 }

@@ -1,28 +1,30 @@
 #include "AmmoTypeModel.h"
-#include "JsonObject.h"
-#include <stdexcept>
-#include <string_theory/format>
-#include <utility>
 
-AmmoTypeModel::AmmoTypeModel(uint16_t index_,
-				ST::string internalName_)
+#include <stdint.h>
+#include <stdexcept>
+#include <utility>
+#include <string_theory/format>
+
+AmmoTypeModel::AmmoTypeModel(uint16_t index_, ST::string && internalName_)
 	:index(index_), internalName(std::move(internalName_))
 {
 }
 
 AmmoTypeModel::~AmmoTypeModel() = default;
 
-void AmmoTypeModel::serializeTo(JsonObject &obj) const
+JsonValue AmmoTypeModel::serialize() const
 {
-	obj.AddMember("index",                index);
-	obj.AddMember("internalName",         internalName.c_str());
+	auto obj = JsonObject();
+	obj.set("index",                index);
+	obj.set("internalName",         internalName);
+	return obj.toValue();
 }
 
-AmmoTypeModel* AmmoTypeModel::deserialize(JsonObjectReader &obj)
+AmmoTypeModel* AmmoTypeModel::deserialize(const JsonValue &json)
 {
+	auto obj = json.toObject();
 	int index = obj.GetInt("index");
-	ST::string internalName = obj.GetString("internalName");
-	return new AmmoTypeModel(index, internalName);
+	return new AmmoTypeModel(index, obj.GetString("internalName"));
 }
 
 

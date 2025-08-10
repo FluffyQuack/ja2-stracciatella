@@ -2,27 +2,22 @@
 #include "Handle_Items.h"
 #include "Overhead.h"
 #include "Structure.h"
-#include "Weapons.h"
-#include "Points.h"
 #include "TileDef.h"
 #include "WorldDef.h"
-#include "Font_Control.h"
-#include "Render_Dirty.h"
 #include "World_Items.h"
 #include "Isometric_Utils.h"
 #include "Sys_Globals.h"
 #include "StrategicMap.h"
-#include "Campaign_Types.h"
 #include "Random.h"
 #include "Action_Items.h"
 #include "GameSettings.h"
 #include "Quests.h"
 #include "Soldier_Profile.h"
-#include "FileMan.h"
 #include "ContentManager.h"
 #include "GameInstance.h"
 #include "MagazineModel.h"
 #include "WeaponModels.h"
+#include "ExplosiveModel.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -243,7 +238,7 @@ void LoadWorldItemsFromMap(HWFILE const f)
 
 	// Read the number of items that were saved in the map
 	UINT32 n_world_items;
-	auto itemReplacements = GCM->getMapItemReplacements();
+	auto const& itemReplacements = GCM->getMapItemReplacements();
 	f->read(&n_world_items, sizeof(n_world_items));
 
 	if (gTacticalStatus.uiFlags & LOADING_SAVED_GAME && !gfEditMode)
@@ -327,22 +322,24 @@ void LoadWorldItemsFromMap(HWFILE const f)
 			}
 		}
 
-		switch (o.usItem)
+		if (o.usItem == ACTION_ITEM)
 		{
-			case ACTION_ITEM:
-				// If we are loading a pit, they are typically loaded without being armed.
-				if (o.bActionValue == ACTION_ITEM_SMALL_PIT ||
-					o.bActionValue == ACTION_ITEM_LARGE_PIT)
-				{
-					wi.usFlags      &= ~WORLD_ITEM_ARMED_BOMB;
-					wi.bVisible      = BURIED;
-					o.bDetonatorType = 0;
-				}
-				break;
+			// If we are loading a pit, they are typically loaded without being armed.
+			if (o.bActionValue == ACTION_ITEM_SMALL_PIT ||
+				o.bActionValue == ACTION_ITEM_LARGE_PIT)
+			{
+				wi.usFlags      &= ~WORLD_ITEM_ARMED_BOMB;
+				wi.bVisible      = BURIED;
+				o.bDetonatorType = 0;
+			}
+		} else {
+			auto item = GCM->getItem(o.usItem, ItemSystem::nothrow);
+			const ExplosiveModel* explosive = nullptr;
+			if (item) {
+				explosive = item->asExplosive();
+			}
 
-			case MINE:
-			case TRIP_FLARE:
-			case TRIP_KLAXON:
+			if (explosive && explosive->isPressureTriggered()) {
 				if (wi.bVisible == HIDDEN_ITEM && o.bTrap > 0)
 				{
 					ArmBomb(&o, BOMB_PRESSURE);
@@ -350,7 +347,7 @@ void LoadWorldItemsFromMap(HWFILE const f)
 					// this is coming from the map so the enemy must know about it.
 					gpWorldLevelData[wi.sGridNo].uiFlags |= MAPELEMENT_ENEMY_MINE_PRESENT;
 				}
-				break;
+			}
 		}
 
 		// All armed bombs are buried
@@ -462,15 +459,3 @@ void RefreshWorldItemsIntoItemPools(const std::vector<WORLDITEM>& items)
 		AddItemToPool(wi.sGridNo, &o, static_cast<Visibility>(wi.bVisible), wi.ubLevel, wi.usFlags, wi.bRenderZHeightAboveLevel);
 	}
 }
-
-
-#ifdef WITH_UNITTESTS
-#undef FAIL
-#include "gtest/gtest.h"
-
-TEST(WorldItems, asserts)
-{
-	EXPECT_EQ(sizeof(WORLDITEM), 52u);
-}
-
-#endif

@@ -1,27 +1,21 @@
 #include "CharProfile.h"
+#include "Cursors.h"
 #include "Directories.h"
 #include "Font.h"
-#include "IMP_Finish.h"
-#include "IMP_Portraits.h"
-#include "IMP_MainPage.h"
-#include "IMP_Voices.h"
-#include "IMPVideoObjects.h"
-#include "MessageBoxScreen.h"
-#include "VObject.h"
-#include "Timer_Control.h"
-#include "Render_Dirty.h"
-#include "Cursors.h"
-#include "Laptop.h"
-#include "IMP_Attribute_Selection.h"
-#include "SoundMan.h"
-#include "IMP_Compile_Character.h"
-#include "Text.h"
-#include "LaptopSave.h"
-#include "Button_System.h"
-#include "ScreenIDs.h"
-#include "VSurface.h"
 #include "Font_Control.h"
 #include "GameInstance.h"
+#include "IMP_Finish.h"
+#include "IMP_MainPage.h"
+#include "IMPVideoObjects.h"
+#include "MessageBoxScreen.h"
+#include "Timer_Control.h"
+#include "VObject.h"
+#include "Laptop.h"
+#include "IMP_Attribute_Selection.h"
+#include "IMP_Compile_Character.h"
+#include "Text.h"
+#include "Button_System.h"
+#include "ScreenIDs.h"
 #include "GamePolicy.h"
 #include "ContentManager.h"
 
@@ -281,13 +275,11 @@ static void BtnIMPFinishAttributesCallback(GUI_BUTTON *btn, UINT32 reason)
 
 static void RenderCharFullName(void)
 {
-	INT16 sX, sY;
-
 	// render the characters full name
 	SetFontAttributes(FONT14ARIAL, FONT_WHITE);
-	ST::string sString = st_format_printf(pIMPFinishStrings, pFullName);
-	FindFontCenterCoordinates(LAPTOP_SCREEN_UL_X, 0, LAPTOP_SCREEN_LR_X - LAPTOP_SCREEN_UL_X, 0 , sString , FONT14ARIAL, &sX, &sY);
-	MPrint(sX, STD_SCREEN_Y + LAPTOP_SCREEN_WEB_DELTA_Y + 33, sString);
+	MPrint(LAPTOP_SCREEN_UL_X, STD_SCREEN_Y + LAPTOP_SCREEN_WEB_DELTA_Y + 33,
+		st_format_printf(pIMPFinishStrings, pFullName),
+		CenterAlign(LAPTOP_SCREEN_LR_X - LAPTOP_SCREEN_UL_X));
 }
 
 

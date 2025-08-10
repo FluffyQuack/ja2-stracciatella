@@ -3,6 +3,7 @@
 #include "Isometric_Utils.h"
 #include "Weapons.h"
 #include "OppList.h"
+#include "Overhead.h"
 #include "Points.h"
 #include "PathAI.h"
 #include "WorldMan.h"
@@ -14,6 +15,7 @@
 #include "Buildings.h"
 #include "Soldier_Macros.h"
 #include "Render_Fun.h"
+#include "SmokeEffects.h"
 #include "StrategicMap.h"
 #include "Environment.h"
 #include "Lighting.h"
@@ -961,7 +963,7 @@ INT16 ClosestReachableDisturbance(SOLDIERTYPE *pSoldier, UINT8 ubUnconsciousOK, 
 
 INT16 ClosestKnownOpponent(SOLDIERTYPE *pSoldier, INT16 * psGridNo, INT8 * pbLevel)
 {
-	INT16 sGridNo, sClosestOpponent = NOWHERE;
+	GridNo sGridNo, sClosestOpponent = NOWHERE;
 	INT32 iRange, iClosestRange = 1500;
 	INT8  *pbPersOL, *pbPublOL;
 	INT8  bLevel, bClosestLevel;
@@ -1014,6 +1016,12 @@ INT16 ClosestKnownOpponent(SOLDIERTYPE *pSoldier, INT16 * psGridNo, INT8 * pbLev
 			// using public knowledge, obtain opponent's "best guess" gridno
 			sGridNo = gsPublicLastKnownOppLoc[pSoldier->bTeam][pOpp->ubID];
 			bLevel = gbPublicLastKnownOppLevel[pSoldier->bTeam][pOpp->ubID];
+		}
+
+		if (sGridNo == NOWHERE)
+		{
+			// This team has not seen this opponent at all yet.
+			continue;
 		}
 
 		// if we are standing at that gridno(!, obviously our info is old...)

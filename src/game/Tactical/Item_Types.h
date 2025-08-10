@@ -1,7 +1,7 @@
 #ifndef ITEM_TYPES_H
 #define ITEM_TYPES_H
 
-#include "Types.h"
+#include "JA2Types.h"
 
 enum ItemCursor
 {
@@ -53,7 +53,7 @@ enum DetonatorType
 #define PANIC_FREQUENCY_3		125
 
 #define OBJECT_UNDROPPABLE		0x01
-#define OBJECT_MODIFIED		0x02
+// 0x02 was the unused OBJECT_MODIFIED
 #define OBJECT_AI_UNUSABLE		0x04
 #define OBJECT_ARMED_BOMB		0x08
 #define OBJECT_KNOWN_TO_BE_TRAPPED	0x10
@@ -74,7 +74,6 @@ struct OBJECTTYPE
 			UINT8  ubGunShotsLeft; // duh, amount of ammo left
 			UINT16 usGunAmmoItem; // the item # for the item table
 			INT8   bGunAmmoStatus; // only for "attached ammo" - grenades, mortar shells
-			UINT8  ubGunUnused[MAX_OBJECTS_PER_SLOT - 6]; // XXX HACK000B
 		};
 		struct
 		{
@@ -86,9 +85,9 @@ struct OBJECTTYPE
 		};
 		struct
 		{
-			INT8   bMoneyStatus;
+			INT8   bMoneyStatus; // same address as bStatus[0]
 			UINT32 uiMoneyAmount;
-			UINT8  ubMoneyUnused[MAX_OBJECTS_PER_SLOT - 5]; // XXX HACK000B
+			INT8   padding[4];   // this is required to increase the size of the union to 12 bytes
 		};
 		struct
 		{
@@ -115,13 +114,11 @@ struct OBJECTTYPE
 		{
 			INT8  bKeyStatus[ 6 ];
 			UINT8 ubKeyID;
-			UINT8 ubKeyUnused[1]; // XXX HACK000B
 		};
 		struct
 		{
 			UINT8 ubOwnerProfile;
 			UINT8 ubOwnerCivGroup;
-			UINT8 ubOwnershipUnused[6]; // XXX HACK000B
 		};
 	};
 	// attached objects
@@ -132,9 +129,16 @@ struct OBJECTTYPE
 	UINT8  ubMission;
 	INT8   bTrap; // 1-10 exp_lvl to detect
 	UINT8  ubImprintID; // ID of merc that item is imprinted on
+
+	// Was the weight of object in multiples of 0.1kg
+	// (including attachments and ammo, if applicable)
+	// no longer used, this is now computed on demand.
 	UINT8  ubWeight;
 	UINT8  fUsed; // flags for whether the item is used or not
 };
+// An OBJECTTYPE is included in WORLDITEM and these are loaded with a single read(), so the layout must match vanilla's.
+static_assert(sizeof(OBJECTTYPE) == 36 && (offsetof(OBJECTTYPE, usAttachItem) - offsetof(OBJECTTYPE, ubNumberOfObjects) == 14)
+	&& offsetof(OBJECTTYPE, uiMoneyAmount) == 8);
 
 
 // SUBTYPES
@@ -210,12 +214,14 @@ struct OBJECTTYPE
 
 #define EXPLOSIVE_GUN( x )		( x == ROCKET_LAUNCHER || x == TANK_CANNON )
 
-#define MAX_WEAPONS 70
+// This limitation was lifted but the definition is still needed for
+// backwards compatibility.
+constexpr UINT16 MAX_WEAPONS = 70;
 
-#define NOTHING NONE
 enum ITEMDEFINE
 {
 	NONE = 0,
+	NOTHING = NONE,
 
 	// weapons
 	GLOCK_17,
@@ -607,5 +613,7 @@ enum ITEMDEFINE
 
 	MAXITEMS
 };
+
+grams Weight(OBJECTTYPE const& object);
 
 #endif

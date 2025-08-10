@@ -2,13 +2,11 @@
 #include "Font.h"
 #include "HImage.h"
 #include "Isometric_Utils.h"
-#include "Local.h"
 #include "MercPortrait.h"
 #include "Types.h"
 #include "MouseSystem.h"
 #include "Button_System.h"
 #include "Input.h"
-#include "English.h"
 #include "Debug.h"
 #include "VObject.h"
 #include "VSurface.h"
@@ -36,7 +34,6 @@
 #include "MessageBoxScreen.h"
 #include "Assignments.h"
 #include "Text.h"
-#include "WordWrap.h"
 #include "Game_Clock.h"
 #include "JAScreens.h"
 #include "UILayout.h"
@@ -522,7 +519,7 @@ static void KillTacticalPlacementGUI(void)
 		MSYS_RemoveRegion(&m.region);
 	}
 
-	if( gsCurInterfacePanel < 0 || gsCurInterfacePanel >= NUM_UI_PANELS )
+	if( gsCurInterfacePanel >= NUM_UI_PANELS )
 		gsCurInterfacePanel = TEAM_PANEL;
 
 	SetCurrentInterfacePanel(gsCurInterfacePanel);

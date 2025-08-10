@@ -1,6 +1,6 @@
 #pragma once
 
-#include "JsonObject.h"
+#include "Json.h"
 #include "MercSystem.h"
 #include <vector>
 
@@ -10,10 +10,10 @@
 class NpcPlacementModel
 {
 public:
-	NpcPlacementModel(uint8_t profileId_, std::vector<uint8_t> sectorIds_,
+	NpcPlacementModel(uint8_t profileId_, std::vector<uint8_t>&& sectorIds_,
 		bool isPlacedAtStart_, bool useAlternateMap_, bool isSciFiOnly_);
 
-	static NpcPlacementModel* deserialize(const rapidjson::Value& element, const MercSystem* mercSystem);
+	static NpcPlacementModel* deserialize(const JsonValue& element, const MercSystem* mercSystem);
 
 	// Randomly pick one from the possible sectors. Returns -1 if sectorIds is empty
 	int16_t pickPlacementSector() const;

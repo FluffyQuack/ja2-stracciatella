@@ -1,15 +1,12 @@
 #include "Button_System.h"
 #include "Directories.h"
 #include "Font.h"
-#include "Interface.h"
-#include "Local.h"
+#include "Handle_UI.h"
 #include "MouseSystem.h"
 #include "GameScreen.h"
 #include "StrategicMap.h"
 #include "Game_Clock.h"
-#include "SysUtil.h"
 #include "Font_Control.h"
-#include "PopUpBox.h"
 #include "Cursors.h"
 #include "Strategic_Exit_GUI.h"
 #include "MercTextBox.h"
@@ -17,7 +14,6 @@
 #include "Overhead.h"
 #include "Cursor_Control.h"
 #include "Input.h"
-#include "English.h"
 #include "Text.h"
 #include "Strategic_Movement.h"
 #include "Soldier_Macros.h"
@@ -113,7 +109,6 @@ static void CheckLoadMapCallback(GUI_BUTTON* btn, UINT32 reason);
 static void LoadRegionCallback(MOUSE_REGION* pRegion, UINT32 iReason);
 static void LoadRegionMoveCallback(MOUSE_REGION* pRegion, UINT32 iReason);
 static void OKCallback(GUI_BUTTON* btn, UINT32 reason);
-static void SectorExitBackgroundCallback(MOUSE_REGION* pRegion, UINT32 iReason);
 static void SingleMoveCallback(GUI_BUTTON* btn, UINT32 reason);
 static void SingleRegionCallback(MOUSE_REGION* pRegion, UINT32 iReason);
 static void SingleRegionMoveCallback(MOUSE_REGION* pRegion, UINT32 iReason);
@@ -334,8 +329,7 @@ static void InternalInitSectorExitMenu(UINT8 const ubDirection, INT16 const sAdd
 	gfInSectorExitMenu = TRUE;
 
 	MSYS_DefineRegion(&gExitDialog.BackRegion, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
-				MSYS_PRIORITY_HIGHEST - 1, CURSOR_NORMAL, MSYS_NO_CALLBACK,
-				SectorExitBackgroundCallback);
+				MSYS_PRIORITY_HIGHEST - 1, CURSOR_NORMAL, MSYS_NO_CALLBACK, MSYS_NO_CALLBACK);
 
 	gExitDialog.iButtonImages = LoadButtonImage(INTERFACEDIR "/popupbuttons.sti", 0, 1);
 
@@ -846,11 +840,6 @@ static void CancelCallback(GUI_BUTTON* btn, UINT32 reason)
 		// OK, exit
 		RemoveSectorExitMenu( FALSE );
 	}
-}
-
-
-static void SectorExitBackgroundCallback(MOUSE_REGION* pRegion, UINT32 iReason)
-{
 }
 
 

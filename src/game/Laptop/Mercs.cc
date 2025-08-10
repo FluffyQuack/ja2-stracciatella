@@ -7,7 +7,6 @@
 #include "VObject.h"
 #include "WordWrap.h"
 #include "Cursors.h"
-#include "Overhead.h"
 #include "Soldier_Add.h"
 #include "EMail.h"
 #include "Game_Clock.h"
@@ -25,9 +24,9 @@
 #include "Game_Event_Hook.h"
 #include "Quests.h"
 #include "Button_System.h"
+#include "Object_Cache.h"
 #include "Video.h"
 #include "VSurface.h"
-#include "Debug.h"
 #include "Font_Control.h"
 #include "GameInstance.h"
 #include "ContentManager.h"
@@ -135,17 +134,15 @@ enum
 	MERC_SITE_THIRD_OR_MORE_VISITS,
 };
 
-
+namespace {
 // Image Indetifiers
-
-static SGPVObject* guiAccountBox;
-static SGPVObject* guiArrow;
-static SGPVObject* guiFilesBox;
-static SGPVObject* guiMercSymbol;
-static SGPVObject* guiSpecPortrait;
-static SGPVObject* guiMercBackGround;
+cache_key_t const guiAccountBox{ LAPTOPDIR "/accountbox.sti" };
+cache_key_t const guiFilesBox{ LAPTOPDIR "/filesbox.sti" };
+cache_key_t const guiMercSymbol{ LAPTOPDIR "/mercsymbol.sti" };
+cache_key_t const guiSpecPortrait{ LAPTOPDIR "/specportrait.sti" };
+cache_key_t const guiMercVideoPopupBackground{ LAPTOPDIR "/speckcomwindow.sti" };
+}
 static SGPVSurface* guiMercVideoFaceBackground;
-static SGPVObject* guiMercVideoPopupBackground;
 
 UINT8			gubCurMercIndex;
 
@@ -157,6 +154,8 @@ static UINT16  gusSpeckDialogueActualWidth;
 
 static BOOLEAN gfInMercSite = FALSE; // this flag is set when inide of the merc site
 
+namespace {
+
 //Merc Video Conferencing Mode
 enum
 {
@@ -165,6 +164,8 @@ enum
 	MERC_VIDEO_VIDEO_MODE,
 	MERC_VIDEO_EXIT_VIDEO_MODE,
 };
+cache_key_t const guiMercBackGround{ LAPTOPDIR "/mercbackground.sti" };
+}
 
 static UINT8     gubCurrentMercVideoMode;
 static BOOLEAN   gfMercVideoIsBeingDisplayed;
@@ -240,24 +241,6 @@ void EnterMercs()
 	HandleSpeckTalking( TRUE );
 
 	InitMercBackGround();
-
-	// load the Account box graphic and add it
-	guiAccountBox = AddVideoObjectFromFile(LAPTOPDIR "/accountbox.sti");
-
-	// load the files Box graphic and add it
-	guiFilesBox = AddVideoObjectFromFile(LAPTOPDIR "/filesbox.sti");
-
-	// load the MercSymbol graphic and add it
-	guiMercSymbol = AddVideoObjectFromFile(LAPTOPDIR "/mercsymbol.sti");
-
-	// load the SpecPortrait graphic and add it
-	guiSpecPortrait = AddVideoObjectFromFile(LAPTOPDIR "/specportrait.sti");
-
-	// load the Arrow graphic and add it
-	guiArrow = AddVideoObjectFromFile(LAPTOPDIR "/arrow.sti");
-
-	// load the Merc video conf background graphic and add it
-	guiMercVideoPopupBackground = AddVideoObjectFromFile(LAPTOPDIR "/speckcomwindow.sti");
 
 	// Account Box button
 	guiAccountBoxButtonImage = LoadButtonImage(LAPTOPDIR "/smallbuttons.sti", 0, 1);
@@ -339,12 +322,11 @@ void ExitMercs()
 		gubCurrentMercVideoMode = MERC_VIDEO_NO_VIDEO_MODE;
 	}
 
-	DeleteVideoObject(guiAccountBox);
-	DeleteVideoObject(guiFilesBox);
-	DeleteVideoObject(guiMercSymbol);
-	DeleteVideoObject(guiSpecPortrait);
-	DeleteVideoObject(guiArrow);
-	DeleteVideoObject(guiMercVideoPopupBackground);
+	RemoveVObject(guiAccountBox);
+	RemoveVObject(guiFilesBox);
+	RemoveVObject(guiMercSymbol);
+	RemoveVObject(guiSpecPortrait);
+	RemoveVObject(guiMercVideoPopupBackground);
 
 	UnloadButtonImage( guiAccountBoxButtonImage );
 	RemoveButton( guiFileBoxButton );
@@ -481,20 +463,19 @@ void RenderMercs()
 
 void InitMercBackGround()
 {
-	// load the Merc background graphic and add it
-	guiMercBackGround = AddVideoObjectFromFile(LAPTOPDIR "/mercbackground.sti");
+	// Replaced by using the object cache.
 }
 
 
 void DrawMecBackGround()
 {
-	WebPageTileBackground(4, 4, MERC_BACKGROUND_WIDTH, MERC_BACKGROUND_HEIGHT, guiMercBackGround);
+	WebPageTileBackground(4, 4, MERC_BACKGROUND_WIDTH, MERC_BACKGROUND_HEIGHT, GetVObject(guiMercBackGround));
 }
 
 
 void RemoveMercBackGround()
 {
-	DeleteVideoObject(guiMercBackGround);
+	RemoveVObject(guiMercBackGround);
 }
 
 
@@ -624,12 +605,12 @@ ProfileID GetProfileIDFromMERCListing(const MERCListingModel* listing)
 		return LARRY_DRUNK;
 	}
 	return ubMercID;
-};
+}
 
 //Gets the actual merc id from the array
 ProfileID GetProfileIDFromMERCListingIndex(UINT8 ubMercIndex)
 {
-	auto mercsListing = GCM->getMERCListings();
+	auto && mercsListing{ GCM->getMERCListings() };
 	return GetProfileIDFromMERCListing(mercsListing.at(ubMercIndex));
 }
 
@@ -802,7 +783,7 @@ static void HandleTalkingSpeck(void)
 			if( DisplayMercVideoIntro( MERC_INTRO_TIME ) )
 			{
 				//NULL out the string
-				gsSpeckDialogueTextPopUp = ST::null;
+				gsSpeckDialogueTextPopUp.clear();
 
 				//Start speck talking
 				if( !StartSpeckTalking( gusMercVideoSpeckSpeech ) )
@@ -960,7 +941,7 @@ static void MakeBiffAwayForCoupleOfDays(void);
 
 static BOOLEAN IsSpeckTryingToRecruit()
 {
-	auto listings = GCM->getMERCListings();
+	auto && listings{ GCM->getMERCListings() };
 	if (LaptopSaveInfo.gubLastMercIndex >= (listings.size() - 1))
 	{
 		// we have got all mercs already
@@ -1335,14 +1316,13 @@ static BOOLEAN ShouldSpeckStartTalkingDueToActionOnSubPage(void)
 	//if the merc came from the hire screen
 	if( gfJustHiredAMercMerc )
 	{
-		auto listing = GCM->getMERCListings();
+		auto && listing{ GCM->getMERCListings() };
 		HandlePlayerHiringMerc(listing[gubCurMercIndex]);
 
 		//get speck to say the thank you
-		if( Random( 100 ) > 50 )
-			StartSpeckTalking( SPECK_QUOTE_GENERIC_THANKS_FOR_HIRING_MERCS_1 );
-		else
-			StartSpeckTalking( SPECK_QUOTE_GENERIC_THANKS_FOR_HIRING_MERCS_2 );
+		StartSpeckTalking(CoinToss()
+			? SPECK_QUOTE_GENERIC_THANKS_FOR_HIRING_MERCS_1
+			: SPECK_QUOTE_GENERIC_THANKS_FOR_HIRING_MERCS_2);
 
 		gfJustHiredAMercMerc = FALSE;
 		//gfDoneIntroSpeech = TRUE;
@@ -1445,7 +1425,6 @@ static void HandleSpeckIdleConversation(BOOLEAN fReset)
 }
 
 
-static BOOLEAN CanMercQuoteBeSaid(UINT32 uiQuoteID);
 static std::vector<UINT8> GetAvailableRandomQuotes();
 
 static INT16 GetRandomQuoteThatHasBeenSaidTheLeast()

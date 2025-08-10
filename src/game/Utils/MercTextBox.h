@@ -15,8 +15,6 @@ enum MercPopupBoxFlags
 	MERC_POPUP_PREPARE_FLAGS_SKULLICON  = 1U << 2
 };
 
-void InitMercPopupBox(void);
-
 
 enum MercPopUpBackground
 {
@@ -45,6 +43,7 @@ inline MercPopUpBox* PrepareMercPopupBox(MercPopUpBox* box, MercPopUpBackground 
 	return PrepareMercPopupBox(box, ubBackgroundIndex, ubBorderIndex, str.to_utf32(), usWidth, usMarginX, usMarginTopY, usMarginBottomY, pActualWidth, pActualHeight, flags);
 }
 
+// Now just another way to say 'delete box', so it is ok to call this with a nullptr
 void RemoveMercPopupBox(MercPopUpBox*);
 
 void RenderMercPopUpBox(MercPopUpBox const*, INT16 sDestX, INT16 sDestY, SGPVSurface* buffer);

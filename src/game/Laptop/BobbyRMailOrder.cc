@@ -1,11 +1,13 @@
 #include "Directories.h"
 #include "Font.h"
+#include "GameRes.h"
 #include "HImage.h"
+#include "ItemModel.h"
 #include "Laptop.h"
 #include "BobbyRMailOrder.h"
 #include "BobbyR.h"
-#include "Local.h"
 #include "MessageBoxScreen.h"
+#include "Text.h"
 #include "VObject.h"
 #include "WordWrap.h"
 #include "Cursors.h"
@@ -18,9 +20,6 @@
 #include "Soldier_Profile.h"
 #include "Input.h"
 #include "Line.h"
-#include "Text.h"
-#include "Campaign_Types.h"
-#include "Multi_Language_Graphic_Utils.h"
 #include "StrategicMap.h"
 #include "Button_System.h"
 #include "Video.h"
@@ -28,7 +27,6 @@
 #include "Debug.h"
 #include "ScreenIDs.h"
 #include "Font_Control.h"
-#include "FileMan.h"
 #include "UILayout.h"
 
 #include "ContentManager.h"
@@ -207,7 +205,6 @@ static SGPVObject* guiBobbyRayTitle;
 static SGPVObject* guiBobbyROrderGrid;
 static SGPVObject* guiBobbyRLocationGraphic;
 static SGPVObject* guiDeliverySpeedGraphic;
-static SGPVObject* guiConfirmGraphic;
 static SGPVObject* guiTotalSaveArea;		//used as a savebuffer for the subtotal, s&h, and grand total values
 static SGPVObject* guiDropDownBorder;
 static SGPVObject* guiGoldArrowImages;
@@ -335,10 +332,6 @@ void EnterBobbyRMailOrder()
 	guiDeliverySpeedGraphic = AddVideoObjectFromFile(LAPTOPDIR "/bobbydeliveryspeed.sti");
 
 	// load the delivery speed graphic and add it
-	const char* const ImageFile = GetMLGFilename(MLG_CONFIRMORDER);
-	guiConfirmGraphic = AddVideoObjectFromFile(ImageFile);
-
-	// load the delivery speed graphic and add it
 	guiTotalSaveArea = AddVideoObjectFromFile(LAPTOPDIR "/totalsavearea.sti");
 
 	// border
@@ -404,7 +397,7 @@ void EnterBobbyRMailOrder()
 	//s on screen.  When user clicks anywhere the graphic disappears
 	MSYS_DefineRegion(&gSelectedConfirmOrderRegion, LAPTOP_SCREEN_UL_X, LAPTOP_SCREEN_WEB_UL_Y ,
 				LAPTOP_SCREEN_LR_X, LAPTOP_SCREEN_WEB_LR_Y, MSYS_PRIORITY_HIGH+1,
-				CURSOR_WWW, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary<MOUSE_REGION>(SelectConfirmOrderRegionCallBackPrimary, SelectConfirmOrderRegionCallBackSecondary));
+				CURSOR_WWW, MSYS_NO_CALLBACK, MouseCallbackPrimarySecondary(SelectConfirmOrderRegionCallBackPrimary, SelectConfirmOrderRegionCallBackSecondary));
 	gSelectedConfirmOrderRegion.Disable();
 
 	//click on the shipping location to activate the drop down menu
@@ -447,7 +440,7 @@ void ExitBobbyRMailOrder()
 	DeleteVideoObject(guiBobbyROrderGrid);
 	DeleteVideoObject(guiBobbyRLocationGraphic);
 	DeleteVideoObject(guiDeliverySpeedGraphic);
-	DeleteVideoObject(guiConfirmGraphic);
+	RemoveVObject(MLG_CONFIRMORDER);
 	DeleteVideoObject(guiTotalSaveArea);
 	DeleteVideoObject(guiDropDownBorder);
 	DeleteVideoObject(guiGoldArrowImages);
@@ -497,8 +490,9 @@ void HandleBobbyRMailOrder()
 	if(gfDrawConfirmOrderGrpahic)
 	{
 		// Bobbyray title
-		BltVideoObjectOutlineShadow(FRAME_BUFFER, guiConfirmGraphic, 0, BOBBYR_CONFIRM_ORDER_X + 3, BOBBYR_CONFIRM_ORDER_Y + 3);
-		BltVideoObject(FRAME_BUFFER, guiConfirmGraphic, 0, BOBBYR_CONFIRM_ORDER_X,     BOBBYR_CONFIRM_ORDER_Y);
+		SGPVObject const * const vo{ GetVObject(MLG_CONFIRMORDER) };
+		BltVideoObjectOutlineShadow(FRAME_BUFFER, vo, 0, BOBBYR_CONFIRM_ORDER_X + 3, BOBBYR_CONFIRM_ORDER_Y + 3);
+		BltVideoObject(FRAME_BUFFER, vo, 0, BOBBYR_CONFIRM_ORDER_X,     BOBBYR_CONFIRM_ORDER_Y);
 		InvalidateRegion(LAPTOP_SCREEN_UL_X,LAPTOP_SCREEN_WEB_UL_Y,LAPTOP_SCREEN_LR_X,LAPTOP_SCREEN_WEB_LR_Y);
 
 		gfDrawConfirmOrderGrpahic = FALSE;

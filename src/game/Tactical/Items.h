@@ -1,14 +1,10 @@
 #ifndef ITEMS_H
 #define ITEMS_H
 
-#include <vector>
-
 #include "Item_Types.h"
 #include "JA2Types.h"
-#include "Weapons.h"
 
 struct CalibreModel;
-struct ItemModel;
 struct WeaponModel;
 
 void DamageObj(OBJECTTYPE* pObj, INT8 bAmount);
@@ -28,7 +24,6 @@ extern INT8 FindEmptySlotWithin( const SOLDIERTYPE * pSoldier, INT8 bLower, INT8
 extern INT8 FindExactObj( const SOLDIERTYPE * pSoldier, OBJECTTYPE * pObj );
 INT8 FindObjInObjRange(const SOLDIERTYPE* s, UINT16 usItem1, UINT16 usItem2);
 extern INT8 FindLaunchable( const SOLDIERTYPE * pSoldier, UINT16 usWeapon );
-extern INT8 FindGLGrenade( const SOLDIERTYPE * pSoldier );
 extern INT8 FindThrowableGrenade( const SOLDIERTYPE * pSoldier );
 extern INT8 FindUsableObj( const SOLDIERTYPE * pSoldier, UINT16 usItem );
 
@@ -43,7 +38,7 @@ extern void GetObjFrom( OBJECTTYPE * pObj, UINT8 ubGetIndex, OBJECTTYPE * pDest 
 bool AttachObject(SOLDIERTYPE* const s, OBJECTTYPE* const pTargetObj, OBJECTTYPE* const pAttachment, UINT8 const ubIndexInStack = 0);
 extern BOOLEAN RemoveAttachment( OBJECTTYPE * pObj, INT8 bAttachPos, OBJECTTYPE * pNewObj );
 
-UINT8	CalculateObjectWeight(const OBJECTTYPE* pObject);
+// Returns (in percent) how much of his carrying capacity this soldier uses.
 UINT32 CalculateCarriedWeight(const SOLDIERTYPE* pSoldier);
 
 extern UINT16 TotalPoints(const OBJECTTYPE*);

@@ -2,14 +2,14 @@
 
 #include "AmmoTypeModel.h"
 #include "CalibreModel.h"
-#include "JsonObject.h"
+#include "ItemModel.h"
 #include <utility>
 
 MagazineModel::MagazineModel(uint16_t itemIndex_,
-				ST::string internalName_,
-				ST::string shortName_,
-				ST::string name_,
-				ST::string description_,
+				ST::string&& internalName_,
+				ST::string&& shortName_,
+				ST::string&& name_,
+				ST::string&& description_,
 				uint32_t itemClass_,
 				const CalibreModel *calibre_,
 				uint16_t capacity_,
@@ -20,65 +20,67 @@ MagazineModel::MagazineModel(uint16_t itemIndex_,
 	calibre(calibre_), capacity(capacity_), ammoType(ammoType_),
 	dontUseAsDefaultMagazine(dontUseAsDefaultMagazine_)
 {
-	this->shortName = shortName_;
-	this->name = name_;
-	this->description = description_;
+	this->shortName = std::move(shortName_);
+	this->name = std::move(name_);
+	this->description = std::move(description_);
 }
 
-#include "ContentManager.h"
-#include "GameInstance.h"
-#include "Items.h"
 
-void MagazineModel::serializeTo(JsonObject &obj) const
+JsonValue MagazineModel::serialize() const
 {
-	obj.AddMember("itemIndex",            itemIndex);
-	obj.AddMember("internalName",         internalName.c_str());
-	obj.AddMember("calibre",              calibre->internalName);
-	obj.AddMember("capacity",             capacity);
-	obj.AddMember("ammoType",             ammoType->internalName);
+	JsonObject obj;
+	obj.set("itemIndex",            itemIndex);
+	obj.set("internalName",         internalName);
+	obj.set("calibre",              calibre->internalName);
+	obj.set("capacity",             capacity);
+	obj.set("ammoType",             ammoType->internalName);
 
-	obj.AddMember("inventoryGraphics",      inventoryGraphics.serialize(obj.getAllocator()).getValue());
-	obj.AddMember("tileGraphic",      tileGraphic.serialize(obj.getAllocator()).getValue());
-	obj.AddMember("ubWeight",             getWeight());
-	obj.AddMember("ubPerPocket",          getPerPocket());
-	obj.AddMember("usPrice",              getPrice());
-	obj.AddMember("ubCoolness",           getCoolness());
+	obj.set("inventoryGraphics",      inventoryGraphics.serialize());
+	obj.set("tileGraphic",      tileGraphic.serialize());
+	obj.set("ubWeight",             getWeight());
+	obj.set("ubPerPocket",          getPerPocket());
+	obj.set("usPrice",              getPrice());
+	obj.set("ubCoolness",           getCoolness());
 
 	if(isInBigGunList())
 	{
-		obj.AddMember("standardReplacement", standardReplacement);
+		obj.set("standardReplacement", standardReplacement);
 	}
 
 	serializeFlags(obj);
 
 	if(dontUseAsDefaultMagazine)
 	{
-		obj.AddMember("dontUseAsDefaultMagazine", dontUseAsDefaultMagazine);
+		obj.set("dontUseAsDefaultMagazine", dontUseAsDefaultMagazine);
 	}
+
+	return obj.toValue();
 }
 
 MagazineModel* MagazineModel::deserialize(
-	JsonObjectReader &obj,
+	const JsonValue &json,
 	const std::map<ST::string, const CalibreModel*> &calibreMap,
 	const std::map<ST::string, const AmmoTypeModel*> &ammoTypeMap,
-	const VanillaItemStrings& vanillaItemStrings)
+	const BinaryData& vanillaItemStrings)
 {
+	auto obj = json.toObject();
+	ItemModel::InitData const initData{ obj, vanillaItemStrings };
 	int itemIndex                 = obj.GetInt("itemIndex");
 	ST::string internalName       = obj.GetString("internalName");
 	const CalibreModel *calibre   = getCalibre(obj.GetString("calibre"), calibreMap);
-	uint32_t itemClass            = (calibre->index != NOAMMO) ? IC_AMMO : IC_NONE;
+	uint32_t itemClass            = (calibre->index != CalibreModel::NOAMMO) ? IC_AMMO : IC_NONE;
 	uint16_t capacity             = obj.GetInt("capacity");
 	const AmmoTypeModel *ammoType = getAmmoType(obj.GetString("ammoType"), ammoTypeMap);
 	bool dontUseAsDefaultMagazine = obj.getOptionalBool("dontUseAsDefaultMagazine");
-	auto shortName = ItemModel::deserializeShortName(obj, vanillaItemStrings);
-	auto name = ItemModel::deserializeName(obj, vanillaItemStrings);
-	auto description = ItemModel::deserializeDescription(obj, vanillaItemStrings);
+	auto shortName = ItemModel::deserializeShortName(initData);
+	auto name = ItemModel::deserializeName(initData);
+	auto description = ItemModel::deserializeDescription(initData);
 	MagazineModel *mag = new MagazineModel(
 		itemIndex,
-		internalName,
-		shortName,
-		name,
-		description,
+		std::move(internalName),
+		std::move(shortName),
+		std::move(name),
+		std::move(description),
 		itemClass,
 		calibre,
 		capacity,
@@ -86,18 +88,13 @@ MagazineModel* MagazineModel::deserialize(
 		dontUseAsDefaultMagazine
 	);
 
-	mag->fFlags = mag->deserializeFlags(obj);
+	mag->fFlags = ItemModel::deserializeFlags(obj);
 
-	const rapidjson::Value& igSource = obj.GetValue("inventoryGraphics");
-	JsonObjectReader igReader(igSource);
-	const auto inventoryGraphics = InventoryGraphicsModel::deserialize(igReader);
+	const auto inventoryGraphics = InventoryGraphicsModel::deserialize(obj["inventoryGraphics"]);
+	const auto tileGraphic = TilesetTileIndexModel::deserialize(obj["tileGraphic"]);
+
 	mag->inventoryGraphics  = inventoryGraphics;
-
-	const rapidjson::Value& tgSource = obj.GetValue("tileGraphic");
-	JsonObjectReader tgReader(tgSource);
-	const auto tileGraphic = TilesetTileIndexModel::deserialize(tgReader);
 	mag->tileGraphic = tileGraphic;
-
 	mag->ubWeight         = obj.GetInt("ubWeight");
 	mag->ubPerPocket      = obj.GetInt("ubPerPocket");
 	mag->usPrice          = obj.GetInt("usPrice");

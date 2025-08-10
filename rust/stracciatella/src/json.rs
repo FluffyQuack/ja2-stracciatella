@@ -5,13 +5,11 @@
 //! - C style line comments (`// ...`)
 //! - Shell style line comments (`# ...`)
 //!
-//! Shell style line comments should be avoided since RapidJSON does not support them.
 //!
 //! # Links:
 //! - [serde_json](https://crates.io/crates/serde_json)
 //! - [json_comments](https://crates.io/crates/json_comments)
 //! - [JSON](https://json.org/)
-//! - [RapidJSON](http://rapidjson.org/) (used in C++ code)
 
 pub mod de {
     //! Deserialize json with comments.
@@ -97,7 +95,7 @@ pub mod ser {
         fn serialize(&mut self, value: &Value) -> Result<(), String> {
             self.push_comments()?;
             self.push_prefix();
-            self.push_value(&value)?;
+            self.push_value(value)?;
             Ok(())
         }
 
@@ -136,7 +134,7 @@ pub mod ser {
                 }
                 for line in comments.lines() {
                     self.push_prefix();
-                    self.push_str(&line);
+                    self.push_str(line);
                 }
             }
             Ok(())
@@ -154,7 +152,7 @@ pub mod ser {
                             self.push(',');
                         }
                         self.path_truncate(len);
-                        self.path_push(&key);
+                        self.path_push(key);
                         let key = serde_json::to_string(key).map_err(|x| format!("{}", x))?;
                         self.push_comments()?;
                         self.push_prefix();

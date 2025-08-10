@@ -25,9 +25,6 @@ if [[ "$CI_TARGET" == "linux" ]]; then
     # sccache for compilation caching
     linux-install-sccache
 
-    # Google Cloud SDK for Artifact Upload
-    linux-install-google-cloud-sdk
-
     # Rust via Rustup
     unix-install-rustup
 
@@ -37,16 +34,10 @@ elif [[ "$CI_TARGET" == "linux-mingw64" ]]; then
     GCC_VER="${TARGET_GCC_MAJOR_VERSION:-8}"
 
     # MinGW compiler for cross-compiling
-    linux-install-via-apt-get build-essential mingw-w64 "gcc-$GCC_VER" "g++-$GCC_VER"
-
-    # choose a new-enough version of gcc
-    linux-set-gcc-version "$GCC_VER"
+    linux-install-via-apt-get build-essential mingw-w64 g++-mingw-w64-x86-64-posix
 
     # sccache for compilation caching
     linux-install-sccache
-
-    # Google Cloud SDK for Artifact Upload
-    linux-install-google-cloud-sdk
 
     # Rust via Rustup
     unix-install-rustup x86_64-pc-windows-gnu
@@ -54,9 +45,17 @@ elif [[ "$CI_TARGET" == "mac" ]]; then
     # sccache for compilation caching
     macOS-install-via-brew sccache
 
+    # fltk for the launcher
+    macOS-install-via-brew fltk@1.3
+    echo 'export PATH="/opt/homebrew/opt/fltk@1.3/bin:$PATH"' >> ~/.bash_profile
+    source ~/.bash_profile
+
+    # gtest
+    macOS-install-via-brew googletest
+
     # Google Cloud SDK for Artifact Upload
     macOS-install-via-brew-cask google-cloud-sdk
-    source "$(brew --prefix)/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.bash.inc"
+    source "$(brew --prefix)/share/google-cloud-sdk/path.bash.inc"
 
     # Rust via Rustup
     unix-install-rustup
@@ -82,9 +81,6 @@ elif [[ "$CI_TARGET" == "android" ]]; then
 
     # sccache for compilation caching
     linux-install-sccache
-
-    # Google Cloud SDK for Artifact Upload
-    linux-install-google-cloud-sdk
 
     # Rust via Rustup
     unix-install-rustup armv7-linux-androideabi aarch64-linux-android i686-linux-android x86_64-linux-android

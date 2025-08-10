@@ -3,7 +3,6 @@
 #include "HImage.h"
 #include "VObject.h"
 #include "VSurface.h"
-#include "WCheck.h"
 #include "Font_Control.h"
 #include "GameRes.h"
 #include "GameMode.h"
@@ -60,32 +59,6 @@ void InitializeFonts(void)
 
 	// Set default for font system
 	SetFontDestBuffer(FRAME_BUFFER);
-}
-
-
-void ShutdownFonts(void)
-{
-	UnloadFont(gp10PointArial);
-	UnloadFont(gp10PointArialBold);
-	UnloadFont(gp12PointArial);
-	UnloadFont(gp12PointArialFixedFont);
-	UnloadFont(gp12PointFont1);
-	UnloadFont(gp14PointArial);
-	UnloadFont(gp14PointHumanist);
-	UnloadFont(gp16PointArial);
-	UnloadFont(gpBlockFontNarrow);
-	UnloadFont(gpBlockyFont);
-	UnloadFont(gpBlockyFont2);
-	UnloadFont(gpCompFont);
-	UnloadFont(gpLargeFontType1);
-	UnloadFont(gpSmallCompFont);
-	UnloadFont(gpSmallFontType1);
-	UnloadFont(gpTinyFontType1);
-
-	if(GameMode::getInstance()->isEditorMode() && isEnglishVersion())
-	{
-		UnloadFont(gpHugeFont);
-	}
 }
 
 

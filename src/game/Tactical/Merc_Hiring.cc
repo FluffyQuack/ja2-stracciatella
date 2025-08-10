@@ -1,20 +1,10 @@
 #include "Font_Control.h"
-#include "Debug.h"
 #include "math.h"
 #include "MapScreen.h"
 #include "MessageBoxScreen.h"
-#include "WorldDef.h"
 #include "Assignments.h"
 #include "Soldier_Control.h"
-#include "Animation_Data.h"
-#include "Render_Fun.h"
-#include "Render_Dirty.h"
-#include "MouseSystem.h"
-#include "SysUtil.h"
-#include "Points.h"
 #include "Random.h"
-#include "AI.h"
-#include "Soldier_Ani.h"
 #include "Overhead.h"
 #include "Soldier_Profile.h"
 #include "Game_Clock.h"
@@ -25,7 +15,6 @@
 #include "StrategicMap.h"
 #include "Strategic.h"
 #include "Items.h"
-#include "Soldier_Add.h"
 #include "History.h"
 #include "Squads.h"
 #include "Strategic_Merc_Handler.h"
@@ -352,7 +341,7 @@ void MercArrivesCallback(SOLDIERTYPE& s)
 	fTeamPanelDirty = TRUE;
 
 	// if the currently selected sector has no one in it, select this one instead
-	if (!CanGoToTacticalInSector(SGPSector(sSelMap.x, sSelMap.y, iCurrentMapSectorZ)))
+	if (!CanGoToTacticalInSector(sSelMap))
 	{
 		ChangeSelectedMapSector(s.sSector);
 	}
@@ -401,8 +390,8 @@ void HandleMercArrivesQuotes(SOLDIERTYPE& s)
 		// hates the merc who has arrived and is going to gripe about it!
 		switch (WhichHated(other->ubProfile, s.ubProfile))
 		{
-			case 0:  TacticalCharacterDialogue(other, QUOTE_HATED_1_ARRIVES); break;
-			case 1:  TacticalCharacterDialogue(other, QUOTE_HATED_2_ARRIVES); break;
+			case HATED_SLOT1:  TacticalCharacterDialogue(other, QUOTE_HATED_1_ARRIVES); break;
+			case HATED_SLOT2:  TacticalCharacterDialogue(other, QUOTE_HATED_2_ARRIVES); break;
 			default: break;
 		}
 	}

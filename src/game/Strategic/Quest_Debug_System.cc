@@ -1,30 +1,27 @@
 #include "Quest_Debug_System.h"
-#include "AIMMembers.h"
 #include "Button_System.h"
 #include "ContentManager.h"
 #include "Cursors.h"
-#include "Debug.h"
 #include "Dialogue_Control.h"
 #include "Directories.h"
-#include "English.h"
 #include "Environment.h"
 #include "Faces.h"
-#include "FileMan.h"
 #include "Font.h"
 #include "Font_Control.h"
 #include "Game_Clock.h"
 #include "GameInstance.h"
 #include "Handle_Items.h"
 #include "HImage.h"
-#include "Interface.h"
+#include "Input.h"
 #include "Interface_Dialogue.h"
+#include "ItemModel.h"
 #include "Items.h"
 #include "Keys.h"
 #include "Line.h"
-#include "Local.h"
 #include "MercProfile.h"
 #include "Message.h"
 #include "MessageBoxScreen.h"
+#include "Object_Cache.h"
 #include "OppList.h"
 #include "Overhead.h"
 #include "Quests.h"
@@ -38,7 +35,6 @@
 #include "Soldier_Profile.h"
 #include "StrategicMap.h"
 #include "SysUtil.h"
-#include "Text.h"
 #include "Text_Input.h"
 #include "Types.h"
 #include "UILayout.h"
@@ -344,9 +340,6 @@ static const ST::string PocketText[] = {
 };
 
 
-extern UINT32 guiGameClock;
-
-
 typedef void (*LISTBOX_DISPLAY_FNCTN)();    // Define Display Callback function
 typedef void (*TEXT_ENTRY_CALLBACK)(INT32); // Callback for when the text entry field is finished
 
@@ -385,7 +378,7 @@ enum
 };
 
 //image identifiers
-static SGPVObject* guiQdScrollArrowImage;
+static cache_key_t const guiQdScrollArrowImage{ INTERFACEDIR "/qd_scrollarrows.sti" };
 
 
 static BOOLEAN gfQuestDebugEntry = TRUE;
@@ -610,7 +603,7 @@ ScreenID QuestDebugScreenHandle()
 	{
 		if( gubTextEntryAction != QD_DROP_DOWN_NO_ACTION )
 		{
-			CreateDestroyDisplayTextEntryBox( gubTextEntryAction, ST::null, NULL );
+			CreateDestroyDisplayTextEntryBox( gubTextEntryAction, {}, NULL );
 			gubTextEntryAction = QD_DROP_DOWN_NO_ACTION;
 		}
 
@@ -651,9 +644,6 @@ ScreenID QuestDebugScreenHandle()
 
 	SaveBackgroundRects( );
 	RenderFastHelp();
-
-	ExecuteBaseDirtyRectQueue();
-	EndFrameBufferRender();
 
 	if( gfQuestDebugExit )
 	{
@@ -804,9 +794,6 @@ static void EnterQuestDebugSystem(void)
 		usPosY += usFontHeight;
 	}
 
-	// load Scroll Horizontal Arrow graphic and add it
-	guiQdScrollArrowImage = AddVideoObjectFromFile(INTERFACEDIR "/qd_scrollarrows.sti");
-
 	gfRedrawQuestDebugSystem = TRUE;
 
 
@@ -886,7 +873,7 @@ static void ExitQuestDebugSystem(void)
 	RemoveButton( guiQDPgUpButtonButton );
 	RemoveButton( guiQDPgDownButtonButton );
 
-	DeleteVideoObject(guiQdScrollArrowImage);
+	RemoveVObject(guiQdScrollArrowImage);
 
 	gpActiveListBox->ubCurScrollBoxAction = QD_DROP_DOWN_DESTROY;
 	CreateDestroyDisplaySelectNpcDropDownBox();
@@ -1012,7 +999,7 @@ static void RenderQuestDebugSystem(void)
 	if( gfTextEntryActive )
 	{
 		gubTextEntryAction = QD_DROP_DOWN_DISPLAY;
-		CreateDestroyDisplayTextEntryBox( gubTextEntryAction, ST::null, NULL );
+		CreateDestroyDisplayTextEntryBox( gubTextEntryAction, {}, NULL );
 		gubTextEntryAction = QD_DROP_DOWN_NO_ACTION;
 	}
 

@@ -1,14 +1,24 @@
 #include "ItemModel.h"
-
+#include <functional>
 #include <utility>
 
-#include "JsonObject.h"
-#include "MagazineModel.h"
-#include "WeaponModels.h"
 
+namespace {
+auto deserializeHelper(ItemModel::InitData const& initData,
+	char const * propertyName,
+	decltype(&BinaryData::getItemName) getterMethod)
+{
+	auto result{ initData.json.getOptionalString(propertyName) };
+	if (result.empty()) {
+		result = std::invoke(getterMethod, initData.strings,
+		                     initData.json.GetUInt("itemIndex"));
+	}
+	return result;
+}
+}
 
 ItemModel::ItemModel(uint16_t itemIndex,
-			ST::string internalName,
+			ST::string&& internalName,
 			uint32_t usItemClass,
 			uint8_t classIndex,
 			ItemCursor cursor) :
@@ -30,28 +40,28 @@ ItemModel::ItemModel(uint16_t itemIndex,
 }
 
 ItemModel::ItemModel(uint16_t   itemIndex,
-			ST::string internalName,
-			ST::string shortName,
-			ST::string name,
-			ST::string description,
+			ST::string&& internalName,
+			ST::string&& shortName,
+			ST::string&& name,
+			ST::string&& description,
 			uint32_t   usItemClass,
 			uint8_t    ubClassIndex,
 			ItemCursor ubCursor,
-			InventoryGraphicsModel inventoryGraphics_,
-			TilesetTileIndexModel tileGraphic_,
+			InventoryGraphicsModel&& inventoryGraphics_,
+			TilesetTileIndexModel&& tileGraphic_,
 			uint8_t    ubWeight,
 			uint8_t    ubPerPocket,
 			uint16_t   usPrice,
 			uint8_t    ubCoolness,
 			int8_t     bReliability,
 			int8_t     bRepairEase,
-			uint16_t   fFlags) : inventoryGraphics(inventoryGraphics_), tileGraphic(tileGraphic_)
+			uint16_t   fFlags) : inventoryGraphics(std::move(inventoryGraphics_)), tileGraphic(tileGraphic_)
 {
 	this->itemIndex             = itemIndex;
-	this->internalName          = internalName;
-	this->shortName             = shortName;
-	this->name                  = name;
-	this->description           = description;
+	this->internalName          = std::move(internalName);
+	this->shortName             = std::move(shortName);
+	this->name                  = std::move(name);
+	this->description           = std::move(description);
 	this->usItemClass           = usItemClass;
 	this->ubClassIndex          = ubClassIndex;
 	this->ubCursor              = ubCursor;
@@ -63,8 +73,6 @@ ItemModel::ItemModel(uint16_t   itemIndex,
 	this->bRepairEase           = bRepairEase;
 	this->fFlags                = fFlags;
 }
-
-ItemModel::~ItemModel() = default;
 
 const ST::string& ItemModel::getInternalName() const   { return internalName;          }
 
@@ -112,25 +120,25 @@ bool ItemModel::isInBigGunList() const   { return fFlags & ITEM_BIGGUNLIST;     
 
 void ItemModel::serializeFlags(JsonObject &obj) const
 {
-	if(getFlags() & ITEM_DAMAGEABLE)          { obj.AddMember("bDamageable", true);     }
-	if(getFlags() & ITEM_REPAIRABLE)          { obj.AddMember("bRepairable", true);     }
-	if(getFlags() & ITEM_WATER_DAMAGES)       { obj.AddMember("bWaterDamages", true);   }
-	if(getFlags() & ITEM_METAL)               { obj.AddMember("bMetal", true);          }
-	if(getFlags() & ITEM_SINKS)               { obj.AddMember("bSinks", true);          }
-	if(getFlags() & ITEM_SHOW_STATUS)         { obj.AddMember("bShowStatus", true);     }
-	if(getFlags() & ITEM_HIDDEN_ADDON)        { obj.AddMember("bHiddenAddon", true);    }
-	if(getFlags() & ITEM_TWO_HANDED)          { obj.AddMember("bTwoHanded", true);      }
-	if(getFlags() & ITEM_NOT_BUYABLE)         { obj.AddMember("bNotBuyable", true);     }
-	if(getFlags() & ITEM_ATTACHMENT)          { obj.AddMember("bAttachment", true);     }
-	if(getFlags() & ITEM_BIGGUNLIST)          { obj.AddMember("bBigGunList", true);     }
-	if(getFlags() & ITEM_NOT_EDITOR)          { obj.AddMember("bNotEditor", true);      }
-	if(getFlags() & ITEM_DEFAULT_UNDROPPABLE) { obj.AddMember("bDefaultUndroppable", true); }
-	if(getFlags() & ITEM_UNAERODYNAMIC)       { obj.AddMember("bUnaerodynamic", true);  }
-	if(getFlags() & ITEM_ELECTRONIC)          { obj.AddMember("bElectronic", true);     }
-	if(getFlags() & ITEM_INSEPARABLE)         { obj.AddMember("bInseparable", true);    }
+	if(getFlags() & ITEM_DAMAGEABLE)          { obj.set("bDamageable", true);     }
+	if(getFlags() & ITEM_REPAIRABLE)          { obj.set("bRepairable", true);     }
+	if(getFlags() & ITEM_WATER_DAMAGES)       { obj.set("bWaterDamages", true);   }
+	if(getFlags() & ITEM_METAL)               { obj.set("bMetal", true);          }
+	if(getFlags() & ITEM_SINKS)               { obj.set("bSinks", true);          }
+	if(getFlags() & ITEM_SHOW_STATUS)         { obj.set("bShowStatus", true);     }
+	if(getFlags() & ITEM_HIDDEN_ADDON)        { obj.set("bHiddenAddon", true);    }
+	if(getFlags() & ITEM_TWO_HANDED)          { obj.set("bTwoHanded", true);      }
+	if(getFlags() & ITEM_NOT_BUYABLE)         { obj.set("bNotBuyable", true);     }
+	if(getFlags() & ITEM_ATTACHMENT)          { obj.set("bAttachment", true);     }
+	if(getFlags() & ITEM_BIGGUNLIST)          { obj.set("bBigGunList", true);     }
+	if(getFlags() & ITEM_NOT_EDITOR)          { obj.set("bNotEditor", true);      }
+	if(getFlags() & ITEM_DEFAULT_UNDROPPABLE) { obj.set("bDefaultUndroppable", true); }
+	if(getFlags() & ITEM_UNAERODYNAMIC)       { obj.set("bUnaerodynamic", true);  }
+	if(getFlags() & ITEM_ELECTRONIC)          { obj.set("bElectronic", true);     }
+	if(getFlags() & ITEM_INSEPARABLE)         { obj.set("bInseparable", true);    }
 }
 
-uint32_t ItemModel::deserializeFlags(JsonObjectReader &obj) const
+uint16_t ItemModel::deserializeFlags(const JsonObject &obj)
 {
 	uint32_t flags = 0;
 	if(obj.getOptionalBool("bDamageable"))        { flags |= ITEM_DAMAGEABLE;             }
@@ -158,87 +166,74 @@ bool ItemModel::canBeAttached(uint16_t attachment) const
 	return false;
 }
 
-void ItemModel::serializeTo(JsonObject &obj) const
+JsonValue ItemModel::serialize() const
 {
-    obj.AddMember("itemIndex", itemIndex);
-    obj.AddMember("internalName", internalName);
-    obj.AddMember("usItemClass", (uint32_t)getItemClass());
-    obj.AddMember("ubClassIndex", getClassIndex());
-    obj.AddMember("ubCursor",  getCursor());
-    obj.AddMember("inventoryGraphics", inventoryGraphics.serialize(obj.getAllocator()).getValue());
-	obj.AddMember("tileGraphic", tileGraphic.serialize(obj.getAllocator()).getValue());
-    obj.AddMember("ubWeight", getWeight());
-    obj.AddMember("ubPerPocket", getPerPocket());
-    obj.AddMember("usPrice", getPrice());
-    obj.AddMember("ubCoolness", getCoolness());
-    obj.AddMember("bReliability", getReliability());
-    obj.AddMember("bRepairEase", getRepairEase());
+	JsonObject obj;
+    obj.set("itemIndex", itemIndex);
+    obj.set("internalName", internalName);
+    obj.set("usItemClass", (uint32_t)getItemClass());
+    obj.set("ubClassIndex", getClassIndex());
+    obj.set("ubCursor",  getCursor());
+    obj.set("inventoryGraphics", inventoryGraphics.serialize());
+	obj.set("tileGraphic", tileGraphic.serialize());
+    obj.set("ubWeight", getWeight());
+    obj.set("ubPerPocket", getPerPocket());
+    obj.set("usPrice", getPrice());
+    obj.set("ubCoolness", getCoolness());
+    obj.set("bReliability", getReliability());
+    obj.set("bRepairEase", getRepairEase());
 
     serializeFlags(obj);
+
+	return obj.toValue();
 }
 
-ST::string ItemModel::deserializeShortName(JsonObjectReader &obj, const VanillaItemStrings& vanillaItemStrings) {
-	uint16_t itemIndex = obj.GetUInt("itemIndex");
-	ST::string shortName = vanillaItemStrings.getShortName(itemIndex);
-	if (obj.getOptionalString("shortName")) {
-		shortName = obj.getOptionalString("shortName");
-	}
-	return shortName;
-}
-
-ST::string ItemModel::deserializeName(JsonObjectReader &obj, const VanillaItemStrings& vanillaItemStrings) {
-	uint16_t itemIndex = obj.GetUInt("itemIndex");
-	ST::string name = vanillaItemStrings.getName(itemIndex);
-	if (obj.getOptionalString("name")) {
-		name = obj.getOptionalString("name");
-	}
-	return name;
-}
-
-ST::string ItemModel::deserializeDescription(JsonObjectReader &obj, const VanillaItemStrings& vanillaItemStrings) {
-	uint16_t itemIndex = obj.GetUInt("itemIndex");
-	ST::string description = vanillaItemStrings.getDescription(itemIndex);
-	if (obj.getOptionalString("description")) {
-		description = obj.getOptionalString("description");
-	}
-	return description;
-}
-
-const ItemModel* ItemModel::deserialize(JsonObjectReader &obj, const VanillaItemStrings& vanillaItemStrings)
+ST::string ItemModel::deserializeShortName(InitData const& initData)
 {
+	return deserializeHelper(initData, "shortName", &BinaryData::getItemShortName);
+}
+
+ST::string ItemModel::deserializeName(InitData const& initData)
+{
+	return deserializeHelper(initData, "name", &BinaryData::getItemName);
+}
+
+ST::string ItemModel::deserializeDescription(InitData const& initData)
+{
+	return deserializeHelper(initData, "description", &BinaryData::getItemDescription);
+}
+
+const ItemModel* ItemModel::deserialize(const JsonValue &json, const BinaryData& vanillaItemStrings)
+{
+	auto obj = json.toObject();
+	InitData const initData{ obj, vanillaItemStrings };
 	uint16_t itemIndex = obj.GetUInt("itemIndex");
 	ST::string internalName = obj.GetString("internalName");
-	const rapidjson::Value& igSource = obj.GetValue("inventoryGraphics");
-	JsonObjectReader igGreader(igSource);
-	auto inventoryGraphics = InventoryGraphicsModel::deserialize(igGreader);
+	auto inventoryGraphics = InventoryGraphicsModel::deserialize(obj["inventoryGraphics"]);
+	auto tileGraphic = TilesetTileIndexModel::deserialize(obj["tileGraphic"]);
 
-	const rapidjson::Value& tgSource = obj.GetValue("tileGraphic");
-	JsonObjectReader tgReader(tgSource);
-	auto tileGraphic = TilesetTileIndexModel::deserialize(tgReader);
+	auto shortName = ItemModel::deserializeShortName(initData);
+	auto name = ItemModel::deserializeName(initData);
+	auto description = ItemModel::deserializeDescription(initData);
+	auto flags = ItemModel::deserializeFlags(obj);
 
-	auto shortName = ItemModel::deserializeShortName(obj, vanillaItemStrings);
-	auto name = ItemModel::deserializeName(obj, vanillaItemStrings);
-	auto description = ItemModel::deserializeDescription(obj, vanillaItemStrings);
-
-	auto* item = new ItemModel(
+	return new ItemModel(
 		itemIndex,
-		internalName,
-		shortName,
-		name,
-		description,
+		std::move(internalName),
+		std::move(shortName),
+		std::move(name),
+		std::move(description),
 		obj.GetUInt("usItemClass"),
 		obj.GetUInt("ubClassIndex"),
 		(ItemCursor)obj.GetUInt("ubCursor"),
-		inventoryGraphics,
-		tileGraphic,
+		std::move(inventoryGraphics),
+		std::move(tileGraphic),
 		obj.GetUInt("ubWeight"),
 		obj.GetUInt("ubPerPocket"),
 		obj.GetUInt("usPrice"),
 		obj.GetUInt("ubCoolness"),
 		obj.GetInt("bReliability"),
 		obj.GetInt("bRepairEase"),
-		0
+		flags
 	);
-	item->fFlags = item->deserializeFlags(obj);
-	return item;
 }

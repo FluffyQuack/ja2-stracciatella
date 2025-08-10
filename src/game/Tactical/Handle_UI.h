@@ -7,7 +7,6 @@
 #include "MouseSystem.h"
 #include "ScreenIDs.h"
 #include "Soldier_Find.h"
-#include <magic_enum.hpp>
 
 
 #define UIEVENT_SINGLEEVENT		0x00000002
@@ -249,6 +248,7 @@ BOOLEAN SelectedMercCanAffordMove(void);
 void ToggleHandCursorMode(UIEventKind* puiNewEvent);
 void ToggleTalkCursorMode(UIEventKind* puiNewEvent);
 void ToggleLookCursorMode();
+void TogglePanMode();
 
 void UIHandleSoldierStanceChange(SOLDIERTYPE* s, INT8 bNewStance);
 MouseMoveState GetCursorMovementFlags();

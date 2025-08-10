@@ -1,8 +1,6 @@
 #ifndef _ROTTING_CORPSES_H
 #define _ROTTING_CORPSES_H
 
-#include "Debug.h"
-#include "Overhead_Types.h"
 #include "Tile_Animation.h"
 
 #include <string_theory/string>
@@ -113,6 +111,9 @@ struct ROTTING_CORPSE_DEFINITION
 
 struct ROTTING_CORPSE
 {
+	UINT32 ID() const;
+	static ROTTING_CORPSE *FromID(UINT32);
+
 	ROTTING_CORPSE_DEFINITION def;
 	BOOLEAN fActivated;
 
@@ -143,29 +144,11 @@ void HandleCrowLeave( SOLDIERTYPE *pSoldier );
 
 void HandleCrowFlyAway( SOLDIERTYPE *pSoldier );
 
-#define MAX_ROTTING_CORPSES				100
+constexpr INT32 MAX_ROTTING_CORPSES = 200;
 
-extern ROTTING_CORPSE gRottingCorpse[ MAX_ROTTING_CORPSES ];
-extern INT32 giNumRottingCorpse;
-extern UINT8 gb4DirectionsFrom8[8];
-
-static inline UINT32 Corpse2ID(const ROTTING_CORPSE* const c)
-{
-	Assert(gRottingCorpse <= c && c < endof(gRottingCorpse));
-	Assert(c->fActivated);
-	return (UINT32)(c - gRottingCorpse);
-}
-
-static inline ROTTING_CORPSE* ID2Corpse(const UINT32 id)
-{
-	Assert(id < lengthof(gRottingCorpse));
-	ROTTING_CORPSE* const c = &gRottingCorpse[id];
-	Assert(c->fActivated);
-	return c;
-}
-
-#define CORPSE2ID(c) (Corpse2ID((c)))
-#define ID2CORPSE(i) (ID2Corpse((i)))
+inline ROTTING_CORPSE gRottingCorpse[MAX_ROTTING_CORPSES];
+inline INT32 giNumRottingCorpse = 0;
+extern UINT8 const gb4DirectionsFrom8[8];
 
 #define BASE_FOR_EACH_ROTTING_CORPSE(type, iter)                      \
 	for (type* iter = gRottingCorpse,                      \

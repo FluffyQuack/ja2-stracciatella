@@ -1,37 +1,18 @@
 #ifndef SGPSTRINGS_H
 #define SGPSTRINGS_H
 
-#include <string_theory/format>
-#include <string_theory/string>
-
-#include <cwchar>
 #include <stdexcept>
-#include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <utility>
+#include <string_theory/string>
+#include <string_theory/format>
 
-#include "PlatformStrings.h"
-
-
-#if defined(__linux__) || defined(_WIN32)
-
-size_t strlcpy(char* dst, const char* src, size_t size);
-
-#endif
-
-
-#ifdef _WIN32
-#ifndef __MINGW32__
-
-#include <stdarg.h>
-
-
-int WINsnprintf(char* s, size_t n, const char* fmt, ...);
-
-#define snprintf  WINsnprintf
-
-#endif
-#endif
+// poison deprecated functions
+[[deprecated("Don't use strlcpy, but regular ST::string assignment.")]]
+	size_t strlcpy(char *dst, const char *src, size_t size);
+[[deprecated("Don't use snprintf, use ST::format instead.")]]
+	int snprintf(char* const s, size_t const n, const char* const fmt, ...);
 
 /// Converts `std::printf` formatting to `ST::format` formatting.
 /// @see https://en.cppreference.com/w/cpp/io/c/fprintf
@@ -60,7 +41,7 @@ ST::string st_buffer_escape(const ST::utf32_buffer& buf);
 template<typename T>
 ST::string st_checked_buffer_to_string(ST::string& err_msg, const ST::buffer<T>& buf)
 {
-	err_msg = ST::null;
+	err_msg.clear();
 	try
 	{
 		return buf.c_str();

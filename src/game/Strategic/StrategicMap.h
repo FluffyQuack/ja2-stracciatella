@@ -3,8 +3,7 @@
 // this file is for manipulation of the strategic map structure
 
 #include "JA2Types.h"
-#include "SAM_Sites.h"
-
+#include "Observable.h"
 #include <string_theory/string>
 
 
@@ -51,7 +50,6 @@ extern Observable<> BeforePrepareSector;
 #define MAP_WORLD_Y				18
 
 // grab the town id value
-UINT8 GetTownIdForSector(UINT8 sector);
 UINT8 GetTownIdForSector(const SGPSector& sSector);
 
 void SetCurrentWorldSector(const SGPSector& sector);

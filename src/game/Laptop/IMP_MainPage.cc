@@ -7,14 +7,11 @@
 #include "Overhead.h"
 #include "Text.h"
 #include "VObject.h"
-#include "Render_Dirty.h"
 #include "Cursors.h"
 #include "Laptop.h"
-#include "Finances.h"
 #include "IMP_Attribute_Selection.h"
 #include "IMP_Finish.h"
 #include "MouseSystem.h"
-#include "Merc_Hiring.h"
 #include "LaptopSave.h"
 #include "IMP_Portraits.h"
 #include "Button_System.h"
@@ -474,8 +471,7 @@ static void IMPMainPageNotSelectableBtnCallback(MOUSE_REGION* pRegion, UINT32 iR
 
 SGPVObject* LoadIMPPortait()
 {
-	SGPFILENAME filename;
-	snprintf(filename, lengthof(filename), FACESDIR "/%d.sti", 200 + iPortraitNumber);
+	ST::string filename = ST::format(FACESDIR "/{}.sti", 200 + iPortraitNumber);
 	return AddVideoObjectFromFile(filename);
 }
 

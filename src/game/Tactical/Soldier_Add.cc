@@ -4,11 +4,8 @@
 #include "Isometric_Utils.h"
 #include "Interface_Panels.h"
 #include "Soldier_Macros.h"
-#include "StrategicMap.h"
 #include "Strategic.h"
 #include "Animation_Control.h"
-#include "Soldier_Create.h"
-#include "Soldier_Init_List.h"
 #include "Soldier_Add.h"
 #include "Map_Information.h"
 #include "FOV.h"
@@ -52,20 +49,14 @@ UINT16 FindGridNoFromSweetSpot(const SOLDIERTYPE* const pSoldier, const INT16 sS
 	INT16 sGridNo;
 	INT32 uiRange, uiLowestRange = 999999;
 	INT32 leftmost;
-	SOLDIERTYPE soldier;
-	UINT8 ubSaveNPCAPBudget;
-	UINT8 ubSaveNPCDistLimit;
+	SOLDIERTYPE soldier{};
 
 	//Save AI pathing vars.  changing the distlimit restricts how
 	//far away the pathing will consider.
-	ubSaveNPCAPBudget = gubNPCAPBudget;
-	ubSaveNPCDistLimit = gubNPCDistLimit;
-	gubNPCAPBudget = 0;
-	gubNPCDistLimit = ubRadius;
+	SaveNPCBudgetAndDistLimit const savePathAIvars(0, ubRadius);
 
 	//create dummy soldier, and use the pathing to determine which nearby slots are
 	//reachable.
-	soldier = SOLDIERTYPE{};
 	soldier.bLevel = 0;
 	soldier.bTeam = 1;
 	soldier.sGridNo = sSweetGridNo;
@@ -130,8 +121,6 @@ UINT16 FindGridNoFromSweetSpot(const SOLDIERTYPE* const pSoldier, const INT16 sS
 			}
 		}
 	}
-	gubNPCAPBudget = ubSaveNPCAPBudget;
-	gubNPCDistLimit = ubSaveNPCDistLimit;
 	return sLowestGridNo;
 }
 
@@ -144,20 +133,14 @@ UINT16 FindGridNoFromSweetSpotThroughPeople(const SOLDIERTYPE* const pSoldier, c
 	INT16 sGridNo;
 	INT32 uiRange, uiLowestRange = 999999;
 	INT32 leftmost;
-	SOLDIERTYPE soldier;
-	UINT8 ubSaveNPCAPBudget;
-	UINT8 ubSaveNPCDistLimit;
+	SOLDIERTYPE soldier{};
 
 	//Save AI pathing vars.  changing the distlimit restricts how
 	//far away the pathing will consider.
-	ubSaveNPCAPBudget = gubNPCAPBudget;
-	ubSaveNPCDistLimit = gubNPCDistLimit;
-	gubNPCAPBudget = 0;
-	gubNPCDistLimit = ubRadius;
+	SaveNPCBudgetAndDistLimit const savePathAIvars(0, ubRadius);
 
 	//create dummy soldier, and use the pathing to determine which nearby slots are
 	//reachable.
-	soldier = SOLDIERTYPE{};
 	soldier.bLevel = 0;
 	soldier.bTeam = pSoldier->bTeam;
 	soldier.sGridNo = sSweetGridNo;
@@ -217,8 +200,6 @@ UINT16 FindGridNoFromSweetSpotThroughPeople(const SOLDIERTYPE* const pSoldier, c
 			}
 		}
 	}
-	gubNPCAPBudget = ubSaveNPCAPBudget;
-	gubNPCDistLimit = ubSaveNPCDistLimit;
 	return sLowestGridNo;
 }
 
@@ -236,16 +217,11 @@ UINT16 FindGridNoFromSweetSpotWithStructData( SOLDIERTYPE *pSoldier, UINT16 usAn
 	INT32 leftmost;
 	BOOLEAN fFound = FALSE;
 	SOLDIERTYPE soldier;
-	UINT8 ubSaveNPCAPBudget;
-	UINT8 ubSaveNPCDistLimit;
 	UINT8 ubBestDirection=0;
 
 	//Save AI pathing vars.  changing the distlimit restricts how
 	//far away the pathing will consider.
-	ubSaveNPCAPBudget = gubNPCAPBudget;
-	ubSaveNPCDistLimit = gubNPCDistLimit;
-	gubNPCAPBudget = 0;
-	gubNPCDistLimit = ubRadius;
+	SaveNPCBudgetAndDistLimit const savePathAIvars(0, ubRadius);
 
 	//create dummy soldier, and use the pathing to determine which nearby slots are
 	//reachable.
@@ -304,24 +280,8 @@ UINT16 FindGridNoFromSweetSpotWithStructData( SOLDIERTYPE *pSoldier, UINT16 usAn
 				if ( NewOKDestination( pSoldier, sGridNo, TRUE, pSoldier->bLevel ) )
 				{
 					BOOLEAN fDirectionFound = FALSE;
-					UINT16  usOKToAddStructID;
+					UINT16 const usOKToAddStructID = GetStructureID(pSoldier);
 					UINT16  usAnimSurface;
-
-					if ( pSoldier->pLevelNode != NULL )
-					{
-						if ( pSoldier->pLevelNode->pStructureData != NULL )
-						{
-							usOKToAddStructID = pSoldier->pLevelNode->pStructureData->usStructureID;
-						}
-						else
-						{
-							usOKToAddStructID = INVALID_STRUCTURE_ID;
-						}
-					}
-					else
-					{
-						usOKToAddStructID = INVALID_STRUCTURE_ID;
-					}
 
 					// Get animation surface...
 					usAnimSurface = DetermineSoldierAnimationSurface( pSoldier, usAnimState );
@@ -348,7 +308,8 @@ UINT16 FindGridNoFromSweetSpotWithStructData( SOLDIERTYPE *pSoldier, UINT16 usAn
 
 							if (uiRange == 0 )
 							{
-								uiRange = 999;
+								// If we don't have a path, this cannot be the best gridno!
+								continue;
 							}
 						}
 						else
@@ -368,8 +329,7 @@ UINT16 FindGridNoFromSweetSpotWithStructData( SOLDIERTYPE *pSoldier, UINT16 usAn
 			}
 		}
 	}
-	gubNPCAPBudget = ubSaveNPCAPBudget;
-	gubNPCDistLimit = ubSaveNPCDistLimit;
+
 	if ( fFound )
 	{
 		// Set direction we chose...
@@ -395,16 +355,11 @@ static UINT16 FindGridNoFromSweetSpotWithStructDataUsingGivenDirectionFirst(SOLD
 	INT32 leftmost;
 	BOOLEAN fFound = FALSE;
 	SOLDIERTYPE soldier;
-	UINT8 ubSaveNPCAPBudget;
-	UINT8 ubSaveNPCDistLimit;
 	UINT8 ubBestDirection = 0;
 
 	//Save AI pathing vars.  changing the distlimit restricts how
 	//far away the pathing will consider.
-	ubSaveNPCAPBudget = gubNPCAPBudget;
-	ubSaveNPCDistLimit = gubNPCDistLimit;
-	gubNPCAPBudget = 0;
-	gubNPCDistLimit = ubRadius;
+	SaveNPCBudgetAndDistLimit const savePathAIvars(0, ubRadius);
 
 	//create dummy soldier, and use the pathing to determine which nearby slots are
 	//reachable.
@@ -464,24 +419,8 @@ static UINT16 FindGridNoFromSweetSpotWithStructDataUsingGivenDirectionFirst(SOLD
 				if ( NewOKDestination( pSoldier, sGridNo, TRUE, pSoldier->bLevel ) )
 				{
 					BOOLEAN fDirectionFound = FALSE;
-					UINT16  usOKToAddStructID;
+					UINT16 const usOKToAddStructID = GetStructureID(pSoldier);
 					UINT16  usAnimSurface;
-
-					if ( pSoldier->pLevelNode != NULL )
-					{
-						if ( pSoldier->pLevelNode->pStructureData != NULL )
-						{
-							usOKToAddStructID = pSoldier->pLevelNode->pStructureData->usStructureID;
-						}
-						else
-						{
-							usOKToAddStructID = INVALID_STRUCTURE_ID;
-						}
-					}
-					else
-					{
-						usOKToAddStructID = INVALID_STRUCTURE_ID;
-					}
 
 					// Get animation surface...
 					usAnimSurface = DetermineSoldierAnimationSurface( pSoldier, usAnimState );
@@ -519,7 +458,8 @@ static UINT16 FindGridNoFromSweetSpotWithStructDataUsingGivenDirectionFirst(SOLD
 
 							if (uiRange == 0 )
 							{
-								uiRange = 999;
+								// If we don't have a path, this cannot be the best gridno!
+								continue;
 							}
 						}
 						else
@@ -539,8 +479,7 @@ static UINT16 FindGridNoFromSweetSpotWithStructDataUsingGivenDirectionFirst(SOLD
 			}
 		}
 	}
-	gubNPCAPBudget = ubSaveNPCAPBudget;
-	gubNPCDistLimit = ubSaveNPCDistLimit;
+
 	if ( fFound )
 	{
 		// Set direction we chose...
@@ -563,24 +502,17 @@ UINT16 FindGridNoFromSweetSpotWithStructDataFromSoldier(const SOLDIERTYPE* const
 	INT16 sGridNo;
 	INT32 uiRange, uiLowestRange = 999999;
 	INT32 leftmost;
-	UINT8 ubSaveNPCAPBudget;
-	UINT8 ubSaveNPCDistLimit;
 	INT16 sSweetGridNo;
-	SOLDIERTYPE soldier;
+	SOLDIERTYPE soldier{};
 
 	sSweetGridNo = pSrcSoldier->sGridNo;
 
-
 	//Save AI pathing vars.  changing the distlimit restricts how
 	//far away the pathing will consider.
-	ubSaveNPCAPBudget = gubNPCAPBudget;
-	ubSaveNPCDistLimit = gubNPCDistLimit;
-	gubNPCAPBudget = 0;
-	gubNPCDistLimit = ubRadius;
+	SaveNPCBudgetAndDistLimit const savePathAIvars(0, ubRadius);
 
 	//create dummy soldier, and use the pathing to determine which nearby slots are
 	//reachable.
-	soldier = SOLDIERTYPE{};
 	soldier.bLevel = 0;
 	soldier.bTeam = 1;
 	soldier.sGridNo = sSweetGridNo;
@@ -627,19 +559,11 @@ UINT16 FindGridNoFromSweetSpotWithStructDataFromSoldier(const SOLDIERTYPE* const
 				if ( NewOKDestination( pSoldier, sGridNo, TRUE, pSoldier->bLevel ) )
 				{
 					BOOLEAN fDirectionFound = FALSE;
-					UINT16  usOKToAddStructID;
 					UINT16  usAnimSurface;
 
 					if ( fClosestToMerc != 3 )
 					{
-						if ( pSoldier->pLevelNode != NULL && pSoldier->pLevelNode->pStructureData != NULL )
-						{
-							usOKToAddStructID = pSoldier->pLevelNode->pStructureData->usStructureID;
-						}
-						else
-						{
-							usOKToAddStructID = INVALID_STRUCTURE_ID;
-						}
+						UINT16 const usOKToAddStructID = GetStructureID(pSoldier);
 
 						// Get animation surface...
 						usAnimSurface = DetermineSoldierAnimationSurface( pSoldier, usAnimState );
@@ -690,8 +614,6 @@ UINT16 FindGridNoFromSweetSpotWithStructDataFromSoldier(const SOLDIERTYPE* const
 			}
 		}
 	}
-	gubNPCAPBudget = ubSaveNPCAPBudget;
-	gubNPCDistLimit = ubSaveNPCDistLimit;
 	return sLowestGridNo;
 }
 
@@ -852,18 +774,13 @@ UINT16 FindRandomGridNoFromSweetSpot(const SOLDIERTYPE* const pSoldier, const IN
 	BOOLEAN fFound = FALSE;
 	UINT32  cnt = 0;
 	SOLDIERTYPE soldier;
-	UINT8   ubSaveNPCAPBudget;
-	UINT8   ubSaveNPCDistLimit;
 	INT16   sTop, sBottom;
 	INT16   sLeft, sRight;
 	INT16   cnt1, cnt2;
 
 	//Save AI pathing vars.  changing the distlimit restricts how
 	//far away the pathing will consider.
-	ubSaveNPCAPBudget = gubNPCAPBudget;
-	ubSaveNPCDistLimit = gubNPCDistLimit;
-	gubNPCAPBudget = 0;
-	gubNPCDistLimit = ubRadius;
+	SaveNPCBudgetAndDistLimit const savePathAIvars(0, ubRadius);
 
 	//create dummy soldier, and use the pathing to determine which nearby slots are
 	//reachable.
@@ -935,9 +852,6 @@ UINT16 FindRandomGridNoFromSweetSpot(const SOLDIERTYPE* const pSoldier, const IN
 		}
 
 	} while( !fFound );
-
-	gubNPCAPBudget = ubSaveNPCAPBudget;
-	gubNPCDistLimit = ubSaveNPCDistLimit;
 
 	return( sGridNo );
 }
@@ -1128,15 +1042,13 @@ static void AddSoldierToSectorGridNo(SOLDIERTYPE* const s, INT16 const sGridNo, 
 {
 	// Add merc to gridno
 
-	SoldierSP soldier = GetSoldier(s);
-
 	// Set reserved location!
 	s->sReservedMovementGridNo = NOWHERE;
 
 	// Save OLD insertion code.. as this can change...
 	UINT8 const insertion_code = s->ubStrategicInsertionCode;
 
-	soldier->removePendingAnimation();
+	Soldier{s}.removePendingAnimation();
 
 	//If we are not loading a saved game
 	SetSoldierPosFlags set_pos_flags = SSP_NONE;

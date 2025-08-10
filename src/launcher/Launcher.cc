@@ -162,6 +162,8 @@ void Launcher::show() {
 	populateChoices();
 	initializeInputsFromDefaults();
 
+	playButton->take_focus();
+
 	const Fl_PNG_Image icon("logo32.png", logo32_png, 1374);
 	stracciatellaLauncher->icon(&icon);
 	stracciatellaLauncher->show();
@@ -280,9 +282,8 @@ void Launcher::populateChoices() {
 		gameVersionInput->add(resourceVersionString.get());
 	}
 	for (std::pair<int,int> res : predefinedResolutions) {
-		char resolutionString[255];
-		sprintf(resolutionString, "%dx%d", res.first, res.second);
-		predefinedResolutionMenuButton->insert(-1, resolutionString, 0, setPredefinedResolution, this, 0);
+		ST::string resolutionString = ST::format("{d}x{d}", res.first, res.second);
+		predefinedResolutionMenuButton->insert(-1, resolutionString.c_str(), 0, setPredefinedResolution, this, 0);
 	}
 
 	for (VideoScaleQuality scalingMode : scalingModes) {
@@ -294,7 +295,7 @@ void Launcher::populateChoices() {
 void Launcher::openGameDirectorySelector(Fl_Widget *btn, void *userdata) {
 	Launcher* window = static_cast< Launcher* >( userdata );
 	Fl_Native_File_Chooser fnfc;
-	fnfc.title("Select the original Jagged Alliance 2 install directory");
+	fnfc.title("Select the original Jagged Alliance 2 installation directory");
 	fnfc.type(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
 	ST::char_buffer decoded = decodePath(window->gameDirectoryInput->value());
 	fnfc.directory(decoded.empty() ? nullptr : decoded.c_str());
@@ -306,12 +307,47 @@ void Launcher::openGameDirectorySelector(Fl_Widget *btn, void *userdata) {
 			break; // CANCEL
 		default:
 		{
-			ST::string encoded = encodePath(fnfc.filename());
-			window->gameDirectoryInput->value(encoded.c_str());
+			const auto dir = encodePath(fnfc.filename());
+			if (!checkGameDirectoryForCommonMistakes(dir)) return;
+			window->gameDirectoryInput->value(dir.c_str());
 			window->update(true);
 			break; // FILE CHOSEN
 		}
 	}
+}
+
+bool Launcher::checkGameDirectoryForCommonMistakes(const ST::string& dir) {
+	auto fileToCheck = FileMan::resolveExistingComponents(FileMan::joinPaths(dir, "data/Ja2Set.dat.xml"));
+	try {
+		if (!checkIfRelativePathExists(dir.c_str(), "Data", true)) {
+			fl_message_title("Incorrect game directory detected");
+			int choice = fl_choice(
+				"The Data directory was not found within game directory.\nThis means the chosen directory does not contain a Jagged Alliance 2 installation.",
+				"Continue",
+				"Cancel",
+				0
+			);
+			if (choice == 1) {
+				return false;
+			}
+		}
+		if (checkIfRelativePathExists(dir.c_str(), "Data/Ja2Set.dat.xml", true)) {
+			fl_message_title("Modified game directory detected");
+			auto choice = fl_choice(
+				"We detected that the game directory contains the 1.13 patch.\nJA2 Stracciatella will not work properly with the modified files.\nPlease use a clean installation of Jagged Alliance 2.",
+				"Continue",
+				"Cancel",
+				0
+			);
+
+			if (choice == 1) {
+				return false;
+			}
+		}
+	} catch (const std::runtime_error &ex) {
+		SLOGE("failed to read game dir: {}", ex.what());
+	}
+	return true;
 }
 
 void Launcher::openSaveGameDirectorySelector(Fl_Widget *btn, void *userdata) {
@@ -500,13 +536,9 @@ void Launcher::startGame(Fl_Widget* btn, void* userdata) {
 	Launcher* window = static_cast< Launcher* >( userdata );
 
 	window->writeJsonFile();
-	if (!checkIfRelativePathExists(window->gameDirectoryInput->value(), "Data", true)) {
-		fl_message_title(window->playButton->label());
-		int choice = fl_choice("Data directory not found within game directory.\nAre you sure you want to continue?", "Stop", "Continue", 0);
-		if (choice != 1) {
-			return;
-		}
-	}
+
+	if (!checkGameDirectoryForCommonMistakes(window->gameDirectoryInput->value())) return;
+
 	window->startExecutable(false);
 }
 
@@ -534,14 +566,17 @@ void Launcher::startEditor(Fl_Widget* btn, void* userdata) {
 
 void Launcher::guessVersion(Fl_Widget* btn, void* userdata) {
 	Launcher* window = static_cast< Launcher* >( userdata );
+	ST::string gamedir = window->gameDirectoryInput->value();
+
+	if (!checkGameDirectoryForCommonMistakes(gamedir)) return;
+
 	fl_message_title("Guess Game Version");
 	int choice = fl_choice("Comparing resources packs can take a long time.\nAre you sure you want to continue?", "Stop", "Continue", 0);
 	if (choice != 1) {
 		return;
 	}
 
-	const char* gamedir = window->gameDirectoryInput->value();
-	int guessedVersion = guessResourceVersion(gamedir);
+	int guessedVersion = guessResourceVersion(gamedir.c_str());
 	if (guessedVersion != -1) {
 		int resourceVersionIndex = 0;
 		for (GameVersion version : predefinedVersions) {
@@ -696,9 +731,9 @@ void Launcher::enableMods(Fl_Widget* widget, void* userdata) {
 	for (auto i = window->availableModsBrowser->size(); i > 0; i--) {
 		if (window->availableModsBrowser->selected(i) && window->availableModsBrowser->visible(i)) {
 			updated = true;
-			window->enabledModsBrowser->insert(1, window->availableModsBrowser->text(i));
-			window->enabledModsBrowser->data(1, window->availableModsBrowser->data(i));
-			window->enabledModsBrowser->select(1, 1);
+			window->enabledModsBrowser->add(window->availableModsBrowser->text(i), window->availableModsBrowser->data(i));
+			window->enabledModsBrowser->select(window->enabledModsBrowser->size());
+			window->enabledModsBrowser->bottomline(window->enabledModsBrowser->size());
 			window->availableModsBrowser->hide(i);
 		}
 	}
@@ -784,7 +819,7 @@ void Launcher::selectGameVersion(Fl_Widget* widget, void* userdata)
 	GameVersion currentResourceVersion = predefinedVersions.at(currentResourceVersionIndex);
 	if (currentResourceVersion == GameVersion::SIMPLIFIED_CHINESE)
 	{
-		//force enalbe Simplified Chinese Mod
+		//force enable Simplified Chinese Mod
 		for (auto i = window->availableModsBrowser->size(); i > 0; i--)
 		{
 			char* modId = static_cast<char*>(window->availableModsBrowser->data(i));

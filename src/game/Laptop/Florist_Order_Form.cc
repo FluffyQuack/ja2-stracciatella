@@ -12,7 +12,6 @@
 #include "Text_Input.h"
 #include "Finances.h"
 #include "Game_Clock.h"
-#include "English.h"
 #include "Text.h"
 #include "LaptopSave.h"
 #include "Random.h"
@@ -261,8 +260,7 @@ void EnterFloristOrderForm()
 	guiFlowerOrderCheckBoxButtonImage = AddVideoObjectFromFile(LAPTOPDIR "/ordercheckbox.sti");
 
 	// load the currently selected flower bouquet
-	char sTemp[40];
-	sprintf(sTemp, LAPTOPDIR "/flower_%d.sti", guiCurrentlySelectedFlower);
+	ST::string sTemp = ST::format(LAPTOPDIR "/flower_{}.sti", guiCurrentlySelectedFlower);
 	guiCurrentlySelectedFlowerImage = AddVideoObjectFromFile(sTemp);
 
 	guiDropDownBorder = AddVideoObjectFromFile(INTERFACEDIR "/tactpopup.sti");
@@ -987,6 +985,6 @@ void InitFloristOrderForm()
 	gubCurrentlySelectedFlowerLocation = 0;
 	gbCurrentlySelectedCard = -1;
 
-	gsSentimentTextField = ST::null;
-	gsNameTextField = ST::null;
+	gsSentimentTextField.clear();
+	gsNameTextField.clear();
 }

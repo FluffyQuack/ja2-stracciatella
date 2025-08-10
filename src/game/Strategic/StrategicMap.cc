@@ -24,16 +24,13 @@
 #include "Explosion_Control.h"
 #include "Faces.h"
 #include "Fade_Screen.h"
-#include "FileMan.h"
-#include "Font.h"
-#include "Font_Control.h"
-#include "GameInstance.h"
 #include "GameLoop.h"
+#include "GameInstance.h"
 #include "GamePolicy.h"
 #include "GameScreen.h"
 #include "GameSettings.h"
 #include "Game_Clock.h"
-#include "Game_Events.h"
+#include "Game_Event_Hook.h"
 #include "HImage.h"
 #include "Handle_UI.h"
 #include "History.h"
@@ -47,17 +44,16 @@
 #include "LoadSaveSectorInfo.h"
 #include "LoadSaveStrategicMapElement.h"
 #include "Loading_Screen.h"
-#include "Local.h"
 #include "Logger.h"
 #include "MapScreen.h"
 #include "Map_Edgepoints.h"
 #include "Map_Information.h"
 #include "Map_Screen_Helicopter.h"
+#include "Map_Screen_Interface_Map.h"
 #include "Meanwhile.h"
 #include "Merc_Contract.h"
 #include "Merc_Entering.h"
 #include "Merc_Hiring.h"
-#include "Message.h"
 #include "MessageBoxScreen.h"
 #include "Militia_Control.h"
 #include "MineModel.h"
@@ -67,7 +63,6 @@
 #include "Overhead.h"
 #include "PathAI.h"
 #include "Physics.h"
-#include "Player_Command.h"
 #include "Points.h"
 #include "PreBattle_Interface.h"
 #include "Queen_Command.h"
@@ -75,14 +70,13 @@
 #include "Radar_Screen.h"
 #include "Random.h"
 #include "RenderWorld.h"
-#include "Render_Dirty.h"
+#include "SAM_Sites.h"
 #include "SamSiteModel.h"
 #include "SaveLoadMap.h"
 #include "Scheduling.h"
 #include "ScreenIDs.h"
 #include "Soldier_Add.h"
 #include "Soldier_Control.h"
-#include "Soldier_Create.h"
 #include "Soldier_Init_List.h"
 #include "Soldier_Macros.h"
 #include "Sound_Control.h"
@@ -103,7 +97,6 @@
 #include "Tactical_Turns.h"
 #include "Text.h"
 #include "Timer.h"
-#include "Timer_Control.h"
 #include "TownModel.h"
 #include "Town_Militia.h"
 #include "Types.h"
@@ -278,12 +271,6 @@ void InitStrategicEngine()
 	OnAirspaceControlUpdated.addListener("default", HandleAirspaceControlUpdated);
 }
 
-
-UINT8 GetTownIdForSector(UINT8 const sector)
-{
-	// return the name value of the town in this sector
-	return StrategicMap[SGPSector(sector).AsStrategicIndex()].bNameId;
-}
 
 UINT8 GetTownIdForSector(const SGPSector& sSector)
 {
@@ -544,9 +531,6 @@ void SetCurrentWorldSector(const SGPSector& sector)
 		// ATE: Check what sector we are in, to show description if we have an RPC
 		HandleRPCDescriptionOfSector(sector);
 
-		// ATE: Set Flag for being visited
-		SetSectorFlag(sector, SF_HAS_ENTERED_TACTICAL);
-
 		ResetMultiSelection();
 
 		gTacticalStatus.fHasEnteredCombatModeSinceEntering = FALSE;
@@ -789,13 +773,6 @@ void HandleQuestCodeOnSectorEntry(const SGPSector& sNewSector)
 		gMercProfiles[ MADAME ].bNPCData2 = 0;
 	}
 	*/
-
-	if (sector == SEC_C6 && gubQuest[QUEST_RESCUE_MARIA] == QUESTDONE)
-	{
-		// make sure Maria and Angel are gone
-		gMercProfiles[ MARIA ].sSector = SGPSector();
-		gMercProfiles[ ANGEL ].sSector = SGPSector();
-	}
 
 	if (sector == SEC_D5)
 	{
@@ -1070,7 +1047,7 @@ check_entry:
 			{ /* Strategic insertion failed because it expected to find an entry
 				 * point. This is likely a missing part of the map or possible fault in
 				 * strategic movement costs, traversal logic, etc. */
-				ST::string sector = ST::null;
+				ST::string sector;
 				if (gfWorldLoaded)
 				{
 					if (gWorldSector.z == 0)
@@ -1254,7 +1231,7 @@ ST::string GetSectorIDString(const SGPSector& sector, BOOLEAN detailed)
 {
 	if (!sector.IsValid())
 	{
-		return ST::null;
+		return {};
 	}
 
 	if (sector.z != 0)
@@ -1262,7 +1239,7 @@ ST::string GetSectorIDString(const SGPSector& sector, BOOLEAN detailed)
 		UNDERGROUND_SECTORINFO const* const u = FindUnderGroundSector(sector);
 		if (!u || (!(u->uiFlags & SF_ALREADY_VISITED) && !gfGettingNameFromSaveLoadScreen))
 		{ // Display nothing
-			return ST::null;
+			return {};
 		}
 	}
 
@@ -1391,7 +1368,7 @@ static UINT8 GetStrategicInsertionDataFromAdjacentMoveDirection(UINT8 ubTactical
 }
 
 
-static INT16 PickGridNoNearestEdge(SOLDIERTYPE* pSoldier, UINT8 ubTacticalDirection);
+static int16_t PickGridNoNearestEdge(SOLDIERTYPE* pSoldier, uint8_t ubTacticalDirection);
 
 
 void JumpIntoAdjacentSector( UINT8 ubTacticalDirection, UINT8 ubJumpCode, INT16 sAdditionalData )
@@ -2056,7 +2033,6 @@ BOOLEAN OKForSectorExit( INT8 bExitDirection, UINT16 usAdditionalData, UINT32 *p
 	BOOLEAN     fOnlySelectedGuy = FALSE;
 	SOLDIERTYPE *pValidSoldier = NULL;
 	UINT8       ubReturnVal = FALSE;
-	UINT8       ubNumControllableMercs = 0;
 	UINT8       ubNumMercs = 0, ubNumEPCs = 0;
 	UINT8       ubPlayerControllableMercsInSquad = 0;
 
@@ -2095,8 +2071,6 @@ BOOLEAN OKForSectorExit( INT8 bExitDirection, UINT16 usAdditionalData, UINT32 *p
 			//not more than once.
 			pValidSoldier = pSoldier;
 
-			ubNumControllableMercs++;
-
 			//We need to keep track of the number of EPCs and mercs in this squad.  If we have
 			//only one merc and one or more EPCs, then we can't allow the merc to tactically traverse,
 			//if he is the only merc near enough to traverse.
@@ -2108,7 +2082,6 @@ BOOLEAN OKForSectorExit( INT8 bExitDirection, UINT16 usAdditionalData, UINT32 *p
 				if( AM_A_ROBOT( pSoldier ) && !CanRobotBeControlled( pSoldier ) )
 				{
 					gfRobotWithoutControllerAttemptingTraversal = TRUE;
-					ubNumControllableMercs--;
 					continue;
 				}
 			}
@@ -2395,262 +2368,73 @@ void LoadStrategicInfoFromSavedFile(HWFILE const f)
 }
 
 
-static INT16 PickGridNoNearestEdge(SOLDIERTYPE* pSoldier, UINT8 ubTacticalDirection)
+static int16_t PickGridNoNearestEdge(SOLDIERTYPE* pSoldier, uint8_t ubTacticalDirection)
 {
-	INT16  sGridNo, sStartGridNo, sOldGridNo;
-	INT8   bOdd = 1, bOdd2 = 1;
-	UINT8  bAdjustedDist = 0;
-	UINT32 cnt;
+	int16_t sGridNo = pSoldier->sGridNo;
+	int16_t sStartGridNo = pSoldier->sGridNo;
+	int16_t sOldGridNo = pSoldier->sGridNo;
+	bool    dirToggle = true;
+	uint8_t  bAdjustedDist = 0;
+	uint32_t cnt;
+	// EAST
+	int16_t incrementToEdge = DirIncrementer[NORTH];
+	int16_t altIncrementToEdge = DirIncrementer[EAST];
+	int16_t incrementAlongEdge = DirIncrementer[NORTHWEST];
+	int16_t altIncrementAlongEdge = DirIncrementer[SOUTHEAST];
 
-	switch( ubTacticalDirection )
-	{
-
-		case EAST:
-
-			sGridNo      = pSoldier->sGridNo;
-			sStartGridNo = pSoldier->sGridNo;
-			sOldGridNo   = pSoldier->sGridNo;
-
-			// Move directly to the right!
-			while( GridNoOnVisibleWorldTile( sGridNo ) )
-			{
-				sOldGridNo = sGridNo;
-
-				if ( bOdd )
-				{
-					sGridNo -= WORLD_COLS;
-				}
-				else
-				{
-					sGridNo++;
-				}
-
-				bOdd = (INT8)!bOdd;
-			}
-
-			sGridNo      = sOldGridNo;
-			sStartGridNo = sOldGridNo;
-
-			do
-			{
-				// OK, here we go back one, check for OK destination...
-				if ( NewOKDestination( pSoldier, sGridNo, TRUE, pSoldier->bLevel ) && FindBestPath( pSoldier, sGridNo, pSoldier->bLevel, WALKING, NO_COPYROUTE, PATH_THROUGH_PEOPLE ) )
-				{
-					return( sGridNo );
-				}
-
-				// If here, try another place!
-				// ( alternate up/down )
-				if ( bOdd2 )
-				{
-					bAdjustedDist++;
-
-					sGridNo = sStartGridNo;
-
-					for ( cnt = 0; cnt < bAdjustedDist; cnt++ )
-					{
-						sGridNo = (INT16)(sGridNo - WORLD_COLS - 1);
-					}
-				}
-				else
-				{
-					sGridNo = sStartGridNo;
-
-					for ( cnt = 0; cnt < bAdjustedDist; cnt++ )
-					{
-						sGridNo = (INT16)(sGridNo + WORLD_COLS + 1);
-					}
-				}
-
-				bOdd2 = (INT8)(!bOdd2);
-
-			} while( TRUE );
-
+	switch (ubTacticalDirection) {
 		case WEST:
-
-			sGridNo      = pSoldier->sGridNo;
-			sStartGridNo = pSoldier->sGridNo;
-			sOldGridNo   = pSoldier->sGridNo;
-
-			// Move directly to the left!
-			while( GridNoOnVisibleWorldTile( sGridNo ) )
-			{
-				sOldGridNo = sGridNo;
-
-				if ( bOdd )
-				{
-					sGridNo += WORLD_COLS;
-				}
-				else
-				{
-					sGridNo--;
-				}
-
-				bOdd = (INT8)!bOdd;
-			}
-
-			sGridNo      = sOldGridNo;
-			sStartGridNo = sOldGridNo;
-
-			do
-			{
-				// OK, here we go back one, check for OK destination...
-				if ( NewOKDestination( pSoldier, sGridNo, TRUE, pSoldier->bLevel ) && FindBestPath( pSoldier, sGridNo, pSoldier->bLevel, WALKING, NO_COPYROUTE, PATH_THROUGH_PEOPLE ) )
-				{
-					return( sGridNo );
-				}
-
-				// If here, try another place!
-				// ( alternate up/down )
-				if ( bOdd2 )
-				{
-					bAdjustedDist++;
-
-					sGridNo = sStartGridNo;
-
-					for ( cnt = 0; cnt < bAdjustedDist; cnt++ )
-					{
-						sGridNo = (INT16)(sGridNo - WORLD_COLS - 1);
-					}
-				}
-				else
-				{
-					sGridNo = sStartGridNo;
-
-					for ( cnt = 0; cnt < bAdjustedDist; cnt++ )
-					{
-						sGridNo = (INT16)(sGridNo + WORLD_COLS + 1);
-					}
-				}
-
-				bOdd2 = (INT8)(!bOdd2);
-
-			} while( TRUE );
-
+			incrementToEdge = DirIncrementer[SOUTH];
+			altIncrementToEdge = DirIncrementer[WEST];
+			break;
 		case NORTH:
-
-			sGridNo      = pSoldier->sGridNo;
-			sStartGridNo = pSoldier->sGridNo;
-			sOldGridNo   = pSoldier->sGridNo;
-
-			// Move directly to the left!
-			while( GridNoOnVisibleWorldTile( sGridNo ) )
-			{
-				sOldGridNo = sGridNo;
-
-				if ( bOdd )
-				{
-					sGridNo -= WORLD_COLS;
-				}
-				else
-				{
-					sGridNo--;
-				}
-
-				bOdd = (INT8)(!bOdd);
-			}
-
-			sGridNo      = sOldGridNo;
-			sStartGridNo = sOldGridNo;
-
-			do
-			{
-				// OK, here we go back one, check for OK destination...
-				if ( NewOKDestination( pSoldier, sGridNo, TRUE, pSoldier->bLevel ) && FindBestPath( pSoldier, sGridNo, pSoldier->bLevel, WALKING, NO_COPYROUTE, PATH_THROUGH_PEOPLE ) )
-				{
-					return( sGridNo );
-				}
-
-				// If here, try another place!
-				// ( alternate left/right )
-				if ( bOdd2 )
-				{
-					bAdjustedDist++;
-
-					sGridNo = sStartGridNo;
-
-					for ( cnt = 0; cnt < bAdjustedDist; cnt++ )
-					{
-						sGridNo = (INT16)(sGridNo + WORLD_COLS - 1);
-					}
-				}
-				else
-				{
-					sGridNo = sStartGridNo;
-
-					for ( cnt = 0; cnt < bAdjustedDist; cnt++ )
-					{
-						sGridNo = (INT16)(sGridNo - WORLD_COLS + 1);
-					}
-				}
-
-				bOdd2 = (INT8)(!bOdd2);
-
-			} while( TRUE );
-
+			altIncrementToEdge = DirIncrementer[WEST];
+			incrementAlongEdge = DirIncrementer[SOUTHWEST];
+			altIncrementAlongEdge = DirIncrementer[NORTHEAST];
+			break;
 		case SOUTH:
+			incrementToEdge = DirIncrementer[SOUTH];
+			incrementAlongEdge = DirIncrementer[SOUTHEAST];
+			altIncrementAlongEdge = DirIncrementer[NORTHEAST];
+			break;
+	}
+	// Move directly TO the edge of the sector in a zigzag pattern
+	while (GridNoOnVisibleWorldTile(sGridNo)) {
+		sOldGridNo = sGridNo;
 
-			sGridNo      = pSoldier->sGridNo;
-			sStartGridNo = pSoldier->sGridNo;
-			sOldGridNo   = pSoldier->sGridNo;
+		if (dirToggle) sGridNo += incrementToEdge;
+		else sGridNo += altIncrementToEdge;
 
-			// Move directly to the left!
-			while( GridNoOnVisibleWorldTile( sGridNo ) )
-			{
-				sOldGridNo = sGridNo;
-
-				if ( bOdd )
-				{
-					sGridNo += WORLD_COLS;
-				}
-				else
-				{
-					sGridNo++;
-				}
-
-				bOdd = (INT8)(!bOdd);
-			}
-
-			sGridNo      = sOldGridNo;
-			sStartGridNo = sOldGridNo;
-
-			do
-			{
-				// OK, here we go back one, check for OK destination...
-				if ( NewOKDestination( pSoldier, sGridNo, TRUE, pSoldier->bLevel ) && FindBestPath( pSoldier, sGridNo, pSoldier->bLevel, WALKING, NO_COPYROUTE, PATH_THROUGH_PEOPLE ) )
-				{
-					return( sGridNo );
-				}
-
-				// If here, try another place!
-				// ( alternate left/right )
-				if ( bOdd2 )
-				{
-					bAdjustedDist++;
-
-					sGridNo = sStartGridNo;
-
-					for ( cnt = 0; cnt < bAdjustedDist; cnt++ )
-					{
-						sGridNo = (INT16)(sGridNo + WORLD_COLS - 1);
-					}
-				}
-				else
-				{
-					sGridNo = sStartGridNo;
-
-					for ( cnt = 0; cnt < bAdjustedDist; cnt++ )
-					{
-						sGridNo = (INT16)(sGridNo - WORLD_COLS + 1);
-					}
-				}
-
-				bOdd2 = (INT8)(!bOdd2);
-
-			} while( TRUE );
+		dirToggle = !dirToggle;
 	}
 
-	return( NOWHERE );
+	sGridNo = sOldGridNo;
+	sStartGridNo = sOldGridNo;
+	dirToggle = true;
+
+	do { // OK, here we go back one, check for OK destination...		
+		if (sGridNo > 0 && sGridNo < MAPLENGTH) {
+			if (NewOKDestination(pSoldier, sGridNo, TRUE, pSoldier->bLevel) && FindBestPath(pSoldier, sGridNo, pSoldier->bLevel, WALKING, NO_COPYROUTE, PATH_THROUGH_PEOPLE)) {
+				return(sGridNo);
+			}
+		}
+		// If here, try another place! ( alternate up/down or left/right ALONG the edge of the sector )
+		sGridNo = sStartGridNo;
+		if (dirToggle) {
+			bAdjustedDist++;
+			for (cnt = 0; cnt < bAdjustedDist; cnt++) {
+				sGridNo = sGridNo + incrementAlongEdge;
+			}
+		}
+		else {
+			for (cnt = 0; cnt < bAdjustedDist; cnt++) {
+				sGridNo = sGridNo + altIncrementAlongEdge;
+			}
+		}
+		dirToggle = !dirToggle;
+	} while (bAdjustedDist != std::numeric_limits<uint8_t>::max());
+
+	return(NOWHERE);
 }
 
 
